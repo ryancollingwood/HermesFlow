@@ -118,7 +118,6 @@ services:
         limits:
           memory: ${HERMES_MEM_LIMIT:-2G}
           cpus: "${HERMES_CPU_LIMIT:-2.0}"
-    networks: [edge, agent]
     networks: [edge, agent, memory]
     logging: *default-logging
 
