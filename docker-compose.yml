@@ -1,10 +1,12 @@
 # =============================================================================
-#  Hermes Agent + Windmill — consolidated stack
+#  Hermes Agent + Windmill + Cognee memory — consolidated stack
 #  - Caddy front door (single ingress, optional TLS)
 #  - Windmill LSP for editor intellisense
+#  - Cognee (personal second-brain memory) + Qdrant (vector store)
 #  - Healthchecks where they're meaningful
 #  - Resource limits on the privileged workers
 #  - Light network segmentation (db not reachable from the edge)
+#  NOTE: the obsolete top-level `version:` key has been removed (Compose v2).
 # =============================================================================
 
 x-logging: &default-logging
@@ -24,6 +26,8 @@ networks:
   edge:
   # windmill server/workers <-> hermes gateway API (OpenAI-compatible endpoint)
   agent:
+  # cognee + qdrant <-> hermes (memory layer, isolated from edge)
+  memory:
 
 services:
   # ---------------------------------------------------------------------------
@@ -115,6 +119,86 @@ services:
           memory: ${HERMES_MEM_LIMIT:-2G}
           cpus: "${HERMES_CPU_LIMIT:-2.0}"
     networks: [edge, agent]
+    networks: [edge, agent, memory]
+    logging: *default-logging
+
+  # ---------------------------------------------------------------------------
+  #  Cognee — personal second-brain memory API
+  #  Connects to Qdrant for vector storage and your local Ollama for embeddings/LLM.
+  #  Exposes a REST API that Hermes can call via MCP or direct HTTP.
+  # ---------------------------------------------------------------------------
+  cognee:
+    image: cogneeai/cognee:latest
+    container_name: cognee
+    restart: unless-stopped
+    environment:
+      # LLM backend — point at your local Ollama (host.docker.internal = host machine)
+      - LLM_PROVIDER=ollama
+      - LLM_MODEL=${COGNEE_LLM_MODEL:-qwen3:30b}
+      - LLM_API_BASE=http://host.docker.internal:11434
+      # Embeddings — sentence-transformers runs inside cognee (CPU, no cloud)
+      - EMBEDDING_PROVIDER=sentence_transformer
+      - EMBEDDING_MODEL=${COGNEE_EMBEDDING_MODEL:-all-MiniLM-L6-v2}
+      # Vector store backend
+      - VECTOR_DB_PROVIDER=qdrant
+      - VECTOR_DB_URL=http://qdrant:6333
+      # Graph store — cognee ships with networkx (lightweight, no Neo4j needed)
+      - GRAPH_DB_PROVIDER=networkx
+      # Relational store for metadata (sqlite is fine for personal second-brain scale)
+      - DB_PROVIDER=sqlite
+      - DB_PATH=/cognee-data/cognee.db
+      # API key for the Cognee REST API (used by Hermes MCP config)
+      - COGNEE_API_KEY=${COGNEE_API_KEY:-change-me}
+    volumes:
+      - ${COGNEE_DATA_DIR:-./data/cognee}:/cognee-data
+    ports:
+      - "${COGNEE_BIND:-127.0.0.1}:${COGNEE_PORT:-8686}:8686"
+    depends_on:
+      qdrant:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # reach Ollama on the host
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8686/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: ${COGNEE_MEM_LIMIT:-2G}
+          cpus: "${COGNEE_CPU_LIMIT:-1.0}"
+    networks: [memory]
+    logging: *default-logging
+
+  # ---------------------------------------------------------------------------
+  #  Qdrant — vector store for Cognee
+  #  No cloud, no API key — pure local. Dashboard at /dashboard if you expose it.
+  # ---------------------------------------------------------------------------
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: qdrant
+    restart: unless-stopped
+    volumes:
+      - ${QDRANT_DATA_DIR:-./data/qdrant}:/qdrant/storage
+    environment:
+      - QDRANT__SERVICE__GRPC_PORT=6334
+    ports:
+      - "${QDRANT_BIND:-127.0.0.1}:${QDRANT_HTTP_PORT:-6333}:6333"   # REST + dashboard
+      - "${QDRANT_BIND:-127.0.0.1}:${QDRANT_GRPC_PORT:-6334}:6334"   # gRPC
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:6333/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    deploy:
+      resources:
+        limits:
+          memory: ${QDRANT_MEM_LIMIT:-1G}
+          cpus: "${QDRANT_CPU_LIMIT:-0.5}"
+    networks: [memory]
     logging: *default-logging
 
   # ---------------------------------------------------------------------------

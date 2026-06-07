@@ -33,3 +33,13 @@ http://hermes.localhost {
 http://hermes-api.localhost {
     reverse_proxy hermes:8642
 }
+
+# --- Cognee memory API ------------------------------------------------------
+http://cognee.localhost {
+    reverse_proxy cognee:8686
+}
+
+# --- Qdrant dashboard (optional — comment out if not needed) ----------------
+http://qdrant.localhost {
+    reverse_proxy qdrant:6333
+}

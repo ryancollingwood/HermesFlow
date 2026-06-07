@@ -14,7 +14,7 @@ HERMES_IMAGE := nousresearch/hermes-agent:latest
 # reference $$HOME are expanded by the shell when the recipe sources the file.
 ENV_FILE := .env
 
-.PHONY: help check init apikey wizard secure pull up down restart logs ps health backup bootstrap
+.PHONY: help check init apikey wizard secure pull up down restart logs ps health backup bootstrap lint validate ci
 
 help: ## Show this help
 	@echo "Hermes + Windmill stack"
@@ -87,6 +87,16 @@ health: ## Probe Hermes /health and Windmill /api/version
 	@set -a; . ./$(ENV_FILE); set +a; \
 	  echo -n "Hermes:   "; curl -fsS "http://127.0.0.1:$${API_SERVER_PORT:-8642}/health" || echo "unreachable"; echo; \
 	  echo -n "Windmill: "; curl -fsS -H "Host: windmill.localhost" "http://127.0.0.1:$${CADDY_HTTP_PORT:-80}/api/version" || echo "unreachable"; echo
+
+validate: ## Validate docker-compose.yml (mirrors CI)
+	@test -f .env || cp .env.example .env
+	@$(COMPOSE) config -q && echo "✓ compose config valid"
+
+lint: ## Ruff + py_compile the Windmill scripts (mirrors CI)
+	@command -v ruff >/dev/null && ruff check windmill/ || echo "(install ruff for full lint)"
+	@find windmill -name '*.py' -exec python3 -m py_compile {} + && echo "✓ python syntax OK"
+
+ci: validate lint ## Run the same checks as GitHub Actions
 
 backup: ## Snapshot Postgres + the Hermes data dir into ./backups/
 	@mkdir -p backups

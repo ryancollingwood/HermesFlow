@@ -166,6 +166,19 @@ name the gateway actually serves — run `client.py` (or
 - **LSP cache permission errors** — non-critical; `chown` `WM_LSP_CACHE_DIR` to
   the container UID or remove the mount.
 
+## CI
+
+`.github/workflows/ci.yml` runs on every push/PR:
+
+- **compose** — `docker compose config` (validates structure + `${VAR}` expansion against `.env.example`) and `caddy validate` on the `Caddyfile`.
+- **python** — `ruff check`, `py_compile`, and a YAML parse pass over `windmill/`.
+
+Run the same checks locally before pushing:
+
+```sh
+make ci          # = make validate + make lint
+```
+
 ## Sources
 
 Hermes behaviour follows the official
