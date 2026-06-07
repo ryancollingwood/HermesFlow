@@ -104,6 +104,8 @@ windmill/
 
 ### Push it
 
+This assume you've installed the wmill cli (`npm install -g windmill-cli`)
+
 ```sh
 cd windmill
 wmill workspace add main main http://windmill.localhost   # one-time
