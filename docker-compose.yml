@@ -1,0 +1,247 @@
+# =============================================================================
+#  Hermes Agent + Windmill — consolidated stack
+#  - Caddy front door (single ingress, optional TLS)
+#  - Windmill LSP for editor intellisense
+#  - Healthchecks where they're meaningful
+#  - Resource limits on the privileged workers
+#  - Light network segmentation (db not reachable from the edge)
+# =============================================================================
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "20m"
+    max-file: "5"
+    compress: "true"
+
+# Shared base for the Windmill app image so the worker definitions stay DRY
+x-windmill-image: &wm-image ${WM_IMAGE:-ghcr.io/windmill-labs/windmill:main}
+
+networks:
+  # db <-> windmill server/workers. Not exposed to Hermes or the proxy.
+  backend:
+  # caddy <-> the things it needs to reach (server, lsp, hermes)
+  edge:
+  # windmill server/workers <-> hermes gateway API (OpenAI-compatible endpoint)
+  agent:
+
+services:
+  # ---------------------------------------------------------------------------
+  #  Reverse proxy / single ingress
+  # ---------------------------------------------------------------------------
+  caddy:
+    image: caddy:2
+    container_name: caddy
+    restart: unless-stopped
+    ports:
+      - "${CADDY_HTTP_PORT:-80}:80"
+      - "${CADDY_HTTPS_PORT:-443}:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ${CADDY_DATA_DIR:-./data/caddy/data}:/data
+      - ${CADDY_CONFIG_DIR:-./data/caddy/config}:/config
+    depends_on:
+      # service_started (not _healthy) so a flaky app healthcheck never blocks ingress
+      windmill_server:
+        condition: service_started
+      windmill_lsp:
+        condition: service_started
+      hermes:
+        condition: service_started
+    networks: [edge]
+    logging: *default-logging
+
+  # ---------------------------------------------------------------------------
+  #  Hermes Agent — gateway + built-in dashboard (ONE container)
+  #  All state (config, .env, sessions, memory, skills) lives under /opt/data.
+  #  The dashboard is a supervised s6 service inside this container, toggled by
+  #  HERMES_DASHBOARD=1 and served on 9119 — it CANNOT be a separate container
+  #  (its liveness check needs a shared PID namespace with the gateway).
+  #  No `init:` — the image runs s6-overlay as PID 1 (reaps + forwards signals).
+  # ---------------------------------------------------------------------------
+  hermes:
+    image: nousresearch/hermes-agent:${HERMES_VERSION:-latest}
+    container_name: hermes
+    restart: unless-stopped
+    command: gateway run
+    ports:
+      # HERMES_BIND defaults to localhost. Set it to 0.0.0.0 (or empty) for LAN
+      # access — but with HERMES_DASHBOARD_INSECURE=1 the dashboard exposes API
+      # keys + session data to anyone who can reach 9119, so only do that on a
+      # trusted LAN or behind Caddy.
+      - "${HERMES_BIND:-127.0.0.1}:${API_SERVER_PORT:-8642}:8642"        # gateway API + health
+      - "${HERMES_BIND:-127.0.0.1}:${HERMES_DASHBOARD_PORT:-9119}:9119"  # dashboard
+    environment:
+      # Map the container's hermes user to your host UID/GID so it can write to
+      # the bind-mounted /opt/data (PUID/PGID are accepted aliases).
+      - HERMES_UID=${HERMES_UID:-1000}
+      - HERMES_GID=${HERMES_GID:-1000}
+      # Dashboard
+      - HERMES_DASHBOARD=${HERMES_DASHBOARD:-1}
+      - HERMES_DASHBOARD_HOST=${HERMES_DASHBOARD_HOST:-0.0.0.0}
+      - HERMES_DASHBOARD_PORT=${HERMES_DASHBOARD_PORT:-9119}
+      - HERMES_DASHBOARD_INSECURE=${HERMES_DASHBOARD_INSECURE:-}
+      # OpenAI-compatible API server. Needed for the dashboard / external tools
+      # (e.g. Windmill) to reach the gateway. If enabled, API_SERVER_KEY must be
+      # >= 8 chars — generate with: openssl rand -hex 32
+      - API_SERVER_ENABLED=${API_SERVER_ENABLED:-false}
+      - API_SERVER_HOST=${API_SERVER_HOST:-0.0.0.0}
+      - API_SERVER_KEY=${API_SERVER_KEY:-}
+      # Provider keys / bot tokens: by default these come from the wizard-written
+      # /opt/data/.env. Uncomment to forward from the top-level .env INSTEAD —
+      # but a direct value (even empty) OVERRIDES /opt/data/.env, so uncomment if setting a value
+      # - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      # - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      # - OPENAI_API_KEY=${OPENAI_API_KEY}
+      # - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+      # - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
+    volumes:
+      - ${DATA_DIR:-./data/hermes}:/opt/data
+      - ${SHARED_DIR:-./data/shared}:/shared
+    shm_size: 1g   # Playwright/Chromium browser tools need shared memory
+    # Health endpoint lives on the API server (API_SERVER_ENABLED=true). If this
+    # returns 401/404 on your version, switch to the authenticated probe below.
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8642/health"]
+      # Authenticated alternative (uses the in-container API key):
+      # test: ["CMD-SHELL", "curl -fsS -H \"Authorization: Bearer $$API_SERVER_KEY\" http://localhost:8642/v1/models"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: ${HERMES_MEM_LIMIT:-2G}
+          cpus: "${HERMES_CPU_LIMIT:-2.0}"
+    networks: [edge, agent]
+    logging: *default-logging
+
+  # ---------------------------------------------------------------------------
+  #  Windmill database
+  # ---------------------------------------------------------------------------
+  db:
+    image: postgres:16
+    container_name: windmill_db
+    shm_size: 1g
+    restart: unless-stopped
+    volumes:
+      - ${WM_DATA_DIR:-./data/windmill}/db:/var/lib/postgresql/data
+    environment:
+      POSTGRES_PASSWORD: ${WM_DB_PASSWORD:-windmill}
+      POSTGRES_DB: windmill
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [backend]
+    logging: *default-logging
+
+  # ---------------------------------------------------------------------------
+  #  Windmill server
+  # ---------------------------------------------------------------------------
+  windmill_server:
+    image: *wm-image
+    pull_policy: always
+    container_name: windmill_server
+    restart: unless-stopped
+    environment:
+      - DATABASE_URL=postgres://postgres:${WM_DB_PASSWORD:-windmill}@db/windmill?sslmode=disable
+      - MODE=server
+      - BASE_URL=${WM_BASE_URL:-http://localhost:8000}
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ${WM_DATA_DIR:-./data/windmill}/logs:/tmp/windmill/logs
+      - ${SHARED_DIR:-./data/shared}:/shared
+    # The server serves HTTP, so a probe is meaningful. If this image has no
+    # curl, swap to the wget form below or remove the block.
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8000/api/version || wget -qO- http://localhost:8000/api/version || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    networks: [backend, edge, agent]
+    logging: *default-logging
+
+  # ---------------------------------------------------------------------------
+  #  Windmill LSP (editor intellisense — proxied at /ws/*)
+  # ---------------------------------------------------------------------------
+  windmill_lsp:
+    image: ${WM_LSP_IMAGE:-ghcr.io/windmill-labs/windmill-lsp:latest}
+    pull_policy: always
+    container_name: windmill_lsp
+    restart: unless-stopped
+    environment:
+      - WINDMILL_BASE_URL=http://windmill_server:8000
+    volumes:
+      - ${WM_LSP_CACHE_DIR:-./data/windmill/lsp_cache}:/pyls/.cache
+    networks: [edge]
+    logging: *default-logging
+
+  # ---------------------------------------------------------------------------
+  #  Windmill workers (default group) — privileged, so capped
+  # ---------------------------------------------------------------------------
+  windmill_worker:
+    image: *wm-image
+    pull_policy: always
+    restart: unless-stopped
+    privileged: true
+    init: true
+    deploy:
+      replicas: 2
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 1536M
+        reservations:
+          memory: 512M
+    environment:
+      - DATABASE_URL=postgres://postgres:${WM_DB_PASSWORD:-windmill}@db/windmill?sslmode=disable
+      - MODE=worker
+      - WORKER_GROUP=default
+      - FAVOR_UNSHARE_PID=true
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ${WM_DATA_DIR:-./data/windmill}/cache:/tmp/windmill/cache
+      - ${WM_DATA_DIR:-./data/windmill}/logs:/tmp/windmill/logs
+      - ${SHARED_DIR:-./data/shared}:/shared
+    # Workers don't serve HTTP, so no healthcheck — a process probe here is fragile.
+    networks: [backend, agent]
+    logging: *default-logging
+
+  # ---------------------------------------------------------------------------
+  #  Windmill native worker (lightweight, in-process jobs)
+  # ---------------------------------------------------------------------------
+  windmill_worker_native:
+    image: *wm-image
+    pull_policy: always
+    container_name: windmill_worker_native
+    restart: unless-stopped
+    init: true
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 1024M
+        reservations:
+          memory: 256M
+    environment:
+      - DATABASE_URL=postgres://postgres:${WM_DB_PASSWORD:-windmill}@db/windmill?sslmode=disable
+      - MODE=worker
+      - WORKER_GROUP=native
+      - NATIVE_MODE=true
+      - SLEEP_QUEUE=200
+    depends_on:
+      db:
+        condition: service_healthy
+    volumes:
+      - ${WM_DATA_DIR:-./data/windmill}/logs:/tmp/windmill/logs
+      - ${SHARED_DIR:-./data/shared}:/shared
+    networks: [backend, agent]
+    logging: *default-logging

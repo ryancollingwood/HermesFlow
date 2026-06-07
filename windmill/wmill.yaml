@@ -1,0 +1,15 @@
+# yaml-language-server: $schema=wmill.schema.json
+# wmill CLI sync config. Run `wmill` commands from this `windmill/` directory.
+defaultTs: bun
+includes:
+  - "f/**"
+  - "*.resource-type.yaml"
+excludes: []
+# Keep secret values OUT of the synced YAML by default. When false, pulling a
+# secret variable writes a placeholder, not the real value.
+skipSecrets: true
+workspaces:
+  main:
+    # Point this at your Windmill instance, e.g. http://windmill.localhost
+    baseUrl: http://windmill.localhost
+    # workspaceId defaults to "main"

@@ -1,0 +1,6 @@
+value:
+  base_url: http://hermes:8642/v1
+  # $var: pulls the value from the secret variable at push/run time.
+  api_key: $var:f/hermes/api_key
+resource_type: hermes_endpoint
+description: Local Hermes gateway reachable over the `agent` docker network

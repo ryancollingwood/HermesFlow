@@ -1,0 +1,35 @@
+# =============================================================================
+#  Caddyfile — single ingress for the stack
+#
+#  LAN/homelab default: plain HTTP on hostnames ending in .localhost
+#  (these resolve to 127.0.0.1 automatically on most systems; otherwise add
+#   them to /etc/hosts pointing at the docker host).
+#
+#  To go to a real domain with automatic Let's Encrypt TLS:
+#    1. uncomment the email line in the global block
+#    2. replace each `http://<name>.localhost` with `<name>.yourdomain.com`
+#       (drop the `http://` prefix — Caddy then provisions HTTPS for you)
+#    3. make sure ports 80 and 443 are reachable from the internet
+# =============================================================================
+
+{
+    admin off
+    # email you@example.com
+}
+
+# --- Windmill ---------------------------------------------------------------
+# LSP websocket traffic must go to the lsp container; everything else to server.
+http://windmill.localhost {
+    reverse_proxy /ws/* windmill_lsp:3001
+    reverse_proxy /*    windmill_server:8000
+}
+
+# --- Hermes dashboard (built into the gateway container, port 9119) ---------
+http://hermes.localhost {
+    reverse_proxy hermes:9119
+}
+
+# --- Hermes API (no built-in auth — consider basicauth here) ----------------
+http://hermes-api.localhost {
+    reverse_proxy hermes:8642
+}
