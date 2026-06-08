@@ -14,7 +14,11 @@ HERMES_IMAGE := nousresearch/hermes-agent:latest
 # reference $$HOME are expanded by the shell when the recipe sources the file.
 ENV_FILE := .env
 
-.PHONY: help check init apikey wizard secure pull up down restart logs ps health backup bootstrap lint validate ci
+SKILL_DIR  := $(HOME)/.claude/skills
+SKILL_REPO := https://github.com/mvanhorn/last30days-skill.git
+SKILL_SRC  := $(SKILL_DIR)/last30days-skill
+
+.PHONY: help check init apikey wizard secure pull up down restart logs ps health backup bootstrap lint validate ci install-skill update-skill
 
 help: ## Show this help
 	@echo "Hermes + Windmill stack"
@@ -108,7 +112,25 @@ backup: ## Snapshot Postgres + the Hermes data dir into ./backups/
 	  tar czf "backups/hermes-$$STAMP.tar.gz" -C "$${DATA_DIR:-$$HOME/.hermes/data}" . ; \
 	  echo "✓ wrote backups/windmill-$$STAMP.sql.gz and backups/hermes-$$STAMP.tar.gz"
 
-bootstrap: ## One-shot: check → init → apikey → wizard → secure → pull → up → health
+install-skill: ## Clone/update last30days skill and link it into ~/.claude/skills
+	@mkdir -p $(SKILL_DIR)
+	@if [ -d "$(SKILL_SRC)/.git" ]; then \
+	  echo "→ updating last30days-skill…"; \
+	  git -C $(SKILL_SRC) pull --ff-only; \
+	else \
+	  echo "→ cloning last30days-skill…"; \
+	  git clone $(SKILL_REPO) $(SKILL_SRC); \
+	fi
+	@ln -sfn "$(SKILL_SRC)/skills/last30days" "$(SKILL_DIR)/last30days"
+	@echo "✓ last30days skill ready — invoke with /last30days <topic>"
+
+update-skill: ## Pull latest last30days skill and refresh the symlink
+	@test -d "$(SKILL_SRC)/.git" || { echo "✗ skill not installed — run 'make install-skill' first"; exit 1; }
+	@git -C $(SKILL_SRC) pull --ff-only
+	@ln -sfn "$(SKILL_SRC)/skills/last30days" "$(SKILL_DIR)/last30days"
+	@echo "✓ last30days skill updated"
+
+bootstrap: ## One-shot: check → init → apikey → wizard → secure → pull → up → health → skill
 	@$(MAKE) init
 	@$(MAKE) apikey
 	@echo
@@ -120,3 +142,4 @@ bootstrap: ## One-shot: check → init → apikey → wizard → secure → pull
 	@$(MAKE) up
 	@sleep 8
 	@$(MAKE) health
+	@$(MAKE) install-skill
