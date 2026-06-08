@@ -145,7 +145,7 @@ services:
       # Defaults to the Ollama container; override to use LM Studio or a remote API.
       - HINDSIGHT_API_LLM_API_KEY=${HINDSIGHT_LLM_API_KEY:-ollama}
       - HINDSIGHT_API_LLM_BASE_URL=${HINDSIGHT_LLM_BASE_URL:-http://ollama:11434/v1}
-      - HINDSIGHT_API_LLM_MODEL=${HINDSIGHT_LLM_MODEL:-llama3.2}
+      - HINDSIGHT_API_LLM_MODEL=${HINDSIGHT_LLM_MODEL:-llama3.2:3b}
       # Optional API key to protect the Hindsight endpoint (leave blank for local-only)
       - HINDSIGHT_API_KEY=${HINDSIGHT_API_KEY:-}
       - HINDSIGHT_API_LLM_TIMEOUT=${HINDSIGHT_LLM_TIMEOUT:-}
@@ -191,7 +191,8 @@ services:
     environment:
       # Listen on all interfaces so Docker-networked services can reach it.
       - OLLAMA_HOST=0.0.0.0:11434
-      - OLLAMA_KEEP_ALIVE=${OLLAMA_KEEP_ALIVE:-5m}
+      - OLLAMA_KEEP_ALIVE=${OLLAMA_KEEP_ALIVE:-30m}
+      - OLLAMA_NUM_THREAD=${OLLAMA_NUM_THREAD:-8}
       - OLLAMA_NUM_PARALLEL=${OLLAMA_NUM_PARALLEL:-1}
       - OLLAMA_MAX_LOADED_MODELS=${OLLAMA_MAX_LOADED_MODELS:-1}
     volumes:
@@ -205,8 +206,8 @@ services:
     deploy:
       resources:
         limits:
-          memory: ${OLLAMA_MEM_LIMIT:-8G}
-          cpus: "${OLLAMA_CPU_LIMIT:-4.0}"
+          memory: ${OLLAMA_MEM_LIMIT:-32G}
+          cpus: "${OLLAMA_CPU_LIMIT:-8.0}"
         # Uncomment for NVIDIA GPU support (requires nvidia-container-toolkit):
         # reservations:
         #   devices:
