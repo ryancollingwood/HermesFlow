@@ -95,10 +95,11 @@ Both model IDs should appear in the response.
 
 | Variable | Default | Notes |
 |---|---|---|
+| `HINDSIGHT_DATA_DIR` | `${HOME}/.hindsight` | Host path for `hindsight_db` PostgreSQL data |
+| `HINDSIGHT_DB_PASSWORD` | `change-me-hindsight` | **Change this** — password for the `hindsight_db` container |
 | `HINDSIGHT_LLM_API_KEY` | `lm-studio` | Passed to Hindsight as `HINDSIGHT_API_LLM_API_KEY` |
 | `HINDSIGHT_LLM_BASE_URL` | `http://host.docker.internal:1234/v1` | LM Studio endpoint (host machine) |
 | `HINDSIGHT_LLM_MODEL` | `google/gemma-4-e4b` | Model ID exactly as reported by `/v1/models` |
-| `HINDSIGHT_DATA_DIR` | `C:/Containers/hindsight` | Persists embedded PostgreSQL data across restarts |
 | `HINDSIGHT_API_PORT` | `8888` | REST API port |
 | `HINDSIGHT_UI_PORT` | `9999` | Web UI port (memory browser) |
 | `HINDSIGHT_API_KEY` | _(empty)_ | Optional bearer token to protect the API endpoint |
@@ -260,9 +261,10 @@ HermesFlow uses two complementary backup mechanisms:
 
 ### Automated PostgreSQL backups (label-backup)
 
-The `label-backup` container runs alongside the stack and automatically backs up the Windmill
-PostgreSQL database on a configurable cron schedule. No manual intervention is needed — it
-discovers the `db` container via Docker labels and runs `pg_dump` at the scheduled time.
+The `label-backup` container runs alongside the stack and automatically backs up **both** the
+Windmill (`db`) and Hindsight (`hindsight_db`) PostgreSQL databases on a configurable cron
+schedule. No manual intervention is needed — it discovers both containers via Docker labels and
+runs `pg_dump` for each at the scheduled time.
 
 Backups land in `./backups/db/` by default, with Gzip compression and SHA256 checksums. Old
 backups are pruned automatically after the retention period.

@@ -39,6 +39,7 @@ init: ## Create .env from the example and make the data directories
 	           "$${WM_LSP_CACHE_DIR:-$$HOME/.windmill/lsp_cache}" \
 	           "$${CADDY_DATA_DIR:-$$HOME/.caddy/data}" \
 	           "$${CADDY_CONFIG_DIR:-$$HOME/.caddy/config}" \
+	           "$${HINDSIGHT_DATA_DIR:-$$HOME/.hindsight}/db" \
 	           "$${BACKUP_DIR:-./backups/db}"; \
 	  echo "✓ data directories ready"
 

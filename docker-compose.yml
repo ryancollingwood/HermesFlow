@@ -125,16 +125,48 @@ services:
     logging: *default-logging
 
   # ---------------------------------------------------------------------------
+  #  Hindsight database — external PostgreSQL for Hindsight's memory store.
+  #  Replaces the embedded pg0 so label-backup can schedule automated backups.
+  #  Sits on both backend (reachable by label-backup) and memory (reachable by
+  #  the Hindsight container and Hermes).
+  # ---------------------------------------------------------------------------
+  hindsight_db:
+    image: postgres:16
+    container_name: hindsight_db
+    restart: unless-stopped
+    volumes:
+      - ${HINDSIGHT_DATA_DIR:-./data/hindsight}/db:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: hindsight
+      POSTGRES_PASSWORD: ${HINDSIGHT_DB_PASSWORD:-hindsight}
+      POSTGRES_DB: hindsight
+    labels:
+      backup.enabled: "true"
+      backup.type: postgres
+      backup.cron: "${BACKUP_CRON:-0 0 2 * * *}"
+      backup.conn: "postgresql://hindsight:${HINDSIGHT_DB_PASSWORD:-hindsight}@hindsight_db:5432/hindsight"
+      backup.dest: /backups
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U hindsight"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [backend, memory]
+    logging: *default-logging
+
+  # ---------------------------------------------------------------------------
   #  Hindsight — personal second-brain memory
-  #  Single container with embedded PostgreSQL + pgvector. No external DB needed.
   #  API on 8888, web UI (memory browser) on 9999.
   #  LLM is used for fact extraction and reflect synthesis — points at LM Studio.
+  #  Data is stored in hindsight_db (external PostgreSQL) for automated backups.
   # ---------------------------------------------------------------------------
   hindsight:
     image: ghcr.io/vectorize-io/hindsight:latest
     container_name: hindsight
     restart: unless-stopped
     environment:
+      # External PostgreSQL — replaces the embedded pg0
+      - HINDSIGHT_API_DATABASE_URL=postgresql://hindsight:${HINDSIGHT_DB_PASSWORD:-hindsight}@hindsight_db:5432/hindsight
       # LLM for memory extraction and synthesis (LM Studio on host)
       - HINDSIGHT_API_LLM_API_KEY=${HINDSIGHT_LLM_API_KEY:-lm-studio}
       - HINDSIGHT_API_LLM_BASE_URL=${HINDSIGHT_LLM_BASE_URL:-http://host.docker.internal:1234/v1}
@@ -146,13 +178,14 @@ services:
       - HINDSIGHT_API_LLM_RESPONSE_FORMAT=json_schema
       # need to set this if using lmstudio
       - HINDSIGHT_API_LLM_PROVIDER=lmstudio
-    volumes:
-      - ${HINDSIGHT_DATA_DIR:-C:/Containers/hindsight}:/home/hindsight/.pg0
     ports:
       - "${HINDSIGHT_BIND:-127.0.0.1}:${HINDSIGHT_API_PORT:-8888}:8888"   # REST API
       - "${HINDSIGHT_BIND:-127.0.0.1}:${HINDSIGHT_UI_PORT:-9999}:9999"    # Web UI
     extra_hosts:
       - "host.docker.internal:host-gateway"   # reach LM Studio on the host
+    depends_on:
+      hindsight_db:
+        condition: service_healthy
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost:8888/health"]
       interval: 30s
