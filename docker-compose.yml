@@ -1,8 +1,8 @@
 # =============================================================================
-#  Hermes Agent + Windmill + Cognee memory — consolidated stack
+#  Hermes Agent + Windmill + Hindsight memory — consolidated stack
 #  - Caddy front door (single ingress, optional TLS)
 #  - Windmill LSP for editor intellisense
-#  - Cognee (personal second-brain memory) + Qdrant (vector store)
+#  - Hindsight (personal second-brain memory) — single container, embedded PG
 #  - Healthchecks where they're meaningful
 #  - Resource limits on the privileged workers
 #  - Light network segmentation (db not reachable from the edge)
@@ -26,7 +26,7 @@ networks:
   edge:
   # windmill server/workers <-> hermes gateway API (OpenAI-compatible endpoint)
   agent:
-  # cognee + qdrant <-> hermes (memory layer, isolated from edge)
+  # hindsight <-> hermes (memory layer, isolated from edge)
   memory:
 
 services:
@@ -99,6 +99,9 @@ services:
       # - OPENAI_API_KEY=${OPENAI_API_KEY}
       # - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       # - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
+      # Hindsight memory plugin — forwarded so the plugin can reach the API
+      - HINDSIGHT_API_KEY=${HINDSIGHT_API_KEY:-}
+      - HINDSIGHT_BASE_URL=${HINDSIGHT_BASE_URL:-http://hindsight:8888}
     volumes:
       - ${DATA_DIR:-./data/hermes}:/opt/data
       - ${SHARED_DIR:-./data/shared}:/shared
@@ -122,81 +125,45 @@ services:
     logging: *default-logging
 
   # ---------------------------------------------------------------------------
-  #  Cognee — personal second-brain memory API
-  #  Connects to Qdrant for vector storage and your local Ollama for embeddings/LLM.
-  #  Exposes a REST API that Hermes can call via MCP or direct HTTP.
+  #  Hindsight — personal second-brain memory
+  #  Single container with embedded PostgreSQL + pgvector. No external DB needed.
+  #  API on 8888, web UI (memory browser) on 9999.
+  #  LLM is used for fact extraction and reflect synthesis — points at LM Studio.
   # ---------------------------------------------------------------------------
-  cognee:
-    image: cogneeai/cognee:latest
-    container_name: cognee
+  hindsight:
+    image: ghcr.io/vectorize-io/hindsight:latest
+    container_name: hindsight
     restart: unless-stopped
     environment:
-      # LLM backend — point at your local Ollama (host.docker.internal = host machine)
-      - LLM_PROVIDER=ollama
-      - LLM_MODEL=${COGNEE_LLM_MODEL:-qwen3:30b}
-      - LLM_API_BASE=http://host.docker.internal:11434
-      # Embeddings — sentence-transformers runs inside cognee (CPU, no cloud)
-      - EMBEDDING_PROVIDER=sentence_transformer
-      - EMBEDDING_MODEL=${COGNEE_EMBEDDING_MODEL:-all-MiniLM-L6-v2}
-      # Vector store backend
-      - VECTOR_DB_PROVIDER=qdrant
-      - VECTOR_DB_URL=http://qdrant:6333
-      # Graph store — cognee ships with networkx (lightweight, no Neo4j needed)
-      - GRAPH_DB_PROVIDER=networkx
-      # Relational store for metadata (sqlite is fine for personal second-brain scale)
-      - DB_PROVIDER=sqlite
-      - DB_PATH=/cognee-data/cognee.db
-      # API key for the Cognee REST API (used by Hermes MCP config)
-      - COGNEE_API_KEY=${COGNEE_API_KEY:-change-me}
+      # LLM for memory extraction and synthesis (LM Studio on host)
+      - HINDSIGHT_API_LLM_API_KEY=${HINDSIGHT_LLM_API_KEY:-lm-studio}
+      - HINDSIGHT_API_LLM_BASE_URL=${HINDSIGHT_LLM_BASE_URL:-http://host.docker.internal:1234/v1}
+      - HINDSIGHT_API_LLM_MODEL=${HINDSIGHT_LLM_MODEL:-openai/gpt-oss-20b}
+      # Optional API key to protect the Hindsight endpoint (leave blank for local-only)
+      - HINDSIGHT_API_KEY=${HINDSIGHT_API_KEY:-}
+      - HINDSIGHT_API_LLM_TIMEOUT=${HINDSIGHT_API_LLM_TIMEOUT}
+      - HINDSIGHT_API_LOG_LEVEL=DEBUG
+      - HINDSIGHT_API_LLM_RESPONSE_FORMAT=json_schema
+      # need to set this if using lmstudio
+      - HINDSIGHT_API_LLM_PROVIDER=lmstudio
     volumes:
-      - ${COGNEE_DATA_DIR:-./data/cognee}:/cognee-data
+      - ${HINDSIGHT_DATA_DIR:-C:/Containers/hindsight}:/home/hindsight/.pg0
     ports:
-      - "${COGNEE_BIND:-127.0.0.1}:${COGNEE_PORT:-8686}:8686"
-    depends_on:
-      qdrant:
-        condition: service_healthy
+      - "${HINDSIGHT_BIND:-127.0.0.1}:${HINDSIGHT_API_PORT:-8888}:8888"   # REST API
+      - "${HINDSIGHT_BIND:-127.0.0.1}:${HINDSIGHT_UI_PORT:-9999}:9999"    # Web UI
     extra_hosts:
-      - "host.docker.internal:host-gateway"   # reach Ollama on the host
+      - "host.docker.internal:host-gateway"   # reach LM Studio on the host
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8686/health"]
+      test: ["CMD", "curl", "-fsS", "http://localhost:8888/health"]
       interval: 30s
       timeout: 5s
       retries: 3
-      start_period: 20s
+      start_period: 40s
     deploy:
       resources:
         limits:
-          memory: ${COGNEE_MEM_LIMIT:-2G}
-          cpus: "${COGNEE_CPU_LIMIT:-1.0}"
-    networks: [memory]
-    logging: *default-logging
-
-  # ---------------------------------------------------------------------------
-  #  Qdrant — vector store for Cognee
-  #  No cloud, no API key — pure local. Dashboard at /dashboard if you expose it.
-  # ---------------------------------------------------------------------------
-  qdrant:
-    image: qdrant/qdrant:latest
-    container_name: qdrant
-    restart: unless-stopped
-    volumes:
-      - ${QDRANT_DATA_DIR:-./data/qdrant}:/qdrant/storage
-    environment:
-      - QDRANT__SERVICE__GRPC_PORT=6334
-    ports:
-      - "${QDRANT_BIND:-127.0.0.1}:${QDRANT_HTTP_PORT:-6333}:6333"   # REST + dashboard
-      - "${QDRANT_BIND:-127.0.0.1}:${QDRANT_GRPC_PORT:-6334}:6334"   # gRPC
-    healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:6333/healthz"]
-      interval: 15s
-      timeout: 5s
-      retries: 3
-      start_period: 10s
-    deploy:
-      resources:
-        limits:
-          memory: ${QDRANT_MEM_LIMIT:-1G}
-          cpus: "${QDRANT_CPU_LIMIT:-0.5}"
+          memory: ${HINDSIGHT_MEM_LIMIT:-2G}
+          cpus: "${HINDSIGHT_CPU_LIMIT:-1.0}"
     networks: [memory]
     logging: *default-logging
 
@@ -239,8 +206,6 @@ services:
     volumes:
       - ${WM_DATA_DIR:-./data/windmill}/logs:/tmp/windmill/logs
       - ${SHARED_DIR:-./data/shared}:/shared
-    # The server serves HTTP, so a probe is meaningful. If this image has no
-    # curl, swap to the wget form below or remove the block.
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8000/api/version || wget -qO- http://localhost:8000/api/version || exit 1"]
       interval: 30s
@@ -294,7 +259,6 @@ services:
       - ${WM_DATA_DIR:-./data/windmill}/cache:/tmp/windmill/cache
       - ${WM_DATA_DIR:-./data/windmill}/logs:/tmp/windmill/logs
       - ${SHARED_DIR:-./data/shared}:/shared
-    # Workers don't serve HTTP, so no healthcheck — a process probe here is fragile.
     networks: [backend, agent]
     logging: *default-logging
 

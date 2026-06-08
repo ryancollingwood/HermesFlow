@@ -34,12 +34,7 @@ http://hermes-api.localhost {
     reverse_proxy hermes:8642
 }
 
-# --- Cognee memory API ------------------------------------------------------
-http://cognee.localhost {
-    reverse_proxy cognee:8686
-}
-
-# --- Qdrant dashboard (optional — comment out if not needed) ----------------
-http://qdrant.localhost {
-    reverse_proxy qdrant:6333
+# --- Hindsight (no built-in auth — consider basicauth here) ----------------
+http://hindsight.localhost {
+    reverse_proxy hindsight:9999
 }
