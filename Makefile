@@ -14,7 +14,7 @@ HERMES_IMAGE := nousresearch/hermes-agent:latest
 # reference $$HOME are expanded by the shell when the recipe sources the file.
 ENV_FILE := .env
 
-.PHONY: help check init apikey wizard secure pull up down restart logs ps health backup bootstrap lint validate ci
+.PHONY: help check init apikey wizard secure pull up down restart logs ps health backup bootstrap lint validate ci migrate-hindsight
 
 help: ## Show this help
 	@echo "Hermes + Windmill stack"
@@ -109,6 +109,15 @@ backup: ## Snapshot Hermes /opt/data into ./backups/ (Postgres is automated via 
 	  echo "→ archiving Hermes /data…"; \
 	  tar czf "backups/hermes-$$STAMP.tar.gz" -C "$${DATA_DIR:-$$HOME/.hermes/data}" . ; \
 	  echo "✓ wrote backups/windmill-$$STAMP.sql.gz and backups/hermes-$$STAMP.tar.gz"
+
+migrate-hindsight: ## Migrate Hindsight data from embedded pg0 to hindsight_db (dump then restore)
+	@echo "Usage:"
+	@echo "  Stage 1 (dump, old stack running):  ./scripts/migrate-hindsight-db.sh dump"
+	@echo "  Stage 2 (restore, new stack ready): ./scripts/migrate-hindsight-db.sh restore"
+	@echo "Or run a stage directly: make migrate-hindsight STAGE=dump|restore"
+ifdef STAGE
+	@./scripts/migrate-hindsight-db.sh $(STAGE)
+endif
 
 bootstrap: ## One-shot: check → init → apikey → wizard → secure → pull → up → health
 	@$(MAKE) init

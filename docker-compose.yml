@@ -131,7 +131,7 @@ services:
   #  the Hindsight container and Hermes).
   # ---------------------------------------------------------------------------
   hindsight_db:
-    image: postgres:16
+    image: pgvector/pgvector:pg16
     container_name: hindsight_db
     restart: unless-stopped
     volumes:

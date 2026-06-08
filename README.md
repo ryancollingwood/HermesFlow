@@ -286,6 +286,27 @@ Health and readiness endpoints (useful for monitoring):
 - `GET http://localhost:8080/healthz` — basic health check
 - `GET http://localhost:8080/readyz` — validates Docker access, disk space, and S3 connectivity
 
+### Migrating from the embedded pg0 (existing installs)
+
+If you have an existing Hindsight install with data in the embedded pg0, run the migration
+script **before** switching to the updated `docker-compose.yml`:
+
+```sh
+# Stage 1 — while the OLD Hindsight container is still running
+./scripts/migrate-hindsight-db.sh dump
+
+# Then pull the updated docker-compose.yml and:
+
+# Stage 2 — once hindsight_db is available in the new stack
+./scripts/migrate-hindsight-db.sh restore
+```
+
+Or via Make: `make migrate-hindsight STAGE=dump` / `make migrate-hindsight STAGE=restore`.
+
+The script dumps from the embedded pg0 (PostgreSQL 18 with pgvector, binaries bundled inside the
+Hindsight container) and restores into `hindsight_db` (`pgvector/pgvector:pg16`). The SQL dump
+format is cross-version compatible for application data.
+
 ### Manual Hermes data backup
 
 The `label-backup` container only handles databases. Hermes stores its configuration, sessions,
@@ -306,6 +327,7 @@ make backup   # tars Hermes /opt/data → ./backups/hermes-<timestamp>.tar.gz
 | `make apikey` | Generate `API_SERVER_KEY` into `.env` if empty |
 | `make backup` | Tar of Hermes `/opt/data` → `./backups/` (Postgres is automated via label-backup) |
 | `make pull` | Pull latest images |
+| `make migrate-hindsight` | Migrate Hindsight data from embedded pg0 to `hindsight_db` |
 
 ## Security notes
 
