@@ -254,6 +254,45 @@ name the gateway actually serves — run `client.py` (or
 > Inside a worker, reach Hermes at `hermes:8642`, **not** `localhost` — localhost
 > is the worker itself. This works because the workers share the `agent` network.
 
+## Backups
+
+HermesFlow uses two complementary backup mechanisms:
+
+### Automated PostgreSQL backups (label-backup)
+
+The `label-backup` container runs alongside the stack and automatically backs up the Windmill
+PostgreSQL database on a configurable cron schedule. No manual intervention is needed — it
+discovers the `db` container via Docker labels and runs `pg_dump` at the scheduled time.
+
+Backups land in `./backups/db/` by default, with Gzip compression and SHA256 checksums. Old
+backups are pruned automatically after the retention period.
+
+Key variables in `.env`:
+
+| Variable | Default | Notes |
+|---|---|---|
+| `BACKUP_DIR` | `./backups/db` | Local destination for automated DB backups |
+| `BACKUP_CRON` | `0 0 2 * * *` | 6-field cron (with seconds); default = 2 AM daily |
+| `BACKUP_RETENTION_PERIOD` | `7d` | Prune backups older than this (`7d`, `24h`, etc.) |
+| `BACKUP_S3_BUCKET` | _(empty)_ | Set to offload backups to S3-compatible storage |
+| `BACKUP_S3_REGION` | _(empty)_ | AWS region or custom region for S3 endpoint |
+| `BACKUP_S3_ENDPOINT` | _(empty)_ | Custom endpoint for MinIO / Cloudflare R2 / etc. |
+| `BACKUP_S3_ACCESS_KEY_ID` | _(empty)_ | S3 access key |
+| `BACKUP_S3_SECRET_ACCESS_KEY` | _(empty)_ | S3 secret key |
+
+Health and readiness endpoints (useful for monitoring):
+- `GET http://localhost:8080/healthz` — basic health check
+- `GET http://localhost:8080/readyz` — validates Docker access, disk space, and S3 connectivity
+
+### Manual Hermes data backup
+
+The `label-backup` container only handles databases. Hermes stores its configuration, sessions,
+and skills in `/opt/data` (a bind-mounted volume). Use `make backup` to snapshot it:
+
+```sh
+make backup   # tars Hermes /opt/data → ./backups/hermes-<timestamp>.tar.gz
+```
+
 ## Make targets
 
 | Target | Does |
@@ -263,7 +302,7 @@ name the gateway actually serves — run `client.py` (or
 | `make logs` / `ps` | Follow logs / status |
 | `make health` | Probe Hermes `/health` and Windmill `/api/version` |
 | `make apikey` | Generate `API_SERVER_KEY` into `.env` if empty |
-| `make backup` | `pg_dump` of Windmill + tar of Hermes `/opt/data` → `./backups/` |
+| `make backup` | Tar of Hermes `/opt/data` → `./backups/` (Postgres is automated via label-backup) |
 | `make pull` | Pull latest images |
 
 ## Security notes

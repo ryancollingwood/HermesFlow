@@ -38,7 +38,8 @@ init: ## Create .env from the example and make the data directories
 	           "$${WM_DATA_DIR:-$$HOME/.windmill}"/{db,logs,cache} \
 	           "$${WM_LSP_CACHE_DIR:-$$HOME/.windmill/lsp_cache}" \
 	           "$${CADDY_DATA_DIR:-$$HOME/.caddy/data}" \
-	           "$${CADDY_CONFIG_DIR:-$$HOME/.caddy/config}"; \
+	           "$${CADDY_CONFIG_DIR:-$$HOME/.caddy/config}" \
+	           "$${BACKUP_DIR:-./backups/db}"; \
 	  echo "✓ data directories ready"
 
 apikey: ## Generate API_SERVER_KEY in .env if it's empty
@@ -98,7 +99,7 @@ lint: ## Ruff + py_compile the Windmill scripts (mirrors CI)
 
 ci: validate lint ## Run the same checks as GitHub Actions
 
-backup: ## Snapshot Postgres + the Hermes data dir into ./backups/
+backup: ## Snapshot Hermes /opt/data into ./backups/ (Postgres is automated via label-backup)
 	@mkdir -p backups
 	@set -a; . ./$(ENV_FILE); set +a; \
 	  STAMP=$$(date +%F-%H%M); \
