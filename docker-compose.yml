@@ -22,12 +22,14 @@ x-windmill-image: &wm-image ${WM_IMAGE:-ghcr.io/windmill-labs/windmill:main}
 networks:
   # db <-> windmill server/workers. Not exposed to Hermes or the proxy.
   backend:
-  # caddy <-> the things it needs to reach (server, lsp, hermes)
+  # caddy <-> the things it needs to reach (server, lsp, hermes, ollama)
   edge:
   # windmill server/workers <-> hermes gateway API (OpenAI-compatible endpoint)
   agent:
   # hindsight <-> hermes (memory layer, isolated from edge)
   memory:
+  # ollama <-> hermes, hindsight, windmill workers (local LLM inference layer)
+  inference:
   # prometheus + exporters + grafana (scraping stays off the application networks)
   monitoring:
 
@@ -53,6 +55,8 @@ services:
       windmill_lsp:
         condition: service_started
       hermes:
+        condition: service_started
+      ollama:
         condition: service_started
     networks: [edge]
     logging: *default-logging
@@ -123,7 +127,7 @@ services:
         limits:
           memory: ${HERMES_MEM_LIMIT:-2G}
           cpus: "${HERMES_CPU_LIMIT:-2.0}"
-    networks: [edge, agent, memory]
+    networks: [edge, agent, memory, inference]
     logging: *default-logging
 
   # ---------------------------------------------------------------------------
@@ -137,17 +141,17 @@ services:
     container_name: hindsight
     restart: unless-stopped
     environment:
-      # LLM for memory extraction and synthesis (LM Studio on host)
-      - HINDSIGHT_API_LLM_API_KEY=${HINDSIGHT_LLM_API_KEY:-lm-studio}
-      - HINDSIGHT_API_LLM_BASE_URL=${HINDSIGHT_LLM_BASE_URL:-http://host.docker.internal:1234/v1}
-      - HINDSIGHT_API_LLM_MODEL=${HINDSIGHT_LLM_MODEL:-openai/gpt-oss-20b}
+      # LLM for memory extraction and synthesis.
+      # Defaults to the Ollama container; override to use LM Studio or a remote API.
+      - HINDSIGHT_API_LLM_API_KEY=${HINDSIGHT_LLM_API_KEY:-ollama}
+      - HINDSIGHT_API_LLM_BASE_URL=${HINDSIGHT_LLM_BASE_URL:-http://ollama:11434/v1}
+      - HINDSIGHT_API_LLM_MODEL=${HINDSIGHT_LLM_MODEL:-llama3.2}
       # Optional API key to protect the Hindsight endpoint (leave blank for local-only)
       - HINDSIGHT_API_KEY=${HINDSIGHT_API_KEY:-}
-      - HINDSIGHT_API_LLM_TIMEOUT=${HINDSIGHT_API_LLM_TIMEOUT}
+      - HINDSIGHT_API_LLM_TIMEOUT=${HINDSIGHT_LLM_TIMEOUT:-}
       - HINDSIGHT_API_LOG_LEVEL=DEBUG
-      - HINDSIGHT_API_LLM_RESPONSE_FORMAT=json_schema
-      # need to set this if using lmstudio
-      - HINDSIGHT_API_LLM_PROVIDER=lmstudio
+      - HINDSIGHT_API_LLM_RESPONSE_FORMAT=${HINDSIGHT_LLM_RESPONSE_FORMAT:-json_schema}
+      - HINDSIGHT_API_LLM_PROVIDER=${HINDSIGHT_LLM_PROVIDER:-ollama}
     volumes:
       - ${HINDSIGHT_DATA_DIR:-C:/Containers/hindsight}:/home/hindsight/.pg0
     ports:
@@ -166,7 +170,50 @@ services:
         limits:
           memory: ${HINDSIGHT_MEM_LIMIT:-2G}
           cpus: "${HINDSIGHT_CPU_LIMIT:-1.0}"
-    networks: [memory]
+    networks: [memory, inference]
+    logging: *default-logging
+
+  # ---------------------------------------------------------------------------
+  #  Ollama — local LLM inference server (OpenAI-compatible API at /v1)
+  #  Models are stored in OLLAMA_DATA_DIR (can be several GB each).
+  #  Pull a model after first start:
+  #    docker exec ollama ollama pull llama3.2
+  #
+  #  NVIDIA GPU support: requires nvidia-container-toolkit on the host.
+  #  Uncomment the `reservations` block under deploy.resources and restart.
+  # ---------------------------------------------------------------------------
+  ollama:
+    image: ollama/ollama:${OLLAMA_VERSION:-latest}
+    container_name: ollama
+    restart: unless-stopped
+    ports:
+      - "${OLLAMA_BIND:-127.0.0.1}:${OLLAMA_PORT:-11434}:11434"
+    environment:
+      # Listen on all interfaces so Docker-networked services can reach it.
+      - OLLAMA_HOST=0.0.0.0:11434
+      - OLLAMA_KEEP_ALIVE=${OLLAMA_KEEP_ALIVE:-5m}
+      - OLLAMA_NUM_PARALLEL=${OLLAMA_NUM_PARALLEL:-1}
+      - OLLAMA_MAX_LOADED_MODELS=${OLLAMA_MAX_LOADED_MODELS:-1}
+    volumes:
+      - ${OLLAMA_DATA_DIR:-./data/ollama}:/root/.ollama
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: ${OLLAMA_MEM_LIMIT:-8G}
+          cpus: "${OLLAMA_CPU_LIMIT:-4.0}"
+        # Uncomment for NVIDIA GPU support (requires nvidia-container-toolkit):
+        # reservations:
+        #   devices:
+        #     - driver: nvidia
+        #       count: all
+        #       capabilities: [gpu]
+    networks: [inference, edge]
     logging: *default-logging
 
   # ---------------------------------------------------------------------------
@@ -261,7 +308,7 @@ services:
       - ${WM_DATA_DIR:-./data/windmill}/cache:/tmp/windmill/cache
       - ${WM_DATA_DIR:-./data/windmill}/logs:/tmp/windmill/logs
       - ${SHARED_DIR:-./data/shared}:/shared
-    networks: [backend, agent]
+    networks: [backend, agent, inference]
     logging: *default-logging
 
   # ---------------------------------------------------------------------------
@@ -292,7 +339,7 @@ services:
     volumes:
       - ${WM_DATA_DIR:-./data/windmill}/logs:/tmp/windmill/logs
       - ${SHARED_DIR:-./data/shared}:/shared
-    networks: [backend, agent]
+    networks: [backend, agent, inference]
     logging: *default-logging
 
   # ---------------------------------------------------------------------------
