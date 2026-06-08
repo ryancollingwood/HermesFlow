@@ -38,3 +38,13 @@ http://hermes-api.localhost {
 http://hindsight.localhost {
     reverse_proxy hindsight:9999
 }
+
+# --- Grafana (monitoring dashboards) ----------------------------------------
+http://grafana.localhost {
+    reverse_proxy grafana:3000
+}
+
+# --- Prometheus (raw metrics — restrict to trusted networks in production) --
+http://prometheus.localhost {
+    reverse_proxy prometheus:9090
+}
