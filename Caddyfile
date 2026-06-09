@@ -48,3 +48,8 @@ http://grafana.localhost {
 http://prometheus.localhost {
     reverse_proxy prometheus:9090
 }
+
+# --- Ollama (local LLM inference — restrict to trusted networks in production)
+http://ollama.localhost {
+    reverse_proxy ollama:11434
+}
