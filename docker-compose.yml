@@ -431,7 +431,6 @@ services:
     container_name: node_exporter
     restart: unless-stopped
     command:
-      - --path.rootfs=/host
       - --collector.disable-defaults
       - --collector.cpu
       - --collector.diskstats
@@ -440,8 +439,6 @@ services:
       - --collector.meminfo
       - --collector.netdev
       - --collector.uname
-    volumes:
-      - /:/host:ro,rslave
     deploy:
       resources:
         limits:
