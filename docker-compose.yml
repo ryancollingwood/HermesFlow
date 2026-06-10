@@ -148,7 +148,7 @@ services:
       - HINDSIGHT_API_LLM_MODEL=${HINDSIGHT_LLM_MODEL:-llama3.2:3b}
       # Optional API key to protect the Hindsight endpoint (leave blank for local-only)
       - HINDSIGHT_API_KEY=${HINDSIGHT_API_KEY:-}
-      - HINDSIGHT_API_LLM_TIMEOUT=${HINDSIGHT_LLM_TIMEOUT:-}
+      - HINDSIGHT_API_LLM_TIMEOUT=${HINDSIGHT_LLM_TIMEOUT:-360}
       - HINDSIGHT_API_LOG_LEVEL=DEBUG
       - HINDSIGHT_API_LLM_RESPONSE_FORMAT=${HINDSIGHT_LLM_RESPONSE_FORMAT:-json_schema}
       - HINDSIGHT_API_LLM_PROVIDER=${HINDSIGHT_LLM_PROVIDER:-ollama}
@@ -431,7 +431,6 @@ services:
     container_name: node_exporter
     restart: unless-stopped
     command:
-      - --path.rootfs=/host
       - --collector.disable-defaults
       - --collector.cpu
       - --collector.diskstats
@@ -440,8 +439,6 @@ services:
       - --collector.meminfo
       - --collector.netdev
       - --collector.uname
-    volumes:
-      - /:/host:ro,rslave
     deploy:
       resources:
         limits:
