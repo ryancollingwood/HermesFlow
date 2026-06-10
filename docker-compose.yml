@@ -58,6 +58,8 @@ services:
         condition: service_started
       ollama:
         condition: service_started
+      hindsight:
+        condition: service_started
     networks: [edge]
     logging: *default-logging
 
@@ -152,8 +154,39 @@ services:
       - HINDSIGHT_API_LOG_LEVEL=DEBUG
       - HINDSIGHT_API_LLM_RESPONSE_FORMAT=${HINDSIGHT_LLM_RESPONSE_FORMAT:-json_schema}
       - HINDSIGHT_API_LLM_PROVIDER=${HINDSIGHT_LLM_PROVIDER:-openai}
+      - HINDSIGHT_API_LLM_MAX_CONCURRENT=${HINDSIGHT_LLM_MAX_CONCURRENT:-2}
+      - HINDSIGHT_API_LLM_REASONING_EFFORT=${HINDSIGHT_LLM_REASONING_EFFORT:-low}
+      # ── Per-operation LLM overrides ────────────────────────────────────────
+      # Unset = inherit the defaults above. Set to route a specific pipeline
+      # stage (retain / reflect / consolidation) to a different model or provider.
+      - HINDSIGHT_API_RETAIN_LLM_PROVIDER=${HINDSIGHT_RETAIN_LLM_PROVIDER:-}
+      - HINDSIGHT_API_RETAIN_LLM_API_KEY=${HINDSIGHT_RETAIN_LLM_API_KEY:-}
+      - HINDSIGHT_API_RETAIN_LLM_MODEL=${HINDSIGHT_RETAIN_LLM_MODEL:-}
+      - HINDSIGHT_API_REFLECT_LLM_PROVIDER=${HINDSIGHT_REFLECT_LLM_PROVIDER:-}
+      - HINDSIGHT_API_REFLECT_LLM_API_KEY=${HINDSIGHT_REFLECT_LLM_API_KEY:-}
+      - HINDSIGHT_API_REFLECT_LLM_MODEL=${HINDSIGHT_REFLECT_LLM_MODEL:-}
+      - HINDSIGHT_API_CONSOLIDATION_LLM_PROVIDER=${HINDSIGHT_CONSOLIDATION_LLM_PROVIDER:-}
+      - HINDSIGHT_API_CONSOLIDATION_LLM_API_KEY=${HINDSIGHT_CONSOLIDATION_LLM_API_KEY:-}
+      - HINDSIGHT_API_CONSOLIDATION_LLM_MODEL=${HINDSIGHT_CONSOLIDATION_LLM_MODEL:-}
+      # ── Embeddings ─────────────────────────────────────────────────────────
+      - HINDSIGHT_API_EMBEDDINGS_PROVIDER=${HINDSIGHT_EMBEDDINGS_PROVIDER:-local}
+      - HINDSIGHT_API_EMBEDDINGS_LOCAL_MODEL=${HINDSIGHT_EMBEDDINGS_LOCAL_MODEL:-BAAI/bge-small-en-v1.5}
+      # ── Reranker ───────────────────────────────────────────────────────────
+      - HINDSIGHT_API_RERANKER_PROVIDER=${HINDSIGHT_RERANKER_PROVIDER:-local}
+      - HINDSIGHT_API_RERANKER_LOCAL_MODEL=${HINDSIGHT_RERANKER_LOCAL_MODEL:-cross-encoder/ms-marco-MiniLM-L-6-v2}
+      - HINDSIGHT_API_RERANKER_LOCAL_MAX_CONCURRENT=${HINDSIGHT_RERANKER_MAX_CONCURRENT:-4}
+      - HINDSIGHT_API_RERANKER_MAX_CANDIDATES=${HINDSIGHT_RERANKER_MAX_CANDIDATES:-300}
+      # ── Retain pipeline ────────────────────────────────────────────────────
+      - HINDSIGHT_API_RETAIN_EXTRACTION_MODE=${HINDSIGHT_RETAIN_EXTRACTION_MODE:-concise}
+      - HINDSIGHT_API_RETAIN_CHUNK_SIZE=${HINDSIGHT_RETAIN_CHUNK_SIZE:-3000}
+      - HINDSIGHT_API_RETAIN_EXTRACT_CAUSAL_LINKS=${HINDSIGHT_RETAIN_EXTRACT_CAUSAL_LINKS:-true}
+      # ── Retrieval ──────────────────────────────────────────────────────────
+      - HINDSIGHT_API_SEMANTIC_MIN_SIMILARITY=${HINDSIGHT_SEMANTIC_MIN_SIMILARITY:-0.3}
+      - HINDSIGHT_API_RECALL_MAX_CONCURRENT=${HINDSIGHT_RECALL_MAX_CONCURRENT:-32}
+      # ── Server ─────────────────────────────────────────────────────────────
+      - HINDSIGHT_API_WORKERS=${HINDSIGHT_WORKERS:-1}
     volumes:
-      - ${HINDSIGHT_DATA_DIR:-C:/Containers/hindsight}:/home/hindsight/.pg0
+      - ${HINDSIGHT_DATA_DIR:-./data/hindsight}:/home/hindsight/.pg0
     ports:
       - "${HINDSIGHT_BIND:-127.0.0.1}:${HINDSIGHT_API_PORT:-8888}:8888"   # REST API
       - "${HINDSIGHT_BIND:-127.0.0.1}:${HINDSIGHT_UI_PORT:-9999}:9999"    # Web UI
@@ -170,7 +203,7 @@ services:
         limits:
           memory: ${HINDSIGHT_MEM_LIMIT:-2G}
           cpus: "${HINDSIGHT_CPU_LIMIT:-1.0}"
-    networks: [memory, inference]
+    networks: [memory, inference, edge]
     logging: *default-logging
 
   # ---------------------------------------------------------------------------
@@ -198,6 +231,32 @@ services:
       # Disable Intel iGPU detection — 2 GB VRAM limits it to <3B models;
       # CPU path with AVX_VNNI handles larger models more reliably.
       - OLLAMA_INTEL_GPU=${OLLAMA_INTEL_GPU:-0}
+      - OLLAMA_CONTEXT_LENGTH=${OLLAMA_CONTEXT_LENGTH:-16384}
+      - OLLAMA_VULKAN=${OLLAMA_VULKAN:-false}
+      # Device visibility — blank = CPU only. Set CUDA_VISIBLE_DEVICES=0 (or
+      # comma-separated indices) and uncomment the GPU reservations block below
+      # to hand a specific GPU to Ollama.
+      - CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-}
+      - GGML_VK_VISIBLE_DEVICES=${GGML_VK_VISIBLE_DEVICES:-}
+      - HIP_VISIBLE_DEVICES=${HIP_VISIBLE_DEVICES:-}
+      - GPU_DEVICE_ORDINAL=${GPU_DEVICE_ORDINAL:-}
+      - ROCR_VISIBLE_DEVICES=${ROCR_VISIBLE_DEVICES:-}
+      # ── Prompt / History ───────────────────────────────────────
+      - OLLAMA_NOHISTORY=${OLLAMA_NOHISTORY:-false}
+      - OLLAMA_NOPRUNE=${OLLAMA_NOPRUNE:-false}
+      # Flash attention — beneficial for hybrid architectures (e.g. lfm2).
+      - OLLAMA_FLASH_ATTENTION=${OLLAMA_FLASH_ATTENTION:-true}
+      # q8_0 halves KV-cache RAM with minimal quality loss on CPU inference.
+      - OLLAMA_KV_CACHE_TYPE=${OLLAMA_KV_CACHE_TYPE:-q8_0}
+      # ── GPU layer offloading ────────────────────────────────────────────────
+      # OLLAMA_NUM_GPU: layers to offload to GPU (0 = CPU only, auto = detect).
+      # Pair with CUDA_VISIBLE_DEVICES / HIP_VISIBLE_DEVICES above.
+      - OLLAMA_NUM_GPU=${OLLAMA_NUM_GPU:-0}
+      # OLLAMA_MAX_VRAM: hard cap on VRAM bytes (prevents taking all GPU memory).
+      # Example: 6442450944 = 6 GB. Leave blank for no cap (auto).
+      - OLLAMA_MAX_VRAM=${OLLAMA_MAX_VRAM:-}
+      # OLLAMA_LOAD_TIMEOUT: how long to wait for a stalled model load.
+      - OLLAMA_LOAD_TIMEOUT=${OLLAMA_LOAD_TIMEOUT:-5m}
     volumes:
       - ${OLLAMA_DATA_DIR:-./data/ollama}:/root/.ollama
     healthcheck:
