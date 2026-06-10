@@ -58,6 +58,8 @@ services:
         condition: service_started
       ollama:
         condition: service_started
+      hindsight:
+        condition: service_started
     networks: [edge]
     logging: *default-logging
 
@@ -201,7 +203,7 @@ services:
         limits:
           memory: ${HINDSIGHT_MEM_LIMIT:-2G}
           cpus: "${HINDSIGHT_CPU_LIMIT:-1.0}"
-    networks: [memory, inference]
+    networks: [memory, inference, edge]
     logging: *default-logging
 
   # ---------------------------------------------------------------------------
