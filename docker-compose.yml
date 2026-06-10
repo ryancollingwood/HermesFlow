@@ -153,7 +153,7 @@ services:
       - HINDSIGHT_API_LLM_RESPONSE_FORMAT=${HINDSIGHT_LLM_RESPONSE_FORMAT:-json_schema}
       - HINDSIGHT_API_LLM_PROVIDER=${HINDSIGHT_LLM_PROVIDER:-openai}
     volumes:
-      - ${HINDSIGHT_DATA_DIR:-C:/Containers/hindsight}:/home/hindsight/.pg0
+      - ${HINDSIGHT_DATA_DIR:-./data/hindsight}:/home/hindsight/.pg0
     ports:
       - "${HINDSIGHT_BIND:-127.0.0.1}:${HINDSIGHT_API_PORT:-8888}:8888"   # REST API
       - "${HINDSIGHT_BIND:-127.0.0.1}:${HINDSIGHT_UI_PORT:-9999}:9999"    # Web UI
@@ -198,6 +198,23 @@ services:
       # Disable Intel iGPU detection — 2 GB VRAM limits it to <3B models;
       # CPU path with AVX_VNNI handles larger models more reliably.
       - OLLAMA_INTEL_GPU=${OLLAMA_INTEL_GPU:-0}
+      - OLLAMA_CONTEXT_LENGTH=${OLLAMA_CONTEXT_LENGTH:-16384}
+      - OLLAMA_VULKAN=${OLLAMA_VULKAN:-false}
+      # Device visibility — blank = CPU only. Set CUDA_VISIBLE_DEVICES=0 (or
+      # comma-separated indices) and uncomment the GPU reservations block below
+      # to hand a specific GPU to Ollama.
+      - CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-}
+      - GGML_VK_VISIBLE_DEVICES=${GGML_VK_VISIBLE_DEVICES:-}
+      - HIP_VISIBLE_DEVICES=${HIP_VISIBLE_DEVICES:-}
+      - GPU_DEVICE_ORDINAL=${GPU_DEVICE_ORDINAL:-}
+      - ROCR_VISIBLE_DEVICES=${ROCR_VISIBLE_DEVICES:-}
+      # ── Prompt / History ───────────────────────────────────────
+      - OLLAMA_NOHISTORY=${OLLAMA_NOHISTORY:-false}
+      - OLLAMA_NOPRUNE=${OLLAMA_NOPRUNE:-false}
+      # Flash attention — beneficial for hybrid architectures (e.g. lfm2).
+      - OLLAMA_FLASH_ATTENTION=${OLLAMA_FLASH_ATTENTION:-true}
+      # q8_0 halves KV-cache RAM with minimal quality loss on CPU inference.
+      - OLLAMA_KV_CACHE_TYPE=${OLLAMA_KV_CACHE_TYPE:-q8_0}
     volumes:
       - ${OLLAMA_DATA_DIR:-./data/ollama}:/root/.ollama
     healthcheck:
