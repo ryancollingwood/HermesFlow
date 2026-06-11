@@ -186,7 +186,8 @@ services:
       # ── Server ─────────────────────────────────────────────────────────────
       - HINDSIGHT_API_WORKERS=${HINDSIGHT_WORKERS:-1}
     volumes:
-      - ${HINDSIGHT_DATA_DIR:-./data/hindsight}:/home/hindsight/.pg0
+      - ${HINDSIGHT_DATA_DIR:-./data/hindsight/data}:/home/hindsight/.pg0
+      - ${HINDSIGHT_CACHE_DIR:-./data/hindsight/cache}:/home/hindsight/.cache
     ports:
       - "${HINDSIGHT_BIND:-127.0.0.1}:${HINDSIGHT_API_PORT:-8888}:8888"   # REST API
       - "${HINDSIGHT_BIND:-127.0.0.1}:${HINDSIGHT_UI_PORT:-9999}:9999"    # Web UI
