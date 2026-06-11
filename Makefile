@@ -14,7 +14,20 @@ HERMES_IMAGE := nousresearch/hermes-agent:latest
 # reference $$HOME are expanded by the shell when the recipe sources the file.
 ENV_FILE := .env
 
-.PHONY: help check init apikey wizard secure pull up down restart logs ps health backup bootstrap lint validate ci
+# On Windows (Git Bash / MSYS2), HOME is a Windows path (C:\Users\...).
+# Docker Desktop bind mounts require POSIX paths (/c/Users/...).
+# Detect and convert once so every recipe that needs a mount-safe path uses
+# DOCKER_HOME instead of $$HOME.
+ifeq ($(OS),Windows_NT)
+  # Convert C:\Users\foo → /c/Users/foo  (works in Git Bash / MSYS2)
+  DOCKER_HOME := $(shell echo "$$HOME" | sed 's|^\([A-Za-z]\):|/\L\1|; s|\\|/|g')
+  ON_WINDOWS := 1
+else
+  DOCKER_HOME := $(HOME)
+  ON_WINDOWS :=
+endif
+
+.PHONY: help check init apikey wizard secure fix-permissions pull up down restart logs ps health backup bootstrap lint validate ci
 
 help: ## Show this help
 	@echo "Hermes + Windmill stack"
@@ -33,13 +46,15 @@ check: ## Verify Docker + Compose are present and .env exists
 init: ## Create .env from the example and make the data directories
 	@test -f $(ENV_FILE) || { cp .env.example $(ENV_FILE); echo "→ created .env from example — EDIT IT before continuing"; }
 	@set -a; . ./$(ENV_FILE); set +a; \
-	  mkdir -p "$${DATA_DIR:-$$HOME/.hermes}" \
-	           "$${SHARED_DIR:-$$HOME/.shared_agent_data}" \
-	           "$${WM_DATA_DIR:-$$HOME/.windmill}"/{db,logs,cache} \
-	           "$${WM_LSP_CACHE_DIR:-$$HOME/.windmill/lsp_cache}" \
-	           "$${CADDY_DATA_DIR:-$$HOME/.caddy/data}" \
-	           "$${CADDY_CONFIG_DIR:-$$HOME/.caddy/config}"; \
-	  echo "✓ data directories ready"
+	  DOCKER_HOME="$(DOCKER_HOME)"; \
+	  mkdir -p "$${DATA_DIR:-$$DOCKER_HOME/.hermes}" \
+	           "$${SHARED_DIR:-$$DOCKER_HOME/.shared_agent_data}" \
+	           "$${WM_DATA_DIR:-$$DOCKER_HOME/.windmill}"/{db,logs,cache} \
+	           "$${WM_LSP_CACHE_DIR:-$$DOCKER_HOME/.windmill/lsp_cache}" \
+	           "$${CADDY_DATA_DIR:-$$DOCKER_HOME/.caddy/data}" \
+	           "$${CADDY_CONFIG_DIR:-$$DOCKER_HOME/.caddy/config}"; \
+	  echo "✓ data directories created"
+	@$(MAKE) --no-print-directory fix-permissions
 
 apikey: ## Generate API_SERVER_KEY in .env if it's empty
 	@grep -q '^API_SERVER_KEY=.\+' $(ENV_FILE) 2>/dev/null && { echo "→ API_SERVER_KEY already set"; exit 0; } || true
@@ -53,16 +68,43 @@ apikey: ## Generate API_SERVER_KEY in .env if it's empty
 
 wizard: ## Run the Hermes first-run setup wizard (interactive; writes ~/.hermes/.env + config)
 	@set -a; . ./$(ENV_FILE); set +a; \
-	  HERMES_DATA="$${DATA_DIR:-$$HOME/.hermes}"; \
+	  HERMES_DATA="$${DATA_DIR:-$(DOCKER_HOME)/.hermes}"; \
 	  docker run -it --rm \
 	    -v "$$HERMES_DATA":/opt/data \
 	    $(HERMES_IMAGE) setup
 
-secure: ## chmod 600 the secret files
+secure: ## chmod 600 the secret files (skipped on Windows where chmod is a no-op)
+ifdef ON_WINDOWS
+	@echo "→ Windows host detected — skipping chmod (NTFS ACLs control access; ensure only your user owns these files)"
+else
 	@chmod 600 $(ENV_FILE) 2>/dev/null && echo "✓ chmod 600 .env" || true
 	@set -a; . ./$(ENV_FILE); set +a; \
 	  HERMES_DATA="$${DATA_DIR:-$$HOME/.hermes}"; \
 	  test -f "$$HERMES_DATA/.env" && chmod 600 "$$HERMES_DATA/.env" && echo "✓ chmod 600 $$HERMES_DATA/.env" || true
+endif
+
+fix-permissions: ## Chown bind-mount dirs to HERMES_UID:HERMES_GID so containers can write to them
+	@set -a; . ./$(ENV_FILE) 2>/dev/null; set +a; \
+	  UID_VAL="$${HERMES_UID:-1000}"; \
+	  GID_VAL="$${HERMES_GID:-1000}"; \
+	  DOCKER_HOME="$(DOCKER_HOME)"; \
+	  DATA="$${DATA_DIR:-$$DOCKER_HOME/.hermes}"; \
+	  SHARED="$${SHARED_DIR:-$$DOCKER_HOME/.shared_agent_data}"; \
+	  WM="$${WM_DATA_DIR:-$$DOCKER_HOME/.windmill}"; \
+	  WM_LSP="$${WM_LSP_CACHE_DIR:-$$DOCKER_HOME/.windmill/lsp_cache}"; \
+	  CADDY_D="$${CADDY_DATA_DIR:-$$DOCKER_HOME/.caddy/data}"; \
+	  CADDY_C="$${CADDY_CONFIG_DIR:-$$DOCKER_HOME/.caddy/config}"; \
+	  echo "→ fixing ownership to $$UID_VAL:$$GID_VAL on bind-mount directories…"; \
+	  docker run --rm \
+	    -v "$$DATA":/mnt/data \
+	    -v "$$SHARED":/mnt/shared \
+	    -v "$$WM":/mnt/wm \
+	    -v "$$WM_LSP":/mnt/wm_lsp \
+	    -v "$$CADDY_D":/mnt/caddy_data \
+	    -v "$$CADDY_C":/mnt/caddy_config \
+	    alpine:3 \
+	    sh -c "chown -R $$UID_VAL:$$GID_VAL /mnt/data /mnt/shared /mnt/wm /mnt/wm_lsp /mnt/caddy_data /mnt/caddy_config && chmod -R u+rwX /mnt/data /mnt/shared /mnt/wm /mnt/wm_lsp /mnt/caddy_data /mnt/caddy_config"; \
+	  echo "✓ ownership corrected"
 
 pull: ## Pull the latest images
 	@$(COMPOSE) pull
