@@ -17,12 +17,16 @@ with the Windmill side pre-wired to call Hermes as an OpenAI-compatible endpoint
 
 ## Architecture
 
-Four Docker networks keep traffic segmented:
+Six Docker networks keep traffic segmented:
 
 - **`backend`** — Postgres ⇄ Windmill server/workers. The DB is reachable by nothing else.
-- **`edge`** — Caddy ⇄ Windmill server, Windmill LSP, Hermes (everything it proxies).
-- **`agent`** — Windmill server/workers ⇄ the Hermes gateway API (`hermes:8642`).
-- **`memory`** — Hindsight ⇄ Hermes. Isolated from the edge and backend networks.
+- **`edge`** — Caddy ⇄ all user-facing services (Windmill, Hermes, Hindsight, Headroom, Ollama).
+- **`agent`** — Windmill server/workers ⇄ Hermes gateway (`hermes:8642`). Also carries
+  Hermes → Headroom (`headroom:8787`).
+- **`memory`** — Hindsight ⇄ Hermes. Isolated from edge and backend.
+- **`inference`** — Ollama ⇄ Hermes, Hindsight, and Windmill workers (local LLM layer).
+- **`monitoring`** — Prometheus, Grafana, cAdvisor, exporters, and Headroom. Isolated
+  from application networks.
 
 The Hermes dashboard and the OpenAI-compatible API run **inside the single Hermes
 container** (the dashboard is a supervised s6 service — it cannot run as a
@@ -166,6 +170,68 @@ Hindsight should surface the retained fact via `hindsight_recall`.
 
 ---
 
+## Headroom context compression
+
+[Headroom](https://headroom-docs.vercel.app/) is an OpenAI-compatible proxy sidecar
+that compresses Hermes LLM request context before forwarding to the upstream provider,
+reducing token usage 40–95% with near-zero accuracy loss. It runs transparently — Hermes
+is unaware of the compression layer.
+
+### How it fits
+
+```
+Hermes → http://headroom:8787/v1/chat/completions → Headroom compresses → OpenRouter API
+```
+
+| Content type | Compressor | Typical savings |
+|---|---|---|
+| JSON / tool outputs | SmartCrusher | 70–90% |
+| Source code | CodeCompressor | 40–70% |
+| Build / test logs | LogCompressor | 80–95% |
+| Search results | SearchCompressor | 60–80% |
+| Plain text | Kompress | 30–50% |
+
+### One-time setup after first boot
+
+```sh
+make headroom
+```
+
+This runs `hermes config set model.base_url http://headroom:8787/v1`, writing to
+`/opt/data/config.yaml` (the bind-mounted data directory) so it persists across
+restarts and container rebuilds. `make bootstrap` will also prompt to run this step.
+
+To revert to direct provider routing:
+
+```sh
+make headroom-revert
+```
+
+### Checking savings
+
+```sh
+# Via Caddy virtualhost:
+open http://headroom.localhost/stats
+open http://headroom.localhost/dashboard
+
+# Direct (bypasses Caddy):
+curl http://127.0.0.1:8787/stats
+curl http://127.0.0.1:8787/stats-history
+
+# Prometheus metrics (also scraped automatically by the stack):
+curl http://127.0.0.1:8787/metrics
+```
+
+### Headroom configuration (`.env`)
+
+| Variable | Default | Notes |
+|---|---|---|
+| `HEADROOM_DAILY_BUDGET` | _(empty)_ | USD daily spend cap — leave blank for unlimited |
+| `HEADROOM_MEM_LIMIT` | `512M` | Container memory cap. Bump to `1G`–`2G` for LLMLingua ML compression |
+| `HEADROOM_CPU_LIMIT` | `0.5` | Container CPU cap |
+
+---
+
 ## Configuration (`.env`)
 
 | Variable | Default | Notes |
@@ -195,6 +261,7 @@ With the default Caddy config (plain HTTP on `.localhost` hostnames):
 | Hermes API | `http://hermes-api.localhost` (or `http://localhost:8642`) |
 | Hindsight UI | `http://hindsight.localhost` (or `http://localhost:9999`) |
 | Hindsight API | `http://localhost:8888` |
+| Headroom dashboard | `http://headroom.localhost` (or `http://localhost:8787`) |
 
 `.localhost` resolves to `127.0.0.1` on most systems. From other machines on your
 LAN, either add host entries or switch to a real domain (see below).
@@ -290,6 +357,12 @@ name the gateway actually serves — run `client.py` (or
   from inside the container: `docker exec hindsight curl http://host.docker.internal:1234/v1/models`
 - **Hermes plugin can't reach Hindsight** — use `http://hindsight:8888` not
   `http://hindsight.localhost` (see [Installing the Hermes plugin](#installing-the-hermes-plugin)).
+- **Hermes errors after `make headroom`** — check Headroom is running:
+  `docker compose ps headroom` and `docker compose logs headroom`. Ensure
+  `OPENROUTER_API_KEY` is set in `.env`. Revert with `make headroom-revert`.
+- **`savings_percent` stays 0** — expected for the first few requests while
+  Headroom calibrates. Check `/v1/compress` with a test payload to confirm
+  compression is active.
 
 ## CI
 

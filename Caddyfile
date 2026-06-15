@@ -53,3 +53,8 @@ http://prometheus.localhost {
 http://ollama.localhost {
     reverse_proxy ollama:11434
 }
+
+# --- Headroom (context compression stats / dashboard) -----------------------
+http://headroom.localhost {
+    reverse_proxy headroom:8787
+}
