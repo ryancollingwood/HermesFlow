@@ -263,7 +263,8 @@ how to point Hindsight and/or Hermes at it. Quick version:
 
 ```sh
 pip install mlx-lm
-./mlx/serve.sh                 # serves an OpenAI-compatible API on :8080
+./mlx/serve.sh                 # manual: serves an OpenAI-compatible API on :8080
+./mlx/install-launchd.sh        # or: always-on launchd agent, restarts on crash/reboot
 make mlx                       # routes Hermes's own model calls through it
 ```
 

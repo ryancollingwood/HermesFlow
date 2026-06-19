@@ -31,7 +31,10 @@ instead.
    pip install mlx-lm
    ```
 
-2. Start the server:
+2. Start the server — pick one:
+
+   **Manual** (runs in your terminal, stops when you close it — good for
+   testing a model before committing to it):
 
    ```sh
    source ~/.mlx-venv/bin/activate
@@ -39,10 +42,37 @@ instead.
    ./mlx/serve.sh mlx-community/Qwen2.5-7B-Instruct-4bit   # or pass a model explicitly
    ```
 
+   **launchd agent** (starts at login, restarts automatically if it crashes —
+   for an "always-on" setup, the closest equivalent to how the rest of the
+   stack runs as managed services):
+
+   ```sh
+   MLX_MODEL=mlx-community/Qwen2.5-7B-Instruct-4bit \
+   MLX_HOST_PORT=8080 \
+     ./mlx/install-launchd.sh
+   ```
+
+   `MLX_VENV_BIN` defaults to `~/.mlx-venv/bin` (matching step 1 above) — set
+   it explicitly if your venv lives elsewhere. The script renders
+   `com.hermesflow.mlx.plist.template` with your values, installs it to
+   `~/Library/LaunchAgents/com.hermesflow.mlx.plist`, and loads it via
+   `launchctl bootstrap`.
+
+   Useful follow-ups:
+
+   ```sh
+   launchctl print gui/$(id -u)/com.hermesflow.mlx   # status + last exit code
+   tail -f ~/Library/Logs/HermesFlow/mlx.{out,err}.log
+   ./mlx/uninstall-launchd.sh                        # stop + remove the agent
+   ```
+
+   Switching models or port: re-run `install-launchd.sh` with new values —
+   it's idempotent (tears down the previous instance first).
+
    The first run downloads the model from Hugging Face (the
    `mlx-community` org hosts pre-converted MLX weights) and caches it under
    `~/.cache/huggingface`. `mlx_lm.server` loads exactly one model per
-   process — restart it to switch models.
+   process — restart it (or re-run `install-launchd.sh`) to switch models.
 
 3. Confirm it's serving:
 
@@ -102,6 +132,7 @@ Browse more converted models at
   separate server instances on different ports if you need that.
 - No GPU sharing with other apps — if LM Studio or another MLX/Metal process
   is also running, you'll contend for the same GPU.
-- The server isn't managed by Docker, so it won't restart automatically on
-  reboot or show up in `docker compose ps` / Prometheus. If you want it
-  always-on, wrap `mlx/serve.sh` in a `launchd` agent.
+- Either way, the server isn't managed by Docker — it won't show up in
+  `docker compose ps`, and Prometheus/cAdvisor won't scrape it. The `launchd`
+  option restarts it across crashes and reboots, but monitoring it is on you
+  (`launchctl print` / the log files above).
