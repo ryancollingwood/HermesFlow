@@ -185,8 +185,33 @@ services:
           cpus: "${HEADROOM_CPU_LIMIT:-0.5}"
 
   # ---------------------------------------------------------------------------
+  #  Hindsight database — external PostgreSQL + pgvector
+  #  Replaces Hindsight's embedded pg0 instance so memory data survives
+  #  container recreation and gets the same backup/monitoring treatment as
+  #  Windmill's db.
+  # ---------------------------------------------------------------------------
+  hindsight_db:
+    image: pgvector/pgvector:pg16
+    container_name: hindsight_db
+    restart: unless-stopped
+    volumes:
+      - ${HINDSIGHT_DB_DATA_DIR:-./data/hindsight/db}:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: ${HINDSIGHT_DB_USER:-hindsight}
+      POSTGRES_PASSWORD: ${HINDSIGHT_DB_PASSWORD:-hindsight}
+      POSTGRES_DB: ${HINDSIGHT_DB_NAME:-hindsight}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${HINDSIGHT_DB_USER:-hindsight}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [memory]
+    logging: *default-logging
+
+  # ---------------------------------------------------------------------------
   #  Hindsight — personal second-brain memory
-  #  Single container with embedded PostgreSQL + pgvector. No external DB needed.
+  #  API server + web UI, backed by the external `hindsight_db` PostgreSQL
+  #  service above (pgvector extension) instead of the embedded pg0.
   #  API on 8888, web UI (memory browser) on 9999.
   #  LLM is used for fact extraction and reflect synthesis — points at LM Studio.
   # ---------------------------------------------------------------------------
@@ -194,7 +219,12 @@ services:
     image: ghcr.io/vectorize-io/hindsight:latest
     container_name: hindsight
     restart: unless-stopped
+    depends_on:
+      hindsight_db:
+        condition: service_healthy
     environment:
+      # ── Database (external PostgreSQL + pgvector, replaces embedded pg0) ──
+      - HINDSIGHT_API_DATABASE_URL=postgresql://${HINDSIGHT_DB_USER:-hindsight}:${HINDSIGHT_DB_PASSWORD:-hindsight}@hindsight_db:5432/${HINDSIGHT_DB_NAME:-hindsight}
       # ── Primary LLM ────────────────────────────────────────────────────────
       - HINDSIGHT_API_LLM_API_KEY=${HINDSIGHT_LLM_API_KEY:-openai}
       - HINDSIGHT_API_LLM_BASE_URL=${HINDSIGHT_LLM_BASE_URL:-http://ollama:11434/v1}
@@ -242,12 +272,10 @@ services:
       - HINDSIGHT_API_LOG_LEVEL=${HINDSIGHT_LOG_LEVEL:-INFO}
       - HINDSIGHT_API_WORKER_POLL_INTERVAL_MS=${HINDSIGHT_API_WORKER_POLL_INTERVAL_MS:-1000}
     volumes:
-      - ${HINDSIGHT_DATA_DIR:-./data/hindsight/data}:/home/hindsight/.pg0
       - ${HINDSIGHT_CACHE_DIR:-./data/hindsight/cache}:/home/hindsight/.cache
     ports:
       - "${HINDSIGHT_BIND:-127.0.0.1}:${HINDSIGHT_API_PORT:-8888}:8888"   # REST API
       - "${HINDSIGHT_BIND:-127.0.0.1}:${HINDSIGHT_UI_PORT:-9999}:9999"    # Web UI
-      - 5432:5432
     extra_hosts:
       - "host.docker.internal:host-gateway"   # reach LM Studio on the host
     healthcheck:
@@ -579,4 +607,21 @@ services:
           cpus: "0.1"
           memory: 64M
     networks: [backend, monitoring]
+    logging: *default-logging
+
+  hindsight_postgres_exporter:
+    image: prometheuscommunity/postgres-exporter:${PG_EXPORTER_VERSION:-latest}
+    container_name: hindsight_postgres_exporter
+    restart: unless-stopped
+    environment:
+      - DATA_SOURCE_NAME=postgresql://${HINDSIGHT_DB_USER:-hindsight}:${HINDSIGHT_DB_PASSWORD:-hindsight}@hindsight_db:5432/${HINDSIGHT_DB_NAME:-hindsight}?sslmode=disable
+    depends_on:
+      hindsight_db:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: 64M
+    networks: [memory, monitoring]
     logging: *default-logging
