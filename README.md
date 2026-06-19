@@ -36,8 +36,6 @@ separate container).
 
 - Docker Engine + Compose v2
 - `make`, `openssl`, `curl`
-- [LM Studio](https://lmstudio.ai) running locally with a chat model and an
-  embedding model both loaded and served (see [LM Studio setup](#lm-studio-setup))
 - (Optional) the [`wmill` CLI](https://www.windmill.dev/docs/advanced/cli) for pushing the Windmill assets
 
 ## Quick start
