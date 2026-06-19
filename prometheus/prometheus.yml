@@ -23,6 +23,11 @@ scrape_configs:
     static_configs:
       - targets: ['postgres_exporter:9187']
 
+  # Hindsight PostgreSQL metrics
+  - job_name: hindsight_postgres_exporter
+    static_configs:
+      - targets: ['hindsight_postgres_exporter:9187']
+
   # Headroom context-compression proxy — token savings and request stats
   - job_name: headroom
     static_configs:

@@ -63,8 +63,9 @@ Run `make` on its own to list all targets.
 
 [Hindsight](https://hindsight.vectorize.io) is the memory layer for Hermes. It
 provides structured fact extraction, entity resolution, a knowledge graph, and
-multi-strategy retrieval (semantic, keyword, temporal, graph) in a single
-container with embedded PostgreSQL — no separate vector store needed.
+multi-strategy retrieval (semantic, keyword, temporal, graph), backed by a
+dedicated external PostgreSQL + pgvector container (`hindsight_db`) rather
+than the embedded `pg0` instance Hindsight ships by default.
 
 ### How it fits
 
@@ -72,9 +73,8 @@ container with embedded PostgreSQL — no separate vector store needed.
 Hermes Agent
 └── hindsight plugin (hindsight_retain / hindsight_recall / hindsight_reflect)
         ↓ http://hindsight:8888
-    Hindsight container
-    ├── embedded PostgreSQL + pgvector
-    ├── fact extraction (via LM Studio)
+    Hindsight container ── HINDSIGHT_API_DATABASE_URL ──→ hindsight_db container
+    ├── fact extraction (via LM Studio)                   (PostgreSQL 16 + pgvector)
     └── knowledge graph
 ```
 
@@ -102,7 +102,7 @@ Both model IDs should appear in the response.
 | `HINDSIGHT_LLM_API_KEY` | `lm-studio` | Passed to Hindsight as `HINDSIGHT_API_LLM_API_KEY` |
 | `HINDSIGHT_LLM_BASE_URL` | `http://host.docker.internal:1234/v1` | LM Studio endpoint (host machine) |
 | `HINDSIGHT_LLM_MODEL` | `google/gemma-4-e4b` | Model ID exactly as reported by `/v1/models` |
-| `HINDSIGHT_DATA_DIR` | `C:/Containers/hindsight` | Persists embedded PostgreSQL data across restarts |
+| `HINDSIGHT_DB_DATA_DIR` | `${HOME}/HermesFlow/hindsight/db` | Persists `hindsight_db` PostgreSQL data across restarts |
 | `HINDSIGHT_API_PORT` | `8888` | REST API port |
 | `HINDSIGHT_UI_PORT` | `9999` | Web UI port (memory browser) |
 | `HINDSIGHT_API_KEY` | _(empty)_ | Optional bearer token to protect the API endpoint |
@@ -217,6 +217,36 @@ up on the next poll cycle.
 
 See the [Hindsight Admin CLI docs](https://hindsight.vectorize.io/developer/admin-cli#recovering-stuck-or-zombie-operations)
 for full reference.
+
+### Migrating from embedded Postgres
+
+If you're upgrading an existing install that still uses Hindsight's embedded
+`pg0` database, move the data to `hindsight_db` **before** cutting `hindsight`
+over to the new `HINDSIGHT_API_DATABASE_URL`:
+
+```sh
+# 1. While `hindsight` is still running on embedded pg0, take a backup:
+docker compose exec hindsight hindsight-admin backup /tmp/hindsight-pg0-backup.zip
+docker compose cp hindsight:/tmp/hindsight-pg0-backup.zip ./hindsight-pg0-backup.zip
+
+# 2. Start the new external Postgres container:
+docker compose up -d hindsight_db
+
+# 3. Recreate hindsight pointed at hindsight_db (applies HINDSIGHT_API_DATABASE_URL):
+docker compose up -d hindsight
+
+# 4. Restore the backup into the now-external-Postgres-backed instance:
+docker compose cp ./hindsight-pg0-backup.zip hindsight:/tmp/hindsight-pg0-backup.zip
+docker compose exec hindsight hindsight-admin restore /tmp/hindsight-pg0-backup.zip --yes
+
+# 5. Verify:
+docker compose exec hindsight hindsight-admin worker-status
+curl http://localhost:8888/health
+```
+
+Keep `./hindsight-pg0-backup.zip` and the old `HINDSIGHT_DATA_DIR` bind mount
+around as a rollback safety net until you've confirmed pre-existing memories
+are present via the web UI / API.
 
 ---
 
