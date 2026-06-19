@@ -168,6 +168,56 @@ What do you know about where I work?
 
 Hindsight should surface the retained fact via `hindsight_recall`.
 
+### Managing zombie operations
+
+Hindsight workers identify themselves by `HINDSIGHT_API_WORKER_ID`, which
+**defaults to the container hostname**. Every `docker restart` or redeploy
+generates a new hostname, so the new worker doesn't recognize the old
+worker's in-flight tasks as its own — those tasks get permanently stuck in
+`processing` ("zombies") and silently stop being processed.
+
+**Symptom:** retain or consolidation jobs stuck for hours, queue depth not
+decreasing, logs showing `[STUCK?]` warnings with `age` climbing well past
+`HINDSIGHT_API_LLM_TIMEOUT`.
+
+#### Prevention — pin a stable worker ID
+
+Add to `.env`:
+
+```bash
+HINDSIGHT_API_WORKER_ID=hindsight-worker-1
+```
+
+With a stable ID, Hindsight's `recover_own_tasks()` correctly reclaims its
+own stuck tasks on every startup — no manual intervention needed.
+
+#### Diagnosing and clearing existing zombies
+
+Use the bundled admin CLI rather than touching the database directly:
+
+```bash
+# See processing tasks grouped by worker. Workers with no recent activity
+# and a growing age are dead.
+docker exec hindsight hindsight-admin worker-status
+
+# Release tasks from one known-dead worker (use the ID from worker-status)
+docker exec hindsight hindsight-admin decommission-worker <old-worker-id>
+
+# Or, if you don't know which worker is dead, release everything stuck
+# across the whole fleet:
+docker exec hindsight hindsight-admin decommission-workers --yes
+```
+
+Both reset `processing` rows back to `pending` so a live worker picks them
+up on the next poll cycle.
+
+> Run `decommission-workers --yes` once after first adding
+> `HINDSIGHT_API_WORKER_ID` to clear any zombies accumulated before the fix
+> was in place. After that, restarts should self-heal.
+
+See the [Hindsight Admin CLI docs](https://hindsight.vectorize.io/developer/admin-cli#recovering-stuck-or-zombie-operations)
+for full reference.
+
 ---
 
 ## Headroom context compression

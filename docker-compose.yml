@@ -165,6 +165,7 @@ services:
       # LLMLingua ML compression (optional — adds ~2GB RAM, 10-30s cold start):
       # - HEADROOM_LLMLINGUA=${HEADROOM_LLMLINGUA:-}
       # - HEADROOM_LLMLINGUA_DEVICE=${HEADROOM_LLMLINGUA_DEVICE:-cpu}
+      - HEADROOM_TELEMETRY=${HEADROOM_TELEMETRY:-false}
     ports:
       # Bind localhost-only — Caddy and internal Docker traffic use named networks.
       # Expose for direct /stats, /dashboard, /metrics access on the host.
@@ -234,6 +235,7 @@ services:
       - HINDSIGHT_API_WORKERS=${HINDSIGHT_WORKERS:-1}
       - HINDSIGHT_API_KEY=${HINDSIGHT_API_KEY:-}
       # ── Worker slot control ────────────────────────────────────────────
+      - HINDSIGHT_API_WORKER_ID=${HINDSIGHT_API_WORKER_ID:-hindsight-worker-1}
       - HINDSIGHT_API_WORKER_MAX_SLOTS=${HINDSIGHT_API_WORKER_MAX_SLOTS:-3}
       - HINDSIGHT_API_WORKER_CONSOLIDATION_MAX_SLOTS=${HINDSIGHT_API_WORKER_CONSOLIDATION_MAX_SLOTS:-1}
       - HINDSIGHT_API_WORKER_RETAIN_MAX_SLOTS=${HINDSIGHT_API_WORKER_RETAIN_MAX_SLOTS:-1}
