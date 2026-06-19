@@ -277,15 +277,53 @@ Hermes → http://headroom:8787/v1/chat/completions → Headroom compresses → 
 make headroom
 ```
 
-This runs `hermes config set model.base_url http://headroom:8787/v1`, writing to
-`/opt/data/config.yaml` (the bind-mounted data directory) so it persists across
-restarts and container rebuilds. `make bootstrap` will also prompt to run this step.
+This sets three Hermes config keys in `/opt/data/config.yaml` (the bind-mounted data
+directory, so it persists across restarts and container rebuilds) and restarts the
+`hermes` container so they take effect:
+
+- `model.provider: custom` — **must not** be left as `openrouter`. Hermes's built-in
+  OpenRouter client ignores `model.base_url` entirely and calls OpenRouter directly,
+  silently bypassing Headroom. Only a non-built-in provider name (`custom`) makes Hermes
+  honor the `base_url` override.
+- `model.base_url: http://headroom:8787/v1` — routes Hermes's outbound chat requests
+  through the proxy.
+- `model.api_key` — copied from `OPENROUTER_API_KEY` so the `custom` provider has
+  credentials to send; Headroom swaps in its own upstream key once `--backend openrouter`
+  (set on the `headroom` service in `docker-compose.yml`) is configured.
+
+`make bootstrap` will also prompt to run this step.
 
 To revert to direct provider routing:
 
 ```sh
 make headroom-revert
 ```
+
+### Verifying Headroom is actually doing something
+
+A "healthy" container and a configured `base_url` are not proof that traffic is flowing
+through it — Hermes can silently bypass Headroom if `model.provider` is wrong (see above).
+Confirm the whole path end-to-end:
+
+```sh
+# 1. Backend should read "openrouter", not the default "anthropic":
+docker exec headroom curl -fsS http://localhost:8787/health | grep backend
+
+# 2. Send a real request, then check it actually landed on /v1/chat/completions:
+docker exec hermes hermes -z "Say PONG and nothing else"
+docker exec headroom curl -fsS http://localhost:8787/stats | grep -o '"api_requests":[0-9]*'
+# api_requests should increment — if it stays 0, Hermes is bypassing the proxy.
+
+# 3. Decisive check — stop Headroom and confirm Hermes now FAILS (proves it's a real
+#    dependency, not bypassed):
+docker stop headroom
+docker exec hermes hermes -z "Say PONG and nothing else"   # should error, not succeed
+docker start headroom
+```
+
+Compression itself only kicks in above `min_tokens_to_crush` (500 tokens by default), so
+short test prompts won't show savings in `requests_compressed` — that's expected, not a
+sign of misconfiguration.
 
 ### Checking savings
 

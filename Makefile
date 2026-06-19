@@ -131,7 +131,10 @@ health: ## Probe Hermes /health and Windmill /api/version
 	  echo -n "Windmill: "; curl -fsS -H "Host: windmill.localhost" "http://127.0.0.1:$${CADDY_HTTP_PORT:-80}/api/version" || echo "unreachable"; echo
 
 headroom: ## Route Hermes through the Headroom context-compression proxy
+	@docker exec hermes hermes config set model.provider custom
 	@docker exec hermes hermes config set model.base_url http://headroom:8787/v1
+	@docker exec hermes sh -c 'set -a; . /opt/data/.env; set +a; hermes config set model.api_key "$$OPENROUTER_API_KEY"' >/dev/null
+	@$(COMPOSE) restart hermes
 	@echo "✓ Hermes is routing through Headroom"
 	@echo "  Stats:     http://headroom.localhost/stats  (or http://localhost:8787/stats)"
 	@echo "  Dashboard: http://headroom.localhost/dashboard"
