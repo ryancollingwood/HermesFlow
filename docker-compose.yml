@@ -156,7 +156,7 @@ services:
       - "--port"
       - "8787"
       - "--budget"
-      - "${HEADROOM_DAILY_BUDGET:-}"
+      - "${HEADROOM_DAILY_BUDGET:-0}"
     environment:
       # Must match the provider Hermes is configured to use.
       - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
