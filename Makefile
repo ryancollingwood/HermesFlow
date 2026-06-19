@@ -27,7 +27,7 @@ else
   ON_WINDOWS :=
 endif
 
-.PHONY: help check init apikey wizard secure fix-permissions pull up down restart logs ps health backup bootstrap lint validate ci headroom headroom-revert
+.PHONY: help check init apikey wizard secure fix-permissions pull up down restart logs ps health backup bootstrap lint validate ci headroom headroom-revert mlx mlx-revert
 
 help: ## Show this help
 	@echo "Hermes + Windmill stack"
@@ -144,6 +144,17 @@ headroom-revert: ## Revert Hermes to direct provider routing (bypass Headroom)
 	@docker exec hermes hermes config set model.base_url ""
 	@$(COMPOSE) restart hermes
 	@echo "✓ Hermes is now routing directly to the provider"
+
+mlx: ## Route Hermes to a host-native MLX server (Apple Silicon — see mlx/README.md)
+	@set -a; . ./$(ENV_FILE); set +a; \
+	  docker exec hermes hermes config set model.provider custom; \
+	  docker exec hermes hermes config set model.base_url "$${MLX_BASE_URL:-http://host.docker.internal:8080/v1}"; \
+	  docker exec hermes hermes config set model.api_key mlx
+	@$(COMPOSE) restart hermes
+	@echo "✓ Hermes is routing to the host MLX server"
+	@echo "  Make sure mlx_lm.server is running on the host first — see mlx/README.md"
+
+mlx-revert: headroom-revert ## Revert Hermes to direct provider routing (alias of headroom-revert)
 
 validate: ## Validate docker-compose.yml (mirrors CI)
 	@test -f .env || cp .env.example .env

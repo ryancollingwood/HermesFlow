@@ -120,6 +120,8 @@ services:
     volumes:
       - ${DATA_DIR:-./data/hermes}:/opt/data
       - ${SHARED_DIR:-./data/shared}:/shared
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # reach a host-native MLX server (see mlx/)
     shm_size: 1g   # Playwright/Chromium browser tools need shared memory
     # Health endpoint lives on the API server (API_SERVER_ENABLED=true). If this
     # returns 401/404 on your version, switch to the authenticated probe below.
