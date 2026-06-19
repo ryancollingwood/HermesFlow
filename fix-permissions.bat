@@ -19,6 +19,9 @@ set "WM_DATA_DIR="
 set "WM_LSP_CACHE_DIR="
 set "CADDY_DATA_DIR="
 set "CADDY_CONFIG_DIR="
+set "HINDSIGHT_DATA_DIR="
+set "HINDSIGHT_CACHE_DIR="
+set "HINDSIGHT_PG0_DIR="
 
 if exist ".env" (
     for /f "usebackq tokens=1* delims==" %%A in (`findstr /v "^#" .env ^| findstr /v "^$"`) do (
@@ -56,6 +59,9 @@ if "%WM_DATA_DIR%"=="" set "WM_DATA_DIR=%DOCKER_HOME%/.windmill"
 if "%WM_LSP_CACHE_DIR%"=="" set "WM_LSP_CACHE_DIR=%DOCKER_HOME%/.windmill/lsp_cache"
 if "%CADDY_DATA_DIR%"=="" set "CADDY_DATA_DIR=%DOCKER_HOME%/.caddy/data"
 if "%CADDY_CONFIG_DIR%"=="" set "CADDY_CONFIG_DIR=%DOCKER_HOME%/.caddy/config"
+if "%HINDSIGHT_DATA_DIR%"=="" set "HINDSIGHT_DATA_DIR=%DOCKER_HOME%/.hindsight/data"
+if "%HINDSIGHT_CACHE_DIR%"=="" set "HINDSIGHT_CACHE_DIR=%DOCKER_HOME%/.hindsight/cache"
+if "%HINDSIGHT_PG0_DIR%"=="" set "HINDSIGHT_PG0_DIR=%HINDSIGHT_DATA_DIR%/.pg0"
 
 :: ── Normalise any remaining backslashes that came from .env ───────────────
 set "DATA_DIR=%DATA_DIR:\=/%"
@@ -64,6 +70,9 @@ set "WM_DATA_DIR=%WM_DATA_DIR:\=/%"
 set "WM_LSP_CACHE_DIR=%WM_LSP_CACHE_DIR:\=/%"
 set "CADDY_DATA_DIR=%CADDY_DATA_DIR:\=/%"
 set "CADDY_CONFIG_DIR=%CADDY_CONFIG_DIR:\=/%"
+set "HINDSIGHT_DATA_DIR=%HINDSIGHT_DATA_DIR:\=/%"
+set "HINDSIGHT_CACHE_DIR=%HINDSIGHT_CACHE_DIR:\=/%"
+set "HINDSIGHT_PG0_DIR=%HINDSIGHT_PG0_DIR:\=/%"
 
 :: ── Verify Docker is available ────────────────────────────────────────────
 docker version >nul 2>&1
@@ -84,6 +93,9 @@ for %%D in (
     "%WM_LSP_CACHE_DIR%"
     "%CADDY_DATA_DIR%"
     "%CADDY_CONFIG_DIR%"
+    "%HINDSIGHT_DATA_DIR%"
+    "%HINDSIGHT_CACHE_DIR%"
+    "%HINDSIGHT_PG0_DIR%"
 ) do (
     :: Convert back to Windows path for mkdir
     set "WIN_PATH=%%~D"
@@ -98,6 +110,9 @@ echo   WM_DATA_DIR    : %WM_DATA_DIR%
 echo   WM_LSP_CACHE   : %WM_LSP_CACHE_DIR%
 echo   CADDY_DATA_DIR : %CADDY_DATA_DIR%
 echo   CADDY_CONFIG   : %CADDY_CONFIG_DIR%
+echo   HINDSIGHT_DATA : %HINDSIGHT_DATA_DIR%
+echo   HINDSIGHT_CACHE: %HINDSIGHT_CACHE_DIR%
+echo   HINDSIGHT_PG0  : %HINDSIGHT_PG0_DIR%
 echo.
 
 docker run --rm ^
@@ -107,11 +122,30 @@ docker run --rm ^
     -v "%WM_LSP_CACHE_DIR%:/mnt/wm_lsp" ^
     -v "%CADDY_DATA_DIR%:/mnt/caddy_data" ^
     -v "%CADDY_CONFIG_DIR%:/mnt/caddy_config" ^
+    -v "%HINDSIGHT_DATA_DIR%:/mnt/hindsight_data" ^
+    -v "%HINDSIGHT_CACHE_DIR%:/mnt/hindsight_cache" ^
     alpine:3 ^
-    sh -c "chown -R %HERMES_UID%:%HERMES_GID% /mnt/data /mnt/shared /mnt/wm /mnt/wm_lsp /mnt/caddy_data /mnt/caddy_config && chmod -R u+rwX /mnt/data /mnt/shared /mnt/wm /mnt/wm_lsp /mnt/caddy_data /mnt/caddy_config"
+    sh -c "chown -R %HERMES_UID%:%HERMES_GID% /mnt/data /mnt/shared /mnt/wm /mnt/wm_lsp /mnt/caddy_data /mnt/caddy_config /mnt/hindsight_data /mnt/hindsight_cache && chmod -R u+rwX /mnt/data /mnt/shared /mnt/wm /mnt/wm_lsp /mnt/caddy_data /mnt/caddy_config /mnt/hindsight_data /mnt/hindsight_cache"
 
 if errorlevel 1 (
     echo [ERROR] Docker container exited with an error — check the output above.
+    exit /b 1
+)
+
+:: ── Fix embedded pg0 PostgreSQL cluster permissions ───────────────────────
+:: Postgres refuses to start unless the cluster's data dir is owned by the run
+:: user AND is mode 0700/0750. The generic "u+rwX" above can't strip the
+:: group/world bits Docker Desktop reports, so we tighten the data dir to 0700
+:: explicitly. The data dir is located by finding PG_VERSION, so this works
+:: regardless of the pg0 instance id (instances/<id>/data).
+:: NOTE: only relevant if pg0 lives on a BIND MOUNT. If you moved it to a named
+:: volume (recommended on Windows), delete this step — it won't apply.
+echo Fixing pg0 PostgreSQL cluster permissions (chown + 0700 on data dir)...
+
+docker run --rm -v "%HINDSIGHT_PG0_DIR%:/mnt/pg0" alpine:3 sh -c "chown -R %HERMES_UID%:%HERMES_GID% /mnt/pg0 && for d in $(find /mnt/pg0 -name PG_VERSION); do chmod 700 $(dirname $d); done"
+
+if errorlevel 1 (
+    echo [ERROR] pg0 permission fix failed — check the output above.
     exit /b 1
 )
 
