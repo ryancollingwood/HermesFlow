@@ -11,13 +11,14 @@ before touching any file.
 | Layer | Services |
 |---|---|
 | Ingress | `caddy` |
-| Agent | `hermes` |
-| Memory | `hindsight` |
+| Agent | `hermes`, `headroom` |
+| Memory | `hindsight`, `hindsight_db` |
+| Inference | `ollama` |
 | Workflow | `windmill_server`, `windmill_lsp`, `windmill_worker` (×2), `windmill_worker_native` |
 | Data | `db` (PostgreSQL 16) |
-| Observability | `prometheus`, `grafana`, `cadvisor`, `node_exporter`, `postgres_exporter` |
+| Observability | `prometheus`, `alertmanager`, `grafana`, `cadvisor`, `node_exporter`, `postgres_exporter`, `hindsight_postgres_exporter`, `loki`, `promtail` |
 
-Networks: `backend`, `edge`, `agent`, `memory`, `monitoring`.
+Networks: `backend`, `edge`, `agent`, `memory`, `inference`, `monitoring`.
 
 ---
 
@@ -171,7 +172,12 @@ documented operational reason.
 |---|---|
 | Grafana UI | `http://grafana.localhost` |
 | Prometheus UI | `http://prometheus.localhost` |
+| Alertmanager UI | `http://alertmanager.localhost` |
 | Scrape config | `prometheus/prometheus.yml` |
+| Alert rules | `prometheus/alert.rules.yml` |
+| Alert routing / receivers | `alertmanager/alertmanager.yml` (no real receiver configured by default) |
+| Log aggregation | Loki + Promtail — query via Grafana **Explore** → `Loki` datasource, no separate UI |
+| Loki / Promtail config | `loki/loki-config.yml`, `loki/promtail-config.yml` |
 | Datasource provisioning | `grafana/provisioning/datasources/prometheus.yml` |
 | Dashboard auto-load directory | `grafana/provisioning/dashboards/` |
 | Grafana credentials | `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD` in `.env` |

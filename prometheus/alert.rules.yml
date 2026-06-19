@@ -1,0 +1,51 @@
+groups:
+  - name: stack-alerts
+    rules:
+      # Any scrape target unreachable for 2m (cadvisor, node_exporter, both
+      # postgres exporters, headroom, alertmanager, loki, promtail, ...).
+      - alert: PrometheusTargetDown
+        expr: up == 0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Scrape target {{ $labels.job }} is down"
+          description: "{{ $labels.instance }} (job {{ $labels.job }}) has been unreachable for 2 minutes."
+
+      # cAdvisor stops reporting container_last_seen the moment a container
+      # disappears, regardless of whether that container exposes its own metrics.
+      - alert: ContainerDown
+        expr: time() - container_last_seen{name!=""} > 60
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Container {{ $labels.name }} has disappeared"
+          description: "cAdvisor hasn't seen container {{ $labels.name }} for over 60s — it may have crashed, been OOM-killed, or removed."
+
+      - alert: PostgresDown
+        expr: pg_up == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Postgres instance for job {{ $labels.job }} is unreachable"
+          description: "postgres_exporter job {{ $labels.job }} reports pg_up == 0."
+
+      - alert: HostDiskSpaceLow
+        expr: node_filesystem_avail_bytes{fstype!~"tmpfs|overlay|squashfs"} / node_filesystem_size_bytes{fstype!~"tmpfs|overlay|squashfs"} < 0.10
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Disk space low on {{ $labels.mountpoint }}"
+          description: "Less than 10% free space remaining on {{ $labels.mountpoint }} for 5+ minutes."
+
+      - alert: HostHighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) > 0.90
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Host memory usage above 90%"
+          description: "Host has been using more than 90% of memory for 5+ minutes."

@@ -155,15 +155,17 @@ lint: ## Ruff + py_compile the Windmill scripts (mirrors CI)
 
 ci: validate lint ## Run the same checks as GitHub Actions
 
-backup: ## Snapshot Postgres + the Hermes data dir into ./backups/
+backup: ## Snapshot Postgres (Windmill + Hindsight) + the Hermes data dir into ./backups/
 	@mkdir -p backups
 	@set -a; . ./$(ENV_FILE); set +a; \
 	  STAMP=$$(date +%F-%H%M); \
-	  echo "→ dumping Postgres…"; \
+	  echo "→ dumping Windmill Postgres…"; \
 	  $(COMPOSE) exec -T db pg_dump -U postgres windmill | gzip > "backups/windmill-$$STAMP.sql.gz"; \
+	  echo "→ dumping Hindsight Postgres…"; \
+	  $(COMPOSE) exec -T hindsight_db pg_dump -U "$${HINDSIGHT_DB_USER:-hindsight}" "$${HINDSIGHT_DB_NAME:-hindsight}" | gzip > "backups/hindsight-$$STAMP.sql.gz"; \
 	  echo "→ archiving Hermes /data…"; \
 	  tar czf "backups/hermes-$$STAMP.tar.gz" -C "$${DATA_DIR:-$$HOME/.hermes/data}" . ; \
-	  echo "✓ wrote backups/windmill-$$STAMP.sql.gz and backups/hermes-$$STAMP.tar.gz"
+	  echo "✓ wrote backups/windmill-$$STAMP.sql.gz, backups/hindsight-$$STAMP.sql.gz, and backups/hermes-$$STAMP.tar.gz"
 
 bootstrap: ## One-shot: check → init → apikey → wizard → secure → pull → up → health
 	@$(MAKE) init

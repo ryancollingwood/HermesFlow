@@ -58,3 +58,8 @@ http://ollama.localhost {
 http://headroom.localhost {
     reverse_proxy headroom:8787
 }
+
+# --- Alertmanager (alert UI / silencing — no built-in auth) -----------------
+http://alertmanager.localhost {
+    reverse_proxy alertmanager:9093
+}
