@@ -25,8 +25,8 @@ Six Docker networks keep traffic segmented:
   Hermes → Headroom (`headroom:8787`).
 - **`memory`** — Hindsight ⇄ Hermes. Isolated from edge and backend.
 - **`inference`** — Ollama ⇄ Hermes, Hindsight, and Windmill workers (local LLM layer).
-- **`monitoring`** — Prometheus, Grafana, cAdvisor, exporters, and Headroom. Isolated
-  from application networks.
+- **`monitoring`** — Prometheus, Alertmanager, Grafana, cAdvisor, exporters, Loki,
+  Promtail, and Headroom. Isolated from application networks.
 
 The Hermes dashboard and the OpenAI-compatible API run **inside the single Hermes
 container** (the dashboard is a supervised s6 service — it cannot run as a
@@ -378,9 +378,13 @@ With the default Caddy config (plain HTTP on `.localhost` hostnames):
 | Hindsight UI | `http://hindsight.localhost` (or `http://localhost:9999`) |
 | Hindsight API | `http://localhost:8888` |
 | Headroom dashboard | `http://headroom.localhost` (or `http://localhost:8787`) |
+| Alertmanager | `http://alertmanager.localhost` |
 
 `.localhost` resolves to `127.0.0.1` on most systems. From other machines on your
 LAN, either add host entries or switch to a real domain (see below).
+
+Loki has no UI of its own and no Caddy route — query container logs via Grafana's
+**Explore** tab with the `Loki` datasource (provisioned automatically).
 
 ### Real domain + TLS
 
@@ -446,7 +450,7 @@ name the gateway actually serves — run `client.py` (or
 | `make logs` / `ps` | Follow logs / status |
 | `make health` | Probe Hermes `/health` and Windmill `/api/version` |
 | `make apikey` | Generate `API_SERVER_KEY` into `.env` if empty |
-| `make backup` | `pg_dump` of Windmill + tar of Hermes `/opt/data` → `./backups/` |
+| `make backup` | `pg_dump` of Windmill + Hindsight Postgres, tar of Hermes `/opt/data` → `./backups/` |
 | `make pull` | Pull latest images |
 
 ## Security notes
