@@ -60,6 +60,8 @@ services:
         condition: service_started
       hindsight:
         condition: service_started
+      headroom:
+        condition: service_started
     networks: [edge]
     logging: *default-logging
 
@@ -75,6 +77,9 @@ services:
     image: nousresearch/hermes-agent:${HERMES_VERSION:-latest}
     container_name: hermes
     restart: unless-stopped
+    depends_on:
+      headroom:
+        condition: service_healthy
     command: gateway run
     ports:
       # HERMES_BIND defaults to localhost. Set it to 0.0.0.0 (or empty) for LAN
@@ -131,6 +136,53 @@ services:
           cpus: "${HERMES_CPU_LIMIT:-2.0}"
     networks: [edge, agent, memory, inference]
     logging: *default-logging
+
+  # ---------------------------------------------------------------------------
+  #  Headroom — context optimisation proxy
+  #  Transparently compresses Hermes LLM requests before forwarding to the
+  #  upstream provider (OpenRouter, etc.). Reachable at http://headroom:8787/v1
+  #  from the hermes container (agent net). Caddy proxies the stats/dashboard
+  #  UI at http://headroom.localhost (edge net). Prometheus scrapes /metrics
+  #  (monitoring net).
+  # ---------------------------------------------------------------------------
+  headroom:
+    image: ghcr.io/chopratejas/headroom:latest
+    container_name: headroom
+    restart: unless-stopped
+    command:
+      - "proxy"
+      - "--host"
+      - "0.0.0.0"
+      - "--port"
+      - "8787"
+      - "--budget"
+      - "${HEADROOM_DAILY_BUDGET:-}"
+    environment:
+      # Must match the provider Hermes is configured to use.
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY}
+      # For direct providers instead of OpenRouter:
+      # - OPENAI_API_KEY=${OPENAI_API_KEY}
+      # - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
+      # LLMLingua ML compression (optional — adds ~2GB RAM, 10-30s cold start):
+      # - HEADROOM_LLMLINGUA=${HEADROOM_LLMLINGUA:-}
+      # - HEADROOM_LLMLINGUA_DEVICE=${HEADROOM_LLMLINGUA_DEVICE:-cpu}
+    ports:
+      # Bind localhost-only — Caddy and internal Docker traffic use named networks.
+      # Expose for direct /stats, /dashboard, /metrics access on the host.
+      - "127.0.0.1:8787:8787"
+    networks: [agent, edge, monitoring]
+    logging: *default-logging
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8787/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          memory: ${HEADROOM_MEM_LIMIT:-512M}
+          cpus: "${HEADROOM_CPU_LIMIT:-0.5}"
 
   # ---------------------------------------------------------------------------
   #  Hindsight — personal second-brain memory

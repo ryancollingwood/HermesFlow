@@ -27,7 +27,7 @@ else
   ON_WINDOWS :=
 endif
 
-.PHONY: help check init apikey wizard secure fix-permissions pull up down restart logs ps health backup bootstrap lint validate ci
+.PHONY: help check init apikey wizard secure fix-permissions pull up down restart logs ps health backup bootstrap lint validate ci headroom headroom-revert
 
 help: ## Show this help
 	@echo "Hermes + Windmill stack"
@@ -130,6 +130,18 @@ health: ## Probe Hermes /health and Windmill /api/version
 	  echo -n "Hermes:   "; curl -fsS "http://127.0.0.1:$${API_SERVER_PORT:-8642}/health" || echo "unreachable"; echo; \
 	  echo -n "Windmill: "; curl -fsS -H "Host: windmill.localhost" "http://127.0.0.1:$${CADDY_HTTP_PORT:-80}/api/version" || echo "unreachable"; echo
 
+headroom: ## Route Hermes through the Headroom context-compression proxy
+	@docker exec hermes hermes config set model.base_url http://headroom:8787/v1
+	@echo "✓ Hermes is routing through Headroom"
+	@echo "  Stats:     http://headroom.localhost/stats  (or http://localhost:8787/stats)"
+	@echo "  Dashboard: http://headroom.localhost/dashboard"
+	@echo "  Metrics:   http://headroom.localhost/metrics"
+
+headroom-revert: ## Revert Hermes to direct provider routing (bypass Headroom)
+	@docker exec hermes hermes config set model.base_url ""
+	@$(COMPOSE) restart hermes
+	@echo "✓ Hermes is now routing directly to the provider"
+
 validate: ## Validate docker-compose.yml (mirrors CI)
 	@test -f .env || cp .env.example .env
 	@$(COMPOSE) config -q && echo "✓ compose config valid"
@@ -162,3 +174,6 @@ bootstrap: ## One-shot: check → init → apikey → wizard → secure → pull
 	@$(MAKE) up
 	@sleep 8
 	@$(MAKE) health
+	@echo
+	@read -p "Configure Hermes to route through Headroom now? [y/N] " hr; \
+	  [[ "$$hr" == "y" || "$$hr" == "Y" ]] && $(MAKE) --no-print-directory headroom || true
