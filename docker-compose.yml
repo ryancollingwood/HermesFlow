@@ -172,6 +172,7 @@ services:
       # - HEADROOM_LLMLINGUA=${HEADROOM_LLMLINGUA:-}
       # - HEADROOM_LLMLINGUA_DEVICE=${HEADROOM_LLMLINGUA_DEVICE:-cpu}
       - HEADROOM_TELEMETRY=${HEADROOM_TELEMETRY:-false}
+      - HEADROOM_LOG_LEVEL=${HEADROOM_LOG_LEVEL:-INFO}
     ports:
       # Bind localhost-only — Caddy and internal Docker traffic use named networks.
       # Expose for direct /stats, /dashboard, /metrics access on the host.
