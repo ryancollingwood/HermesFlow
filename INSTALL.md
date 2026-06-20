@@ -1,0 +1,124 @@
+# Installer walkthrough (`install.sh` / `install.py`)
+
+This document explains exactly what the non-interactive installers do, step by
+step. There are two equivalent implementations:
+
+- **`install.sh`** — bash; uses `make`, `openssl`, `curl`.
+- **`install.py`** — pure Python standard library; no `make`/`bash`/`openssl`/`curl`.
+  Use this on Windows or any host without those tools.
+
+Both are **idempotent**: re-running only fills blanks and never clobbers existing
+secrets, so it's safe to run again after editing `.env` or to repair a partial
+install.
+
+```sh
+# bash (macOS / Linux)
+OPENROUTER_API_KEY=sk-or-... ./install.sh
+
+# python (Windows / anywhere)
+python install.py --provider openrouter --api-key sk-or-...
+```
+
+## Options
+
+| Flag | Default | Purpose |
+|---|---|---|
+| `--provider {openrouter,anthropic,openai}` | `openrouter` | Which AI provider Hermes calls. Picks the key var, a default model, and the `/models` endpoint. |
+| `--api-key <key>` | from `$OPENROUTER_API_KEY` etc. | Provider API key. Falls back to the matching environment variable. |
+| `--model <id>` | provider default (`openai/gpt-4o-mini` for OpenRouter) | Model Hermes defaults to. |
+| `--no-pull` | off | Skip `docker compose pull` (use already-pulled images). |
+| `--skip-model-check` | off | Don't validate the model against the provider's `/models` list. |
+| `--no-memory` | off | Don't enable the Hindsight memory provider. |
+| `--no-windmill` | off | Don't pre-install the Windmill worker Python, create the workspace, or wire up MCP. |
+| `--telegram-bot-token <token>` | — | BotFather token to enable the Telegram channel. **Requires** `--telegram-allowed-users`. |
+| `--telegram-allowed-users <id,id,…>` | — | Comma-separated numeric Telegram user IDs allowed to use the bot. **Requires** `--telegram-bot-token`. |
+
+## Steps
+
+### 1. Check prerequisites
+Verifies `docker` and `docker compose` v2 are present (bash also checks
+`make`/`openssl`/`curl`). Aborts early if anything is missing.
+
+### 2. Validate the model
+Fetches the provider's `/models` list and checks `--model` is in it. On a typo it
+**fails fast** with near-match suggestions, before pulling images or touching the
+stack. Skipped with `--skip-model-check` or when no API key is given.
+
+> Catalog presence is not a callability guarantee — a model can be *listed* by
+> the provider yet rejected for your key/tier. The end-to-end probe in step 9 is
+> the real test.
+
+### 3. Create `.env`
+Copies `.env.example` to `.env` if it doesn't already exist; otherwise leaves the
+existing `.env` untouched.
+
+### 4. Set `HERMES_UID` / `HERMES_GID`
+On macOS/Linux, sets these to the host user so the container can write the
+bind-mounted data dirs. **Skipped on Windows** (Docker Desktop maps a virtual
+UID).
+
+### 5. Generate secrets
+Generates every required secret that's blank or still a known-weak default:
+`API_SERVER_KEY`, `WM_DB_PASSWORD`, `HINDSIGHT_DB_PASSWORD`. Existing custom
+values are left alone.
+
+> Secrets must be generated **before** the first `up`. Postgres only applies
+> `POSTGRES_PASSWORD` on first init, so rotating a DB password after the volume
+> exists breaks auth.
+
+### 6. Create data directories
+Creates the bind-mount directories (`DATA_DIR`, `SHARED_DIR`, the Windmill and
+Caddy dirs). On POSIX it also `chown`s them to `HERMES_UID:HERMES_GID` via a
+throwaway `alpine` container; this is skipped on Windows.
+
+### 7. Write the provider key (and Telegram config)
+Writes the provider key to `<DATA_DIR>/.env` — the file Hermes actually reads.
+The `hermes` service in `docker-compose.yml` leaves provider keys **commented
+out** and reads them from this file (what the interactive wizard would write), so
+setting the key only in the top-level `.env` would **not** reach Hermes.
+
+If Telegram flags were passed, `TELEGRAM_BOT_TOKEN` and `TELEGRAM_ALLOWED_USERS`
+are written to the same file. Both are required together — the channel is never
+configured with a token but no allow-list, so the bot is never left open. On a
+re-run with the stack already up, Hermes is restarted to pick up the channel.
+
+### 8. Pull images and start the stack
+`docker compose pull` (unless `--no-pull`) then `docker compose up -d`, then waits
+for the `hermes` container to pass its healthcheck.
+
+### 9. Set the default model and probe
+Sets `model.default` (the image seeds an invalid default on OpenRouter), then
+sends a one-shot `hermes -z "Say PONG"` and checks the reply — the real
+end-to-end verification that the provider, key, and model all work.
+
+### 10. Hindsight memory (skip with `--no-memory`)
+- Pulls the `HINDSIGHT_*_LLM_MODEL` models into the bundled `ollama` container
+  (only when Hindsight points at `ollama`; embeddings are local).
+- Sets `memory.provider = hindsight` (+ related keys) and restarts Hermes. No
+  `pip install` is needed — the `hindsight-client` package ships in the image.
+- Verifies with `hermes memory status` (`available ✓`) and checks the Hindsight
+  API health endpoint.
+
+### 11. Windmill prep (skip with `--no-windmill`)
+- **Pre-installs the worker Python** into the shared cache to avoid a first-run
+  race between worker replicas that can leave a corrupt interpreter.
+- **Creates the `main` workspace** (a fresh Windmill CE has none; `wmill
+  workspace add` only registers it locally).
+- **Registers Windmill with Hermes over MCP** — mints an `mcp:all`-scoped token
+  and adds it via `hermes mcp add`, so Windmill scripts/flows and its management
+  API become callable tools in Hermes sessions.
+
+## Re-running / repair
+
+Because every step is idempotent you can re-run the installer to:
+
+- add a key or Telegram config you initially skipped,
+- recover after editing `.env`,
+- re-apply Windmill/MCP wiring.
+
+Combine with `--no-pull` to skip image downloads when nothing changed.
+
+## See also
+
+- [README.md](README.md) — full stack overview and per-component docs.
+- The interactive alternative: `make bootstrap` (uses the Hermes setup wizard).

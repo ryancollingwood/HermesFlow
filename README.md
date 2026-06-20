@@ -10,7 +10,7 @@ with the Windmill side pre-wired to call Hermes as an OpenAI-compatible endpoint
 | Path | Purpose |
 |---|---|
 | `docker-compose.yml` | The full stack: Hermes, Hindsight, Windmill (db/server/workers/LSP), Caddy |
-| `install.sh` / `install.py` | Non-interactive installer — bash and pure-Python (Windows-friendly) versions |
+| `install.sh` / `install.py` | Non-interactive installer — bash and pure-Python (Windows-friendly) versions ([step-by-step](INSTALL.md)) |
 | `.env.example` | Every configurable knob — copy to `.env` |
 | `Caddyfile` | Reverse-proxy routing for Windmill + Hermes dashboard/API + Hindsight UI |
 | `Makefile` | `bootstrap`, lifecycle, health, backups, key generation |
@@ -63,6 +63,9 @@ Both installers are equivalent and idempotent; `install.py` needs only Python 3
 and Docker Desktop (no `make`). Flags: `--provider`, `--api-key`, `--model`,
 `--no-pull`, `--skip-model-check`, `--no-memory`, `--no-windmill`,
 `--telegram-bot-token`, `--telegram-allowed-users`.
+
+**See [INSTALL.md](INSTALL.md) for a step-by-step walkthrough** of everything the
+installer does and every flag.
 
 **Telegram channel (optional).** Pass both a bot token and the allowed user IDs to
 wire up Hermes's Telegram channel — they're written to `<DATA_DIR>/.env` (the
