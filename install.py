@@ -41,6 +41,13 @@ Optional Hindsight (memory) model overrides — written to .env before 'up':
     --hindsight-base-url <url>            Hindsight LLM endpoint (ollama/LMStudio/MLX)
     --hindsight-api-key <key>             bearer token protecting the Hindsight API
 
+Profiles (presets; explicit flags still override them):
+    --profile minimal   --no-memory --no-windmill (just the gateway + provider)
+    --profile full      memory + windmill + --with-headroom
+    --profile gpu       --gpu (Linux NVIDIA host, in-container Ollama)
+    --profile mac       --hindsight-model qwen2.5:3b (Apple Silicon, RAM-friendly)
+    --profile server    --bind-lan (LAN exposure + auto Hindsight API key)
+
 Other optional channels / toggles:
     --discord-bot-token <token>           Discord bot token (needs allowed-users)
     --discord-allowed-users <id,id,...>   Discord user IDs allowed to use the bot
@@ -469,7 +476,24 @@ def main() -> None:
                     help="NVIDIA GPU passthrough for Ollama (Linux/WSL2 + nvidia-container-toolkit)")
     ap.add_argument("--env", action="append", default=[], metavar="KEY=VALUE",
                     help="set any other .env variable (repeatable)")
+    ap.add_argument("--profile", choices=["minimal", "full", "gpu", "mac", "server"],
+                    help="preset bundle of flags (explicit flags still override)")
     args = ap.parse_args()
+
+    # Apply the chosen profile, but only to settings the user left at their
+    # default — so explicit flags always win.
+    PROFILES = {
+        "minimal": {"no_memory": True, "no_windmill": True},
+        "full":    {"with_headroom": True},
+        "gpu":     {"gpu": True},
+        "mac":     {"hindsight_model": "qwen2.5:3b"},
+        "server":  {"bind_lan": True},
+    }
+    if args.profile:
+        for attr, val in PROFILES[args.profile].items():
+            if getattr(args, attr) in (False, ""):
+                setattr(args, attr, val)
+        say(f"{ARROW} applying profile '{args.profile}'")
 
     key_var, default_model, models_url, auth_style = PROVIDERS[args.provider]
     model = args.model or default_model

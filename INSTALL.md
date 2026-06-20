@@ -19,6 +19,25 @@ OPENROUTER_API_KEY=sk-or-... ./install.sh
 python install.py --provider openrouter --api-key sk-or-...
 ```
 
+## Profiles
+
+`--profile <name>` applies a preset bundle of flags for a common scenario. Any
+explicit flag you also pass **overrides** the profile, so you can start from a
+preset and tweak (e.g. `--profile gpu --bind-lan`).
+
+| Profile | Bundles | For |
+|---|---|---|
+| `minimal` | `--no-memory --no-windmill` | Just the Hermes gateway + provider. |
+| `full` | `--with-headroom` (memory + windmill are on by default) | Everything, plus context compression. |
+| `gpu` | `--gpu` | Linux/WSL2 NVIDIA host — in-container Ollama with the GPU and full-size models. |
+| `mac` | `--hindsight-model qwen2.5:3b` | Apple Silicon — one small RAM-friendly model (avoids the two-model reload thrash on the CPU-only container). |
+| `server` | `--bind-lan` | Expose on the LAN (auto-generates a Hindsight API key). |
+
+```sh
+./install.sh --profile minimal
+python install.py --profile gpu --api-key sk-or-...
+```
+
 ## Options
 
 | Flag | Default | Purpose |

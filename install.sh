@@ -9,6 +9,13 @@
 #    OPENROUTER_API_KEY=sk-or-... ./install.sh
 #    ./install.sh --provider openrouter --api-key sk-or-... --model openai/gpt-4o-mini
 #
+#  Profiles (presets; explicit flags still override them):
+#    --profile minimal   --no-memory --no-windmill (just the gateway + provider)
+#    --profile full       memory + windmill + --with-headroom
+#    --profile gpu        --gpu (Linux NVIDIA host, in-container Ollama)
+#    --profile mac        --hindsight-model qwen2.5:3b (Apple Silicon, RAM-friendly)
+#    --profile server     --bind-lan (LAN exposure + auto Hindsight API key)
+#
 #  What it does (mirrors `make bootstrap`, minus the TTY wizard):
 #    1. check prerequisites (docker, compose, openssl, curl, make)
 #    2. validate the model against the provider's /models list (--skip-model-check
@@ -76,7 +83,22 @@ DISCORD_USERS=""
 WITH_HEADROOM=0
 BIND_LAN=0
 GPU=0
+PROFILE=""
 EXTRA_ENV=()
+
+# Install profiles: presets applied BEFORE explicit flags (so flags override).
+# Pre-scan argv for --profile <name> (space form), then seed the matching vars.
+prev=""; for a in "$@"; do [ "$prev" = "--profile" ] && PROFILE="$a"; prev="$a"; done
+case "$PROFILE" in
+  "")      : ;;
+  minimal) WITH_MEMORY=0; WITH_WINDMILL=0 ;;
+  full)    WITH_HEADROOM=1 ;;
+  gpu)     GPU=1 ;;
+  mac)     HS_MODEL="qwen2.5:3b" ;;
+  server)  BIND_LAN=1 ;;
+  *) echo "✗ unknown --profile '$PROFILE' (minimal|full|gpu|mac|server)" >&2; exit 1 ;;
+esac
+[ -n "$PROFILE" ] && echo "→ applying profile '$PROFILE'"
 
 usage() {
   # Print the header comment block (between the two ==== dividers).
@@ -316,6 +338,7 @@ while [ $# -gt 0 ]; do
     --with-headroom) WITH_HEADROOM=1; shift ;;
     --bind-lan) BIND_LAN=1; shift ;;
     --gpu) GPU=1; shift ;;
+    --profile) shift 2 ;;
     --env) EXTRA_ENV+=("$2"); shift 2 ;;
     -h|--help)  usage 0 ;;
     *) echo "✗ unknown argument: $1" >&2; usage 1 ;;

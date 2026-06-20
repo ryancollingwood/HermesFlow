@@ -52,6 +52,11 @@ OPENROUTER_API_KEY=sk-or-... ./install.sh
 # or: ./install.sh --provider openrouter --api-key sk-or-... --model openai/gpt-4o-mini
 ```
 
+Pick a **profile** for common scenarios (explicit flags still override it):
+`--profile minimal` (gateway only), `full` (+ Headroom), `gpu` (NVIDIA host),
+`mac` (Apple Silicon, RAM-friendly model), `server` (LAN). E.g.
+`./install.sh --profile gpu --api-key sk-or-...`.
+
 **On Windows (or any host without bash/make/openssl/curl), use the Python port**
 — same flags, same steps, stdlib-only:
 
