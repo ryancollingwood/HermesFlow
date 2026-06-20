@@ -29,6 +29,9 @@ What it does (mirrors install.sh / `make bootstrap`, minus the TTY wizard):
 Optional Telegram channel (both required together):
     --telegram-bot-token <token>          BotFather token
     --telegram-allowed-users <id,id,...>  numeric user IDs allowed to talk to it
+
+Optional MLX host inference server (Apple Silicon macOS only):
+    --with-mlx                            install mlx-lm + always-on launchd agent
 """
 from __future__ import annotations
 
@@ -373,6 +376,40 @@ def setup_windmill() -> None:
         say(f"{WARN} couldn't register the Windmill MCP server in Hermes — wire it up manually (see README).")
 
 
+def setup_mlx() -> None:
+    """Install the host-native MLX inference server (Apple Silicon macOS only).
+
+    MLX must run on the host, not in a container — Docker Desktop on macOS does
+    not pass the GPU through. Creates a venv, installs mlx-lm, and registers the
+    always-on launchd agent.
+    """
+    if platform.system() != "Darwin" or platform.machine() != "arm64":
+        say(f"{WARN} --with-mlx is for Apple Silicon macOS only "
+            f"(host is {platform.system()}/{platform.machine()}) — skipping.")
+        return
+    venv = os.environ.get("MLX_VENV_DIR") or str(Path.home() / ".mlx-venv")
+    server = Path(venv) / "bin" / "mlx_lm.server"
+    pip = str(Path(venv) / "bin" / "pip")
+    say(f"{ARROW} setting up host-native MLX server (Apple Silicon)…")
+    if not server.exists():
+        if subprocess.run([sys.executable, "-m", "venv", venv]).returncode != 0:
+            say(f"{WARN} could not create venv at {venv} — skipping MLX.")
+            return
+        subprocess.run([pip, "install", "-U", "pip"])
+        if subprocess.run([pip, "install", "-U", "mlx-lm"]).returncode != 0:
+            say(f"{WARN} failed to install mlx-lm — skipping MLX.")
+            return
+    say(f"{OK} mlx-lm installed in {venv}")
+    env = dict(os.environ, MLX_VENV_BIN=str(Path(venv) / "bin"))
+    rc = subprocess.run(["bash", "mlx/install-launchd.sh"], env=env).returncode
+    if rc == 0:
+        say(f"{OK} MLX server installed as an always-on launchd agent (model loads on first request)")
+    else:
+        say(f"{WARN} launchd install failed — start it manually with: ./mlx/serve.sh")
+    say("  To route Hermes through MLX:    make mlx")
+    say("  Or point Hindsight at MLX:      set HINDSIGHT_LLM_BASE_URL=${MLX_BASE_URL} in .env, then: docker restart hindsight")
+
+
 # ── main ──────────────────────────────────────────────────────────────────────
 def main() -> None:
     os.chdir(Path(__file__).resolve().parent)
@@ -393,6 +430,8 @@ def main() -> None:
     ap.add_argument("--telegram-allowed-users", default="",
                     help="comma-separated numeric user IDs allowed to use the bot "
                          "(required together with --telegram-bot-token)")
+    ap.add_argument("--with-mlx", action="store_true",
+                    help="install the host-native MLX inference server (Apple Silicon macOS only)")
     args = ap.parse_args()
 
     key_var, default_model, models_url, auth_style = PROVIDERS[args.provider]
@@ -512,6 +551,10 @@ def main() -> None:
         setup_windmill()
     else:
         say(f"{ARROW} skipping Windmill setup (--no-windmill)")
+
+    # 12. MLX host server (opt-in; Apple Silicon only)
+    if args.with_mlx:
+        setup_mlx()
 
     print()
     say("Done. Services:")

@@ -62,7 +62,8 @@ $env:OPENROUTER_API_KEY="sk-or-..."; python install.py
 Both installers are equivalent and idempotent; `install.py` needs only Python 3
 and Docker Desktop (no `make`). Flags: `--provider`, `--api-key`, `--model`,
 `--no-pull`, `--skip-model-check`, `--no-memory`, `--no-windmill`,
-`--telegram-bot-token`, `--telegram-allowed-users`.
+`--telegram-bot-token`, `--telegram-allowed-users`, `--with-mlx`
+(Apple Silicon — set up the host-native MLX inference server).
 
 **See [INSTALL.md](INSTALL.md) for a step-by-step walkthrough** of everything the
 installer does and every flag.

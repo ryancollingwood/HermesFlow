@@ -32,6 +32,7 @@ python install.py --provider openrouter --api-key sk-or-...
 | `--no-windmill` | off | Don't pre-install the Windmill worker Python, create the workspace, or wire up MCP. |
 | `--telegram-bot-token <token>` | — | BotFather token to enable the Telegram channel. **Requires** `--telegram-allowed-users`. |
 | `--telegram-allowed-users <id,id,…>` | — | Comma-separated numeric Telegram user IDs allowed to use the bot. **Requires** `--telegram-bot-token`. |
+| `--with-mlx` | off | Install the host-native MLX inference server (Apple Silicon macOS only). |
 
 ## Steps
 
@@ -107,6 +108,23 @@ end-to-end verification that the provider, key, and model all work.
 - **Registers Windmill with Hermes over MCP** — mints an `mcp:all`-scoped token
   and adds it via `hermes mcp add`, so Windmill scripts/flows and its management
   API become callable tools in Hermes sessions.
+
+### 12. MLX host server (opt-in with `--with-mlx`, Apple Silicon only)
+Only runs when `--with-mlx` is passed, and only on Apple Silicon macOS (it warns
+and skips elsewhere). MLX must run on the **host** — Docker Desktop on macOS
+doesn't pass the GPU into containers, so a containerised runtime gets no
+acceleration. This step:
+
+- creates a Python venv (`~/.mlx-venv`, override with `MLX_VENV_DIR`) and installs
+  `mlx-lm` into it,
+- runs [`mlx/install-launchd.sh`](mlx/install-launchd.sh) to register an always-on
+  launchd agent serving an OpenAI-compatible API on `:8080` (the model downloads
+  on first request; override with `MLX_MODEL` / `MLX_HOST_PORT`).
+
+It does **not** re-route anything automatically. To use MLX afterwards, either
+route Hermes through it (`make mlx`) or point Hindsight at it (set
+`HINDSIGHT_LLM_BASE_URL=${MLX_BASE_URL}` and restart `hindsight`). See
+[`mlx/README.md`](mlx/README.md) for model sizing and details.
 
 ## Re-running / repair
 

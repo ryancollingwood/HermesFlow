@@ -30,6 +30,9 @@
 #  Optional Telegram channel (both required together):
 #    --telegram-bot-token <token>          BotFather token
 #    --telegram-allowed-users <id,id,...>  numeric user IDs allowed to talk to it
+#
+#  Optional MLX host inference server (Apple Silicon macOS only):
+#    --with-mlx                            install mlx-lm + always-on launchd agent
 # =============================================================================
 set -euo pipefail
 
@@ -43,6 +46,7 @@ DO_PULL=1
 CHECK_MODEL=1
 WITH_MEMORY=1
 WITH_WINDMILL=1
+WITH_MLX=0
 TG_TOKEN=""
 TG_USERS=""
 
@@ -189,6 +193,33 @@ setup_windmill() {
   fi
 }
 
+# Set up the host-native MLX inference server (Apple Silicon only). MLX must run
+# on the host, not in a container — Docker Desktop on macOS doesn't pass the GPU
+# through. Installs mlx-lm into a venv and registers the always-on launchd agent.
+setup_mlx() {
+  if [ "$(uname -s)" != "Darwin" ] || [ "$(uname -m)" != "arm64" ]; then
+    echo "⚠ --with-mlx is for Apple Silicon macOS only (host is $(uname -s)/$(uname -m)) — skipping."
+    return 0
+  fi
+  local venv="${MLX_VENV_DIR:-$HOME/.mlx-venv}"
+  echo "→ setting up host-native MLX server (Apple Silicon)…"
+  if [ ! -x "$venv/bin/mlx_lm.server" ]; then
+    python3 -m venv "$venv" || { echo "⚠ could not create venv at $venv — skipping MLX."; return 0; }
+    "$venv/bin/pip" install -U pip >/dev/null 2>&1 || true
+    if ! "$venv/bin/pip" install -U mlx-lm; then
+      echo "⚠ failed to install mlx-lm — skipping MLX."; return 0
+    fi
+  fi
+  echo "✓ mlx-lm installed in $venv"
+  if MLX_VENV_BIN="$venv/bin" bash ./mlx/install-launchd.sh; then
+    echo "✓ MLX server installed as an always-on launchd agent (model loads on first request)"
+  else
+    echo "⚠ launchd install failed — start it manually with: ./mlx/serve.sh"
+  fi
+  echo "  To route Hermes through MLX:    make mlx"
+  echo "  Or point Hindsight at MLX:      set HINDSIGHT_LLM_BASE_URL=\${MLX_BASE_URL} in .env, then: docker restart hindsight"
+}
+
 # Verify $MODEL is offered by $PROVIDER; exit early with a helpful message if not.
 validate_model() {
   [ "$CHECK_MODEL" -eq 1 ] || { echo "→ skipping model check (--skip-model-check)"; return 0; }
@@ -234,6 +265,7 @@ while [ $# -gt 0 ]; do
     --no-windmill) WITH_WINDMILL=0; shift ;;
     --telegram-bot-token) TG_TOKEN="$2"; shift 2 ;;
     --telegram-allowed-users) TG_USERS="$2"; shift 2 ;;
+    --with-mlx) WITH_MLX=1; shift ;;
     -h|--help)  usage 0 ;;
     *) echo "✗ unknown argument: $1" >&2; usage 1 ;;
   esac
@@ -400,6 +432,11 @@ if [ "$WITH_WINDMILL" -eq 1 ]; then
   setup_windmill
 else
   echo "→ skipping Windmill setup (--no-windmill)"
+fi
+
+# ── 12. MLX host server (opt-in; Apple Silicon only) ─────────────────────────
+if [ "$WITH_MLX" -eq 1 ]; then
+  setup_mlx
 fi
 
 echo
