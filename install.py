@@ -39,6 +39,14 @@ Optional Hindsight (memory) model overrides — written to .env before 'up':
     --hindsight-consolidation-model <id>  override just the consolidation scope
     --hindsight-reflect-model <id>        override just the reflect scope
     --hindsight-base-url <url>            Hindsight LLM endpoint (ollama/LMStudio/MLX)
+    --hindsight-api-key <key>             bearer token protecting the Hindsight API
+
+Other optional channels / toggles:
+    --discord-bot-token <token>           Discord bot token (needs allowed-users)
+    --discord-allowed-users <id,id,...>   Discord user IDs allowed to use the bot
+    --with-headroom                       route Hermes through the Headroom proxy
+    --bind-lan                            expose Hermes/Hindsight/Ollama on 0.0.0.0
+    --env KEY=VALUE                       set any other .env var (repeatable)
 """
 from __future__ import annotations
 
@@ -446,6 +454,18 @@ def main() -> None:
     ap.add_argument("--hindsight-reflect-model", default="", help="override the reflect scope")
     ap.add_argument("--hindsight-base-url", default="",
                     help="Hindsight LLM endpoint (ollama / LM Studio / MLX)")
+    ap.add_argument("--hindsight-api-key", default="",
+                    help="bearer token protecting the Hindsight API")
+    ap.add_argument("--discord-bot-token", default="",
+                    help="Discord bot token (requires --discord-allowed-users)")
+    ap.add_argument("--discord-allowed-users", default="",
+                    help="comma-separated Discord user IDs (requires --discord-bot-token)")
+    ap.add_argument("--with-headroom", action="store_true",
+                    help="route Hermes through the Headroom context-compression proxy")
+    ap.add_argument("--bind-lan", action="store_true",
+                    help="expose Hermes/Hindsight/Ollama on 0.0.0.0 instead of loopback")
+    ap.add_argument("--env", action="append", default=[], metavar="KEY=VALUE",
+                    help="set any other .env variable (repeatable)")
     args = ap.parse_args()
 
     key_var, default_model, models_url, auth_style = PROVIDERS[args.provider]
@@ -459,6 +479,13 @@ def main() -> None:
     if (tg_token or tg_users) and not (tg_token and tg_users):
         die(f"{CROSS} Telegram needs BOTH --telegram-bot-token and --telegram-allowed-users\n"
             "  (allowed user IDs are required for the Hermes Telegram channel).")
+
+    # Discord (optional): same both-required rule as Telegram.
+    dc_token = args.discord_bot_token or os.environ.get("DISCORD_BOT_TOKEN", "")
+    dc_users = args.discord_allowed_users or os.environ.get("DISCORD_ALLOWED_USERS", "")
+    if (dc_token or dc_users) and not (dc_token and dc_users):
+        die(f"{CROSS} Discord needs BOTH --discord-bot-token and --discord-allowed-users\n"
+            "  (allowed user IDs are required for the Hermes Discord channel).")
 
     # 1. prerequisites
     say(f"{ARROW} checking prerequisites…")
@@ -510,10 +537,34 @@ def main() -> None:
                 env_set(k, v)
         say(f"{OK} applied Hindsight model/backend overrides to .env")
 
+    # Expose services on the LAN (0.0.0.0) instead of loopback only.
+    if args.bind_lan:
+        for k in ("HERMES_BIND", "HINDSIGHT_BIND", "OLLAMA_BIND"):
+            env_set(k, "0.0.0.0")
+        say(f"{OK} bound Hermes/Hindsight/Ollama to 0.0.0.0 (LAN access)")
+
+    # Hindsight API bearer token: explicit, or auto-generated when exposing to LAN.
+    if args.hindsight_api_key:
+        env_set("HINDSIGHT_API_KEY", args.hindsight_api_key)
+        say(f"{OK} set HINDSIGHT_API_KEY")
+    elif args.bind_lan and not env_value("HINDSIGHT_API_KEY"):
+        env_set("HINDSIGHT_API_KEY", secrets.token_hex(16))
+        say(f"{OK} generated HINDSIGHT_API_KEY (Hindsight is exposed to the LAN)")
+
+    # Generic passthrough: --env KEY=VALUE (repeatable).
+    for kv in args.env:
+        if "=" in kv:
+            k, v = kv.split("=", 1)
+            env_set(k, v)
+            say(f"{OK} set {k} (--env)")
+        else:
+            say(f"{WARN} ignoring --env '{kv}' (expected KEY=VALUE)")
+
     # 5. secrets
     ensure_secret("API_SERVER_KEY", 32)
     ensure_secret("WM_DB_PASSWORD", 32, weak="windmill")
     ensure_secret("HINDSIGHT_DB_PASSWORD", 16, weak="hindsight")
+    ensure_secret("GRAFANA_ADMIN_PASSWORD", 16, weak="changeme")
 
     # 6. data dirs + ownership
     make_dirs_and_fix_perms()
@@ -532,6 +583,14 @@ def main() -> None:
         set_data_env(data_dir, "TELEGRAM_ALLOWED_USERS", tg_users)
         say(f"{OK} configured Telegram channel (bot token + allowed users) in {Path(data_dir) / '.env'}")
         # Fresh install: Hermes starts fresh next step. Re-run: restart to pick it up.
+        if out(["docker", "inspect", "-f", "{{.State.Running}}", "hermes"]) == "true":
+            run(["docker", "restart", "hermes"])
+
+    # Discord channel (optional) — same /opt/data/.env Hermes reads.
+    if dc_token:
+        set_data_env(data_dir, "DISCORD_BOT_TOKEN", dc_token)
+        set_data_env(data_dir, "DISCORD_ALLOWED_USERS", dc_users)
+        say(f"{OK} configured Discord channel (bot token + allowed users) in {Path(data_dir) / '.env'}")
         if out(["docker", "inspect", "-f", "{{.State.Running}}", "hermes"]) == "true":
             run(["docker", "restart", "hermes"])
 
@@ -587,6 +646,20 @@ def main() -> None:
     # 12. MLX host server (opt-in; Apple Silicon only)
     if args.with_mlx:
         setup_mlx()
+
+    # 13. Headroom context-compression routing (opt-in)
+    if args.with_headroom:
+        if args.provider == "openrouter" and api_key:
+            say(f"{ARROW} routing Hermes through Headroom (context compression)…")
+            for k, v in (("model.provider", "custom"),
+                         ("model.base_url", "http://headroom:8787/v1"),
+                         ("model.api_key", api_key)):
+                run(["docker", "exec", "hermes", "hermes", "config", "set", k, v])
+            run(["docker", "restart", "hermes"])
+            wait_hermes_healthy()
+            say(f"{OK} Hermes is routing through Headroom (stats: http://headroom.localhost/stats)")
+        else:
+            say(f"{WARN} --with-headroom needs the openrouter provider + an API key — skipping.")
 
     print()
     say("Done. Services:")

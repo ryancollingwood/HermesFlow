@@ -38,6 +38,12 @@ python install.py --provider openrouter --api-key sk-or-...
 | `--hindsight-consolidation-model <id>` | — | Override just the consolidation scope. |
 | `--hindsight-reflect-model <id>` | — | Override just the reflect scope. |
 | `--hindsight-base-url <url>` | from `.env` | Hindsight LLM endpoint (Ollama / LM Studio / MLX). |
+| `--hindsight-api-key <key>` | — | Bearer token protecting the Hindsight API (auto-generated if `--bind-lan` and unset). |
+| `--discord-bot-token <token>` | — | Discord bot token. **Requires** `--discord-allowed-users`. |
+| `--discord-allowed-users <id,id,…>` | — | Comma-separated Discord user IDs allowed to use the bot. **Requires** `--discord-bot-token`. |
+| `--with-headroom` | off | Route Hermes through the Headroom context-compression proxy (OpenRouter only). |
+| `--bind-lan` | off | Expose Hermes/Hindsight/Ollama on `0.0.0.0` instead of loopback. |
+| `--env KEY=VALUE` | — | Set any other `.env` variable. Repeatable. |
 
 ## Steps
 
@@ -65,8 +71,12 @@ UID).
 
 ### 5. Generate secrets
 Generates every required secret that's blank or still a known-weak default:
-`API_SERVER_KEY`, `WM_DB_PASSWORD`, `HINDSIGHT_DB_PASSWORD`. Existing custom
-values are left alone.
+`API_SERVER_KEY`, `WM_DB_PASSWORD`, `HINDSIGHT_DB_PASSWORD`, and
+`GRAFANA_ADMIN_PASSWORD` (otherwise Grafana boots as `admin`/`changeme`).
+Existing custom values are left alone.
+
+This step also applies the `--bind-lan`, `--hindsight-api-key`, and `--env`
+overrides to `.env` first, so they're in place before the stack starts.
 
 > Secrets must be generated **before** the first `up`. Postgres only applies
 > `POSTGRES_PASSWORD` on first init, so rotating a DB password after the volume
@@ -83,10 +93,12 @@ The `hermes` service in `docker-compose.yml` leaves provider keys **commented
 out** and reads them from this file (what the interactive wizard would write), so
 setting the key only in the top-level `.env` would **not** reach Hermes.
 
-If Telegram flags were passed, `TELEGRAM_BOT_TOKEN` and `TELEGRAM_ALLOWED_USERS`
-are written to the same file. Both are required together — the channel is never
-configured with a token but no allow-list, so the bot is never left open. On a
-re-run with the stack already up, Hermes is restarted to pick up the channel.
+If Telegram or Discord flags were passed, `TELEGRAM_BOT_TOKEN` /
+`TELEGRAM_ALLOWED_USERS` (and/or `DISCORD_BOT_TOKEN` / `DISCORD_ALLOWED_USERS`)
+are written to the same file. Each channel requires both its token **and** its
+allow-list together — a channel is never configured with a token but no
+allow-list, so the bot is never left open. On a re-run with the stack already up,
+Hermes is restarted to pick up the new channel.
 
 ### 8. Pull images and start the stack
 `docker compose pull` (unless `--no-pull`) then `docker compose up -d`, then waits
@@ -134,6 +146,13 @@ It does **not** re-route anything automatically. To use MLX afterwards, either
 route Hermes through it (`make mlx`) or point Hindsight at it (set
 `HINDSIGHT_LLM_BASE_URL=${MLX_BASE_URL}` and restart `hindsight`). See
 [`mlx/README.md`](mlx/README.md) for model sizing and details.
+
+### 13. Headroom routing (opt-in with `--with-headroom`)
+Only runs when `--with-headroom` is passed, and only for the `openrouter`
+provider with a key. Points Hermes's outbound chat through the Headroom
+context-compression proxy (`model.provider=custom`, `model.base_url=http://headroom:8787/v1`)
+and restarts Hermes — the same thing `make headroom` does. Revert with
+`make headroom-revert`.
 
 ## Re-running / repair
 

@@ -62,10 +62,13 @@ $env:OPENROUTER_API_KEY="sk-or-..."; python install.py
 Both installers are equivalent and idempotent; `install.py` needs only Python 3
 and Docker Desktop (no `make`). Flags: `--provider`, `--api-key`, `--model`,
 `--no-pull`, `--skip-model-check`, `--no-memory`, `--no-windmill`,
-`--telegram-bot-token`, `--telegram-allowed-users`, `--with-mlx`
-(Apple Silicon — set up the host-native MLX inference server), and Hindsight model
-overrides `--hindsight-model` / `--hindsight-{retain,consolidation,reflect}-model`
-/ `--hindsight-base-url`. See [INSTALL.md](INSTALL.md) for the full table.
+messaging channels (`--telegram-bot-token`/`--telegram-allowed-users`,
+`--discord-bot-token`/`--discord-allowed-users`), `--with-mlx` (Apple Silicon —
+host-native MLX server), `--with-headroom` (route through the compression proxy),
+`--bind-lan` (expose on `0.0.0.0`), Hindsight overrides (`--hindsight-model` /
+`--hindsight-{retain,consolidation,reflect}-model` / `--hindsight-base-url` /
+`--hindsight-api-key`), and `--env KEY=VALUE` to set any other `.env` variable.
+See [INSTALL.md](INSTALL.md) for the full table.
 
 **See [INSTALL.md](INSTALL.md) for a step-by-step walkthrough** of everything the
 installer does and every flag.
@@ -114,7 +117,7 @@ make bootstrap              # init → secrets → wizard → secure → pull �
 
 1. create `.env` and the data directories,
 2. generate every required secret — `API_SERVER_KEY`, `WM_DB_PASSWORD`,
-   `HINDSIGHT_DB_PASSWORD` (`make secrets`),
+   `HINDSIGHT_DB_PASSWORD`, `GRAFANA_ADMIN_PASSWORD` (`make secrets`),
 3. run the interactive Hermes setup wizard (writes `<DATA_DIR>/.env`),
 4. `chmod 600` the secret files,
 5. pull images, start the stack, and probe health.
@@ -679,7 +682,7 @@ Gotchas (all enforced by Windmill):
 | `make logs` / `ps` | Follow logs / status |
 | `make health` | Probe Hermes `/health` and Windmill `/api/version` |
 | `make apikey` | Generate `API_SERVER_KEY` into `.env` if empty |
-| `make secrets` | Generate every required secret (`API_SERVER_KEY`, `WM_DB_PASSWORD`, `HINDSIGHT_DB_PASSWORD`) that's blank or a weak default |
+| `make secrets` | Generate every required secret (`API_SERVER_KEY`, `WM_DB_PASSWORD`, `HINDSIGHT_DB_PASSWORD`, `GRAFANA_ADMIN_PASSWORD`) that's blank or a weak default |
 | `make backup` | `pg_dump` of Windmill + Hindsight Postgres, tar of Hermes `/opt/data` → `./backups/` |
 | `make pull` | Pull latest images |
 

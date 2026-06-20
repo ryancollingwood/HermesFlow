@@ -40,6 +40,14 @@
 #    --hindsight-consolidation-model <id>  override just the consolidation scope
 #    --hindsight-reflect-model <id>        override just the reflect scope
 #    --hindsight-base-url <url>            Hindsight LLM endpoint (ollama/LMStudio/MLX)
+#    --hindsight-api-key <key>             bearer token protecting the Hindsight API
+#
+#  Other optional channels / toggles:
+#    --discord-bot-token <token>           Discord bot token (needs allowed-users)
+#    --discord-allowed-users <id,id,...>   Discord user IDs allowed to use the bot
+#    --with-headroom                       route Hermes through the Headroom proxy
+#    --bind-lan                            expose Hermes/Hindsight/Ollama on 0.0.0.0
+#    --env KEY=VALUE                       set any other .env var (repeatable)
 # =============================================================================
 set -euo pipefail
 
@@ -61,6 +69,12 @@ HS_RETAIN=""
 HS_CONSOLIDATION=""
 HS_REFLECT=""
 HS_BASE_URL=""
+HS_API_KEY=""
+DISCORD_TOKEN=""
+DISCORD_USERS=""
+WITH_HEADROOM=0
+BIND_LAN=0
+EXTRA_ENV=()
 
 usage() {
   # Print the header comment block (between the two ==== dividers).
@@ -294,6 +308,12 @@ while [ $# -gt 0 ]; do
     --hindsight-consolidation-model) HS_CONSOLIDATION="$2"; shift 2 ;;
     --hindsight-reflect-model) HS_REFLECT="$2"; shift 2 ;;
     --hindsight-base-url) HS_BASE_URL="$2"; shift 2 ;;
+    --hindsight-api-key) HS_API_KEY="$2"; shift 2 ;;
+    --discord-bot-token) DISCORD_TOKEN="$2"; shift 2 ;;
+    --discord-allowed-users) DISCORD_USERS="$2"; shift 2 ;;
+    --with-headroom) WITH_HEADROOM=1; shift ;;
+    --bind-lan) BIND_LAN=1; shift ;;
+    --env) EXTRA_ENV+=("$2"); shift 2 ;;
     -h|--help)  usage 0 ;;
     *) echo "✗ unknown argument: $1" >&2; usage 1 ;;
   esac
@@ -328,6 +348,15 @@ fi
 if { [ -n "$TG_TOKEN" ] || [ -n "$TG_USERS" ]; } && { [ -z "$TG_TOKEN" ] || [ -z "$TG_USERS" ]; }; then
   echo "✗ Telegram needs BOTH --telegram-bot-token and --telegram-allowed-users" >&2
   echo "  (allowed user IDs are required for the Hermes Telegram channel)." >&2
+  exit 1
+fi
+
+# Discord (optional): same both-required rule as Telegram.
+[ -n "$DISCORD_TOKEN" ] || DISCORD_TOKEN="$(printenv DISCORD_BOT_TOKEN 2>/dev/null || true)"
+[ -n "$DISCORD_USERS" ] || DISCORD_USERS="$(printenv DISCORD_ALLOWED_USERS 2>/dev/null || true)"
+if { [ -n "$DISCORD_TOKEN" ] || [ -n "$DISCORD_USERS" ]; } && { [ -z "$DISCORD_TOKEN" ] || [ -z "$DISCORD_USERS" ]; }; then
+  echo "✗ Discord needs BOTH --discord-bot-token and --discord-allowed-users" >&2
+  echo "  (allowed user IDs are required for the Hermes Discord channel)." >&2
   exit 1
 fi
 
@@ -375,6 +404,34 @@ HS_REFLECT="${HS_REFLECT:-$HS_MODEL}"
 [ -n "$HS_MODEL$HS_RETAIN$HS_CONSOLIDATION$HS_REFLECT$HS_BASE_URL" ] \
   && echo "✓ applied Hindsight model/backend overrides to .env"
 
+# Expose services on the LAN (0.0.0.0) instead of loopback only.
+if [ "$BIND_LAN" -eq 1 ]; then
+  env_put HERMES_BIND 0.0.0.0
+  env_put HINDSIGHT_BIND 0.0.0.0
+  env_put OLLAMA_BIND 0.0.0.0
+  echo "✓ bound Hermes/Hindsight/Ollama to 0.0.0.0 (LAN access)"
+fi
+
+# Hindsight API bearer token: explicit value, or auto-generate when exposing to
+# the LAN and none is set (don't leave the memory API open on the network).
+if [ -n "$HS_API_KEY" ]; then
+  env_put HINDSIGHT_API_KEY "$HS_API_KEY"
+  echo "✓ set HINDSIGHT_API_KEY"
+elif [ "$BIND_LAN" -eq 1 ] && [ -z "$(grep -E '^HINDSIGHT_API_KEY=' .env | cut -d= -f2-)" ]; then
+  env_put HINDSIGHT_API_KEY "$(openssl rand -hex 16)"
+  echo "✓ generated HINDSIGHT_API_KEY (Hindsight is exposed to the LAN)"
+fi
+
+# Generic passthrough: --env KEY=VALUE (repeatable) → write to .env before 'up'.
+if [ "${#EXTRA_ENV[@]}" -gt 0 ]; then
+  for kv in "${EXTRA_ENV[@]}"; do
+    case "$kv" in
+      *=*) env_put "${kv%%=*}" "${kv#*=}"; echo "✓ set ${kv%%=*} (--env)" ;;
+      *) echo "⚠ ignoring --env '$kv' (expected KEY=VALUE)" >&2 ;;
+    esac
+  done
+fi
+
 # ── 4. secrets (API key + DB passwords) ──────────────────────────────────────
 make --no-print-directory secrets
 
@@ -412,6 +469,17 @@ if [ -n "$TG_TOKEN" ]; then
   echo "✓ configured Telegram channel (bot token + allowed users) in $DATA_DIR_RESOLVED/.env"
   # On a fresh install Hermes starts fresh in the next step and reads this; on a
   # re-run it's already up, so restart it to pick up the new channel.
+  if [ "$(docker inspect -f '{{.State.Running}}' hermes 2>/dev/null)" = "true" ]; then
+    docker restart hermes >/dev/null 2>&1 || true
+  fi
+fi
+
+# Discord channel (optional) — same /opt/data/.env Hermes reads.
+if [ -n "$DISCORD_TOKEN" ]; then
+  dataenv_set "$DATA_DIR_RESOLVED/.env" DISCORD_BOT_TOKEN "$DISCORD_TOKEN"
+  dataenv_set "$DATA_DIR_RESOLVED/.env" DISCORD_ALLOWED_USERS "$DISCORD_USERS"
+  chmod 600 "$DATA_DIR_RESOLVED/.env" 2>/dev/null || true
+  echo "✓ configured Discord channel (bot token + allowed users) in $DATA_DIR_RESOLVED/.env"
   if [ "$(docker inspect -f '{{.State.Running}}' hermes 2>/dev/null)" = "true" ]; then
     docker restart hermes >/dev/null 2>&1 || true
   fi
@@ -480,6 +548,16 @@ fi
 # ── 12. MLX host server (opt-in; Apple Silicon only) ─────────────────────────
 if [ "$WITH_MLX" -eq 1 ]; then
   setup_mlx
+fi
+
+# ── 13. Headroom context-compression routing (opt-in) ────────────────────────
+if [ "$WITH_HEADROOM" -eq 1 ]; then
+  if [ "$PROVIDER" = "openrouter" ] && [ -n "$API_KEY" ]; then
+    echo "→ routing Hermes through Headroom (context compression)…"
+    make --no-print-directory headroom
+  else
+    echo "⚠ --with-headroom needs the openrouter provider + an API key — skipping."
+  fi
 fi
 
 echo

@@ -88,6 +88,7 @@ secrets: ## Generate every required secret in .env that's blank or still a weak 
 	$(call ensure_secret,API_SERVER_KEY,openssl rand -hex 32,)
 	$(call ensure_secret,WM_DB_PASSWORD,openssl rand -hex 32,windmill)
 	$(call ensure_secret,HINDSIGHT_DB_PASSWORD,openssl rand -hex 16,hindsight)
+	$(call ensure_secret,GRAFANA_ADMIN_PASSWORD,openssl rand -hex 16,changeme)
 
 wizard: ## Run the Hermes first-run setup wizard (interactive; writes ~/.hermes/.env + config)
 	@set -a; . ./$(ENV_FILE); set +a; \
