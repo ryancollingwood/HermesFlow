@@ -667,6 +667,9 @@ services:
   #  set via LOKI_RETENTION_PERIOD in .env (see loki/loki-config.yml). Queried
   #  from Grafana's Explore tab via the Loki datasource — no Caddy route,
   #  nothing here is meant to be browsed directly.
+  #  No healthcheck: the image is distroless (no shell/wget/curl), so an
+  #  HTTP-based check can never succeed. Promtail depends on service_started
+  #  only and retries pushes on its own until Loki's ingester is ready.
   # ---------------------------------------------------------------------------
   loki:
     image: grafana/loki:${LOKI_VERSION:-latest}
@@ -678,12 +681,6 @@ services:
     volumes:
       - ./loki/loki-config.yml:/etc/loki/loki-config.yml:ro
       - ${MONITORING_DATA_DIR:-./data/monitoring}/loki:/loki
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3100/ready"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
     deploy:
       resources:
         limits:
@@ -707,13 +704,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     depends_on:
       loki:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:9080/ready"]
-      interval: 30s
-      timeout: 5s
-      retries: 3
-      start_period: 20s
+        condition: service_started
     deploy:
       resources:
         limits:
