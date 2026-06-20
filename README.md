@@ -110,30 +110,66 @@ Both model IDs should appear in the response.
 ### Installing the Hermes plugin
 
 The `hindsight-hermes` package registers itself automatically via Python entry
-points — no manual config file edits needed.
+points once installed — no manual plugin config file edits needed. It reaches
+Hindsight via the `HINDSIGHT_BASE_URL` and `HINDSIGHT_API_KEY` environment
+variables, which `docker-compose.yml` already passes into the `hermes`
+container (see [Hindsight configuration](#hindsight-configuration-env) above).
 
-**From inside the Hermes container:**
+**1. Install the package and restart:**
 
 ```bash
 docker exec hermes uv pip install hindsight-hermes
 docker restart hermes
 ```
 
-**Run the setup wizard** (once Hermes has restarted):
+**2. Enable memory in Hermes's own config** — installing the package makes
+`hindsight` available as a provider, but Hermes still needs to be told to use
+it. This is a `memory:` block in `/opt/data/config.yaml` (the bind-mounted
+Hermes data directory), set via `hermes config set`, the same mechanism used
+for [Headroom routing](#one-time-setup-after-first-boot):
 
-```bash
-hermes plugins setup hindsight
+```sh
+make memory
 ```
 
-When prompted for the Hindsight base URL, use the **internal Docker hostname**:
+(`make memory-revert` disables it again.) Under the hood this runs:
+
+```bash
+docker exec hermes hermes config set memory.memory_enabled true
+docker exec hermes hermes config set memory.provider hindsight
+docker exec hermes hermes config set memory.user_profile_enabled true
+docker exec hermes hermes config set memory.write_approval false
+docker restart hermes
+```
+
+This produces a `memory:` key like:
+
+```yaml
+memory:
+  memory_enabled: true
+  user_profile_enabled: true
+  write_approval: false
+  memory_char_limit: 2200
+  user_char_limit: 1375
+  provider: hindsight
+  nudge_interval: 10
+```
+
+There is no `hermes plugins setup` wizard — `hermes config set` is the only
+supported way to change these keys, and `provider: hindsight` is what actually
+points Hermes's memory layer at the plugin (the env vars above only control
+how the plugin, once selected, reaches the Hindsight container).
+
+`HINDSIGHT_BASE_URL` should stay on the **internal Docker hostname**:
 
 ```
 http://hindsight:8888
 ```
 
-> ⚠️ Do not use `http://hindsight.localhost` here — that hostname only resolves
-> on your host machine via Caddy. From inside the Hermes container, the correct
-> address is `http://hindsight:8888` (Docker service name on the `memory` network).
+> ⚠️ Do not set `HINDSIGHT_BASE_URL` to `http://hindsight.localhost` — that
+> hostname only resolves on your host machine via Caddy. From inside the
+> Hermes container, the correct address is `http://hindsight:8888` (Docker
+> service name on the `memory` network).
 
 The three URLs and where each is used:
 

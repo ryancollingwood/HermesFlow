@@ -156,6 +156,21 @@ mlx: ## Route Hermes to a host-native MLX server (Apple Silicon — see mlx/READ
 
 mlx-revert: headroom-revert ## Revert Hermes to direct provider routing (alias of headroom-revert)
 
+memory: ## Enable Hindsight as Hermes's memory provider (see README "Hindsight memory")
+	@docker exec hermes hermes config set memory.memory_enabled true
+	@docker exec hermes hermes config set memory.provider hindsight
+	@docker exec hermes hermes config set memory.user_profile_enabled true
+	@docker exec hermes hermes config set memory.write_approval false
+	@$(COMPOSE) restart hermes
+	@echo "✓ Hermes memory is routed through Hindsight"
+	@echo "  UI:  http://hindsight.localhost (or http://localhost:9999)"
+	@echo "  API: http://localhost:8888"
+
+memory-revert: ## Disable the Hindsight memory provider
+	@docker exec hermes hermes config set memory.memory_enabled false
+	@$(COMPOSE) restart hermes
+	@echo "✓ Hermes memory disabled"
+
 validate: ## Validate docker-compose.yml (mirrors CI)
 	@test -f .env || cp .env.example .env
 	@$(COMPOSE) config -q && echo "✓ compose config valid"
