@@ -79,7 +79,7 @@ Hermes Agent
 
 ### LM Studio setup
 
-Hindsight uses your local LM Studio instance for memory extraction and synthesis.
+If using LMStudio for Hindsight for memory extraction and synthesis, you'll need to make some tweaks to allow for multiple serving of models.
 Before starting the stack:
 
 1. Open LM Studio → Developer tab → start the local server
@@ -114,14 +114,14 @@ points — no manual config file edits needed.
 
 **From inside the Hermes container:**
 
-```powershell
+```bash
 docker exec hermes uv pip install hindsight-hermes
 docker restart hermes
 ```
 
 **Run the setup wizard** (once Hermes has restarted):
 
-```
+```bash
 hermes plugins setup hindsight
 ```
 
@@ -140,12 +140,18 @@ The three URLs and where each is used:
 | URL | Used from |
 |---|---|
 | `http://hindsight:8888` | Inside containers — Hermes plugin, MCP config |
-| `http://localhost:8888` | Host machine — PowerShell API testing |
+| `http://localhost:8888` | Host machine — API testing |
 | `http://hindsight.localhost` | Host machine browser — via Caddy UI |
 
 ### Testing memory
 
 **1. Check Hindsight is healthy:**
+
+```bash
+curl http://localhost:8888/health
+```
+
+For windows:
 ```powershell
 Invoke-RestMethod -Uri "http://localhost:8888/health"
 ```
@@ -157,7 +163,7 @@ http://localhost:9999
 
 **3. Test retain/recall from Hermes** (in a Hermes chat session):
 ```
-Remember this: I work at Thoughtworks in Melbourne as a Lead Consultant.
+Remember this: I work at ACME in Melbourne as an Engineer.
 ```
 
 Then in a **new session** (clears working memory):
@@ -252,7 +258,7 @@ are present via the web UI / API.
 ## MLX inference (Apple Silicon)
 
 If you're running this stack on an M-series Mac, [MLX](https://github.com/ml-explore/mlx)
-gives faster, GPU-accelerated local inference than the CPU-only `ollama` container —
+gives faster, GPU-accelerated local inference `ollama` container —
 but it can't run *in* `ollama` or any other container, since Docker Desktop on macOS
 doesn't pass the GPU through to containers. It runs as a native host process instead,
 reachable from the stack via `host.docker.internal` (same pattern as the LM Studio
