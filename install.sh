@@ -33,6 +33,13 @@
 #
 #  Optional MLX host inference server (Apple Silicon macOS only):
 #    --with-mlx                            install mlx-lm + always-on launchd agent
+#
+#  Optional Hindsight (memory) model overrides — written to .env before 'up':
+#    --hindsight-model <id>                set every Hindsight LLM scope to <id>
+#    --hindsight-retain-model <id>         override just the retain scope
+#    --hindsight-consolidation-model <id>  override just the consolidation scope
+#    --hindsight-reflect-model <id>        override just the reflect scope
+#    --hindsight-base-url <url>            Hindsight LLM endpoint (ollama/LMStudio/MLX)
 # =============================================================================
 set -euo pipefail
 
@@ -49,6 +56,11 @@ WITH_WINDMILL=1
 WITH_MLX=0
 TG_TOKEN=""
 TG_USERS=""
+HS_MODEL=""
+HS_RETAIN=""
+HS_CONSOLIDATION=""
+HS_REFLECT=""
+HS_BASE_URL=""
 
 usage() {
   # Print the header comment block (between the two ==== dividers).
@@ -81,6 +93,17 @@ dataenv_set() {
     grep -vE "^$key=" "$file" > "$file.tmp" && mv "$file.tmp" "$file"
   fi
   printf '%s=%s\n' "$key" "$val" >> "$file"
+}
+
+# Set KEY=VALUE in the top-level .env in place (preserve position; append if new).
+# Safe for model ids / URLs (no '|' in values, so the sed delimiter is fine).
+env_put() {
+  local key="$1" val="$2"
+  if grep -qE "^$key=" .env 2>/dev/null; then
+    sed -i.bak "s|^$key=.*|$key=$val|" .env && rm -f .env.bak
+  else
+    printf '%s=%s\n' "$key" "$val" >> .env
+  fi
 }
 
 # Block until the hermes container passes its healthcheck (or give up).
@@ -266,6 +289,11 @@ while [ $# -gt 0 ]; do
     --telegram-bot-token) TG_TOKEN="$2"; shift 2 ;;
     --telegram-allowed-users) TG_USERS="$2"; shift 2 ;;
     --with-mlx) WITH_MLX=1; shift ;;
+    --hindsight-model) HS_MODEL="$2"; shift 2 ;;
+    --hindsight-retain-model) HS_RETAIN="$2"; shift 2 ;;
+    --hindsight-consolidation-model) HS_CONSOLIDATION="$2"; shift 2 ;;
+    --hindsight-reflect-model) HS_REFLECT="$2"; shift 2 ;;
+    --hindsight-base-url) HS_BASE_URL="$2"; shift 2 ;;
     -h|--help)  usage 0 ;;
     *) echo "✗ unknown argument: $1" >&2; usage 1 ;;
   esac
@@ -331,6 +359,21 @@ case "$(uname -s)" in
     echo "✓ set HERMES_UID=$HU HERMES_GID=$HG"
     ;;
 esac
+
+# ── 4b. Hindsight model / backend overrides (optional) ───────────────────────
+# Written to .env before 'up' so the hindsight container starts with them, and so
+# step 10 pulls the right Ollama models. --hindsight-model seeds every scope;
+# per-scope flags override it.
+HS_RETAIN="${HS_RETAIN:-$HS_MODEL}"
+HS_CONSOLIDATION="${HS_CONSOLIDATION:-$HS_MODEL}"
+HS_REFLECT="${HS_REFLECT:-$HS_MODEL}"
+[ -n "$HS_MODEL" ]         && env_put HINDSIGHT_LLM_MODEL "$HS_MODEL"
+[ -n "$HS_RETAIN" ]        && env_put HINDSIGHT_RETAIN_LLM_MODEL "$HS_RETAIN"
+[ -n "$HS_CONSOLIDATION" ] && env_put HINDSIGHT_CONSOLIDATION_LLM_MODEL "$HS_CONSOLIDATION"
+[ -n "$HS_REFLECT" ]       && env_put HINDSIGHT_REFLECT_LLM_MODEL "$HS_REFLECT"
+[ -n "$HS_BASE_URL" ]      && env_put HINDSIGHT_LLM_BASE_URL "$HS_BASE_URL"
+[ -n "$HS_MODEL$HS_RETAIN$HS_CONSOLIDATION$HS_REFLECT$HS_BASE_URL" ] \
+  && echo "✓ applied Hindsight model/backend overrides to .env"
 
 # ── 4. secrets (API key + DB passwords) ──────────────────────────────────────
 make --no-print-directory secrets

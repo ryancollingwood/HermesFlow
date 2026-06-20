@@ -33,6 +33,11 @@ python install.py --provider openrouter --api-key sk-or-...
 | `--telegram-bot-token <token>` | — | BotFather token to enable the Telegram channel. **Requires** `--telegram-allowed-users`. |
 | `--telegram-allowed-users <id,id,…>` | — | Comma-separated numeric Telegram user IDs allowed to use the bot. **Requires** `--telegram-bot-token`. |
 | `--with-mlx` | off | Install the host-native MLX inference server (Apple Silicon macOS only). |
+| `--hindsight-model <id>` | from `.env` | Set **every** Hindsight LLM scope (main/retain/consolidation/reflect) to this model. |
+| `--hindsight-retain-model <id>` | — | Override just the retain scope. |
+| `--hindsight-consolidation-model <id>` | — | Override just the consolidation scope. |
+| `--hindsight-reflect-model <id>` | — | Override just the reflect scope. |
+| `--hindsight-base-url <url>` | from `.env` | Hindsight LLM endpoint (Ollama / LM Studio / MLX). |
 
 ## Steps
 
@@ -94,7 +99,11 @@ end-to-end verification that the provider, key, and model all work.
 
 ### 10. Hindsight memory (skip with `--no-memory`)
 - Pulls the `HINDSIGHT_*_LLM_MODEL` models into the bundled `ollama` container
-  (only when Hindsight points at `ollama`; embeddings are local).
+  (only when Hindsight points at `ollama`; embeddings are local). The models come
+  from `.env`, which the `--hindsight-model` / `--hindsight-*-model` /
+  `--hindsight-base-url` flags above write **before** the stack starts — so e.g.
+  `--hindsight-model qwen2.5:3b` makes every scope use one small model (handy on
+  RAM-limited Macs, avoiding the two-model reload thrash).
 - Sets `memory.provider = hindsight` (+ related keys) and restarts Hermes. No
   `pip install` is needed — the `hindsight-client` package ships in the image.
 - Verifies with `hermes memory status` (`available ✓`) and checks the Hindsight

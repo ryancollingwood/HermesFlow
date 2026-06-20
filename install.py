@@ -32,6 +32,13 @@ Optional Telegram channel (both required together):
 
 Optional MLX host inference server (Apple Silicon macOS only):
     --with-mlx                            install mlx-lm + always-on launchd agent
+
+Optional Hindsight (memory) model overrides — written to .env before 'up':
+    --hindsight-model <id>                set every Hindsight LLM scope to <id>
+    --hindsight-retain-model <id>         override just the retain scope
+    --hindsight-consolidation-model <id>  override just the consolidation scope
+    --hindsight-reflect-model <id>        override just the reflect scope
+    --hindsight-base-url <url>            Hindsight LLM endpoint (ollama/LMStudio/MLX)
 """
 from __future__ import annotations
 
@@ -432,6 +439,13 @@ def main() -> None:
                          "(required together with --telegram-bot-token)")
     ap.add_argument("--with-mlx", action="store_true",
                     help="install the host-native MLX inference server (Apple Silicon macOS only)")
+    ap.add_argument("--hindsight-model", default="",
+                    help="set every Hindsight LLM scope to this model id")
+    ap.add_argument("--hindsight-retain-model", default="", help="override the retain scope")
+    ap.add_argument("--hindsight-consolidation-model", default="", help="override the consolidation scope")
+    ap.add_argument("--hindsight-reflect-model", default="", help="override the reflect scope")
+    ap.add_argument("--hindsight-base-url", default="",
+                    help="Hindsight LLM endpoint (ollama / LM Studio / MLX)")
     args = ap.parse_args()
 
     key_var, default_model, models_url, auth_style = PROVIDERS[args.provider]
@@ -477,6 +491,24 @@ def main() -> None:
         env_set("HERMES_UID", str(os.getuid()))   # type: ignore[attr-defined]
         env_set("HERMES_GID", str(os.getgid()))   # type: ignore[attr-defined]
         say(f"{OK} set HERMES_UID={os.getuid()} HERMES_GID={os.getgid()}")  # type: ignore[attr-defined]
+
+    # 4b. Hindsight model / backend overrides — written before 'up' so the
+    # hindsight container starts with them and step 10 pulls the right models.
+    hs_retain = args.hindsight_retain_model or args.hindsight_model
+    hs_consol = args.hindsight_consolidation_model or args.hindsight_model
+    hs_reflect = args.hindsight_reflect_model or args.hindsight_model
+    hs_overrides = {
+        "HINDSIGHT_LLM_MODEL": args.hindsight_model,
+        "HINDSIGHT_RETAIN_LLM_MODEL": hs_retain,
+        "HINDSIGHT_CONSOLIDATION_LLM_MODEL": hs_consol,
+        "HINDSIGHT_REFLECT_LLM_MODEL": hs_reflect,
+        "HINDSIGHT_LLM_BASE_URL": args.hindsight_base_url,
+    }
+    if any(hs_overrides.values()):
+        for k, v in hs_overrides.items():
+            if v:
+                env_set(k, v)
+        say(f"{OK} applied Hindsight model/backend overrides to .env")
 
     # 5. secrets
     ensure_secret("API_SERVER_KEY", 32)
