@@ -10,6 +10,7 @@ with the Windmill side pre-wired to call Hermes as an OpenAI-compatible endpoint
 | Path | Purpose |
 |---|---|
 | `docker-compose.yml` | The full stack: Hermes, Hindsight, Windmill (db/server/workers/LSP), Caddy |
+| `docker-compose.gpu.yml` | Optional override adding NVIDIA GPU passthrough to Ollama (`--gpu`) |
 | `install.sh` / `install.py` | Non-interactive installer — bash and pure-Python (Windows-friendly) versions ([step-by-step](INSTALL.md)) |
 | `.env.example` | Every configurable knob — copy to `.env` |
 | `Caddyfile` | Reverse-proxy routing for Windmill + Hermes dashboard/API + Hindsight UI |
@@ -65,7 +66,8 @@ and Docker Desktop (no `make`). Flags: `--provider`, `--api-key`, `--model`,
 messaging channels (`--telegram-bot-token`/`--telegram-allowed-users`,
 `--discord-bot-token`/`--discord-allowed-users`), `--with-mlx` (Apple Silicon —
 host-native MLX server), `--with-headroom` (route through the compression proxy),
-`--bind-lan` (expose on `0.0.0.0`), Hindsight overrides (`--hindsight-model` /
+`--bind-lan` (expose on `0.0.0.0`), `--gpu` (NVIDIA passthrough for Ollama),
+Hindsight overrides (`--hindsight-model` /
 `--hindsight-{retain,consolidation,reflect}-model` / `--hindsight-base-url` /
 `--hindsight-api-key`), and `--env KEY=VALUE` to set any other `.env` variable.
 See [INSTALL.md](INSTALL.md) for the full table.

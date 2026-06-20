@@ -46,6 +46,7 @@ Other optional channels / toggles:
     --discord-allowed-users <id,id,...>   Discord user IDs allowed to use the bot
     --with-headroom                       route Hermes through the Headroom proxy
     --bind-lan                            expose Hermes/Hindsight/Ollama on 0.0.0.0
+    --gpu                                 NVIDIA GPU passthrough for Ollama (Linux)
     --env KEY=VALUE                       set any other .env var (repeatable)
 """
 from __future__ import annotations
@@ -464,6 +465,8 @@ def main() -> None:
                     help="route Hermes through the Headroom context-compression proxy")
     ap.add_argument("--bind-lan", action="store_true",
                     help="expose Hermes/Hindsight/Ollama on 0.0.0.0 instead of loopback")
+    ap.add_argument("--gpu", action="store_true",
+                    help="NVIDIA GPU passthrough for Ollama (Linux/WSL2 + nvidia-container-toolkit)")
     ap.add_argument("--env", action="append", default=[], metavar="KEY=VALUE",
                     help="set any other .env variable (repeatable)")
     args = ap.parse_args()
@@ -536,6 +539,17 @@ def main() -> None:
             if v:
                 env_set(k, v)
         say(f"{OK} applied Hindsight model/backend overrides to .env")
+
+    # NVIDIA GPU passthrough for the ollama container.
+    if args.gpu:
+        if platform.system() == "Darwin":
+            say(f"{WARN} --gpu has no effect on macOS — Docker Desktop can't pass the GPU "
+                "through. Use --with-mlx instead.")
+        else:
+            env_set("COMPOSE_FILE", "docker-compose.yml:docker-compose.gpu.yml")
+            env_set("CUDA_VISIBLE_DEVICES", "0")
+            env_set("OLLAMA_NUM_GPU", "999")
+            say(f"{OK} enabled NVIDIA GPU passthrough for Ollama (needs nvidia-container-toolkit on the host)")
 
     # Expose services on the LAN (0.0.0.0) instead of loopback only.
     if args.bind_lan:

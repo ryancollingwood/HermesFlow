@@ -47,6 +47,7 @@
 #    --discord-allowed-users <id,id,...>   Discord user IDs allowed to use the bot
 #    --with-headroom                       route Hermes through the Headroom proxy
 #    --bind-lan                            expose Hermes/Hindsight/Ollama on 0.0.0.0
+#    --gpu                                 NVIDIA GPU passthrough for Ollama (Linux)
 #    --env KEY=VALUE                       set any other .env var (repeatable)
 # =============================================================================
 set -euo pipefail
@@ -74,6 +75,7 @@ DISCORD_TOKEN=""
 DISCORD_USERS=""
 WITH_HEADROOM=0
 BIND_LAN=0
+GPU=0
 EXTRA_ENV=()
 
 usage() {
@@ -313,6 +315,7 @@ while [ $# -gt 0 ]; do
     --discord-allowed-users) DISCORD_USERS="$2"; shift 2 ;;
     --with-headroom) WITH_HEADROOM=1; shift ;;
     --bind-lan) BIND_LAN=1; shift ;;
+    --gpu) GPU=1; shift ;;
     --env) EXTRA_ENV+=("$2"); shift 2 ;;
     -h|--help)  usage 0 ;;
     *) echo "✗ unknown argument: $1" >&2; usage 1 ;;
@@ -403,6 +406,18 @@ HS_REFLECT="${HS_REFLECT:-$HS_MODEL}"
 [ -n "$HS_BASE_URL" ]      && env_put HINDSIGHT_LLM_BASE_URL "$HS_BASE_URL"
 [ -n "$HS_MODEL$HS_RETAIN$HS_CONSOLIDATION$HS_REFLECT$HS_BASE_URL" ] \
   && echo "✓ applied Hindsight model/backend overrides to .env"
+
+# NVIDIA GPU passthrough for the ollama container (Linux / WSL2 + nvidia-container-toolkit).
+if [ "$GPU" -eq 1 ]; then
+  if [ "$(uname -s)" = "Darwin" ]; then
+    echo "⚠ --gpu has no effect on macOS — Docker Desktop can't pass the GPU through. Use --with-mlx instead."
+  else
+    env_put COMPOSE_FILE "docker-compose.yml:docker-compose.gpu.yml"
+    env_put CUDA_VISIBLE_DEVICES 0
+    env_put OLLAMA_NUM_GPU 999
+    echo "✓ enabled NVIDIA GPU passthrough for Ollama (needs nvidia-container-toolkit on the host)"
+  fi
+fi
 
 # Expose services on the LAN (0.0.0.0) instead of loopback only.
 if [ "$BIND_LAN" -eq 1 ]; then

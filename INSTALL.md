@@ -43,6 +43,7 @@ python install.py --provider openrouter --api-key sk-or-...
 | `--discord-allowed-users <id,id,…>` | — | Comma-separated Discord user IDs allowed to use the bot. **Requires** `--discord-bot-token`. |
 | `--with-headroom` | off | Route Hermes through the Headroom context-compression proxy (OpenRouter only). |
 | `--bind-lan` | off | Expose Hermes/Hindsight/Ollama on `0.0.0.0` instead of loopback. |
+| `--gpu` | off | NVIDIA GPU passthrough for the Ollama container (Linux/WSL2 + nvidia-container-toolkit). No-op on macOS. |
 | `--env KEY=VALUE` | — | Set any other `.env` variable. Repeatable. |
 
 ## Steps
@@ -75,8 +76,12 @@ Generates every required secret that's blank or still a known-weak default:
 `GRAFANA_ADMIN_PASSWORD` (otherwise Grafana boots as `admin`/`changeme`).
 Existing custom values are left alone.
 
-This step also applies the `--bind-lan`, `--hindsight-api-key`, and `--env`
-overrides to `.env` first, so they're in place before the stack starts.
+This step also applies the `--gpu`, `--bind-lan`, `--hindsight-api-key`, and
+`--env` overrides to `.env` first, so they're in place before the stack starts.
+`--gpu` layers [`docker-compose.gpu.yml`](docker-compose.gpu.yml) on via
+`COMPOSE_FILE` (adding the NVIDIA device reservation the base file leaves
+commented) and sets `CUDA_VISIBLE_DEVICES` / `OLLAMA_NUM_GPU`. On a GPU host you'd
+keep Ollama in-container — there's no need for host-native MLX.
 
 > Secrets must be generated **before** the first `up`. Postgres only applies
 > `POSTGRES_PASSWORD` on first init, so rotating a DB password after the volume
