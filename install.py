@@ -25,6 +25,10 @@ What it does (mirrors install.sh / `make bootstrap`, minus the TTY wizard):
     10. pull Hindsight's Ollama models + enable it as the memory provider (--no-memory)
     11. prep Windmill: pre-install the worker Python, create the 'main' workspace,
         and register Windmill with Hermes over MCP (--no-windmill)
+
+Optional Telegram channel (both required together):
+    --telegram-bot-token <token>          BotFather token
+    --telegram-allowed-users <id,id,...>  numeric user IDs allowed to talk to it
 """
 from __future__ import annotations
 
@@ -236,21 +240,23 @@ def resolve_data_dir() -> str:
     return expand(env_value("DATA_DIR", f"{home}/.hermes")) or f"{home}/.hermes"
 
 
-def write_provider_key(data_dir: str, key_var: str, api_key: str) -> None:
+def set_data_env(data_dir: str, key: str, value: str) -> Path:
+    """Set KEY=VALUE in <DATA_DIR>/.env (the file Hermes reads). Returns the path."""
     df = Path(data_dir) / ".env"
     df.parent.mkdir(parents=True, exist_ok=True)
     lines = df.read_text(encoding="utf-8").splitlines() if df.exists() else []
-    for i, ln in enumerate(lines):
-        if ln.startswith(key_var + "="):
-            lines[i] = f"{key_var}={api_key}"
-            break
-    else:
-        lines.append(f"{key_var}={api_key}")
+    lines = [ln for ln in lines if not ln.startswith(key + "=")]
+    lines.append(f"{key}={value}")
     df.write_text("\n".join(lines) + "\n", encoding="utf-8")
     try:
         os.chmod(df, 0o600)
     except Exception:
         pass
+    return df
+
+
+def write_provider_key(data_dir: str, key_var: str, api_key: str) -> None:
+    df = set_data_env(data_dir, key_var, api_key)
     say(f"{OK} wrote {key_var} to {df}")
 
 
@@ -382,11 +388,24 @@ def main() -> None:
     ap.add_argument("--skip-model-check", action="store_true")
     ap.add_argument("--no-memory", action="store_true")
     ap.add_argument("--no-windmill", action="store_true")
+    ap.add_argument("--telegram-bot-token", default="",
+                    help="BotFather token to enable the Hermes Telegram channel")
+    ap.add_argument("--telegram-allowed-users", default="",
+                    help="comma-separated numeric user IDs allowed to use the bot "
+                         "(required together with --telegram-bot-token)")
     args = ap.parse_args()
 
     key_var, default_model, models_url, auth_style = PROVIDERS[args.provider]
     model = args.model or default_model
     api_key = args.api_key or os.environ.get(key_var, "")
+
+    # Telegram (optional): both required together — an allow-list is mandatory for
+    # the channel (otherwise anyone who finds the bot could talk to your agent).
+    tg_token = args.telegram_bot_token or os.environ.get("TELEGRAM_BOT_TOKEN", "")
+    tg_users = args.telegram_allowed_users or os.environ.get("TELEGRAM_ALLOWED_USERS", "")
+    if (tg_token or tg_users) and not (tg_token and tg_users):
+        die(f"{CROSS} Telegram needs BOTH --telegram-bot-token and --telegram-allowed-users\n"
+            "  (allowed user IDs are required for the Hermes Telegram channel).")
 
     # 1. prerequisites
     say(f"{ARROW} checking prerequisites…")
@@ -435,6 +454,15 @@ def main() -> None:
     else:
         say(f"{WARN} no API key supplied for {args.provider} — set {key_var} or pass --api-key.")
         say(f"  Add it to {Path(data_dir) / '.env'} later and run: docker restart hermes")
+
+    # Telegram channel (optional) — written to the same /opt/data/.env Hermes reads.
+    if tg_token:
+        set_data_env(data_dir, "TELEGRAM_BOT_TOKEN", tg_token)
+        set_data_env(data_dir, "TELEGRAM_ALLOWED_USERS", tg_users)
+        say(f"{OK} configured Telegram channel (bot token + allowed users) in {Path(data_dir) / '.env'}")
+        # Fresh install: Hermes starts fresh next step. Re-run: restart to pick it up.
+        if out(["docker", "inspect", "-f", "{{.State.Running}}", "hermes"]) == "true":
+            run(["docker", "restart", "hermes"])
 
     # 8. pull + up
     if not args.no_pull:

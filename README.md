@@ -61,7 +61,23 @@ $env:OPENROUTER_API_KEY="sk-or-..."; python install.py
 
 Both installers are equivalent and idempotent; `install.py` needs only Python 3
 and Docker Desktop (no `make`). Flags: `--provider`, `--api-key`, `--model`,
-`--no-pull`, `--skip-model-check`, `--no-memory`, `--no-windmill`.
+`--no-pull`, `--skip-model-check`, `--no-memory`, `--no-windmill`,
+`--telegram-bot-token`, `--telegram-allowed-users`.
+
+**Telegram channel (optional).** Pass both a bot token and the allowed user IDs to
+wire up Hermes's Telegram channel — they're written to `<DATA_DIR>/.env` (the
+file Hermes reads):
+
+```sh
+./install.sh --provider openrouter --api-key sk-or-... \
+  --telegram-bot-token 123456789:ABCdef... \
+  --telegram-allowed-users 11111111,22222222
+```
+
+`--telegram-allowed-users` is a comma-separated list of numeric Telegram user IDs
+and is **required** alongside the token — the channel won't be set up with one but
+not the other, so the bot is never left open to anyone who finds it. (Equivalent
+to setting `TELEGRAM_BOT_TOKEN` / `TELEGRAM_ALLOWED_USERS` in `<DATA_DIR>/.env`.)
 
 `install.sh` is non-interactive and idempotent. It checks prerequisites,
 **validates the model against the provider's `/models` list** (failing early with

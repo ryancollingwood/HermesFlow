@@ -26,6 +26,10 @@
 #   11. prep Windmill: pre-install the worker Python, create the 'main'
 #       workspace, and register Windmill with Hermes over MCP
 #       (--no-windmill to skip)
+#
+#  Optional Telegram channel (both required together):
+#    --telegram-bot-token <token>          BotFather token
+#    --telegram-allowed-users <id,id,...>  numeric user IDs allowed to talk to it
 # =============================================================================
 set -euo pipefail
 
@@ -39,6 +43,8 @@ DO_PULL=1
 CHECK_MODEL=1
 WITH_MEMORY=1
 WITH_WINDMILL=1
+TG_TOKEN=""
+TG_USERS=""
 
 usage() {
   # Print the header comment block (between the two ==== dividers).
@@ -60,6 +66,17 @@ fetch_model_ids() {
   printf '%s' "$body" \
     | grep -oE '"id"[[:space:]]*:[[:space:]]*"[^"]+"' \
     | sed -E 's/.*"([^"]+)"$/\1/'
+}
+
+# Set KEY=VALUE in an env file (replace an existing line or append). Uses
+# grep+append rather than sed so values with :,/ etc. need no escaping.
+dataenv_set() {
+  local file="$1" key="$2" val="$3"
+  mkdir -p "$(dirname "$file")"
+  if [ -f "$file" ] && grep -qE "^$key=" "$file"; then
+    grep -vE "^$key=" "$file" > "$file.tmp" && mv "$file.tmp" "$file"
+  fi
+  printf '%s=%s\n' "$key" "$val" >> "$file"
 }
 
 # Block until the hermes container passes its healthcheck (or give up).
@@ -215,6 +232,8 @@ while [ $# -gt 0 ]; do
     --skip-model-check) CHECK_MODEL=0; shift ;;
     --no-memory) WITH_MEMORY=0; shift ;;
     --no-windmill) WITH_WINDMILL=0; shift ;;
+    --telegram-bot-token) TG_TOKEN="$2"; shift 2 ;;
+    --telegram-allowed-users) TG_USERS="$2"; shift 2 ;;
     -h|--help)  usage 0 ;;
     *) echo "✗ unknown argument: $1" >&2; usage 1 ;;
   esac
@@ -239,6 +258,17 @@ MODEL="${MODEL:-$DEFAULT_MODEL}"
 # Accept the key from the matching env var if not passed explicitly.
 if [ -z "$API_KEY" ]; then
   API_KEY="$(printenv "$KEY_VAR" 2>/dev/null || true)"
+fi
+
+# Telegram (optional): bot token + allowed user IDs. Fall back to env vars.
+[ -n "$TG_TOKEN" ] || TG_TOKEN="$(printenv TELEGRAM_BOT_TOKEN 2>/dev/null || true)"
+[ -n "$TG_USERS" ] || TG_USERS="$(printenv TELEGRAM_ALLOWED_USERS 2>/dev/null || true)"
+# Both are required together: an allow-list is mandatory for the Telegram channel
+# (otherwise anyone who finds the bot could talk to your agent).
+if { [ -n "$TG_TOKEN" ] || [ -n "$TG_USERS" ]; } && { [ -z "$TG_TOKEN" ] || [ -z "$TG_USERS" ]; }; then
+  echo "✗ Telegram needs BOTH --telegram-bot-token and --telegram-allowed-users" >&2
+  echo "  (allowed user IDs are required for the Hermes Telegram channel)." >&2
+  exit 1
 fi
 
 # ── 1. prerequisites ─────────────────────────────────────────────────────────
@@ -297,6 +327,19 @@ else
   echo "⚠ no API key supplied for $PROVIDER — set $KEY_VAR or pass --api-key."
   echo "  The stack will start but Hermes won't be able to call the provider until"
   echo "  you add the key to $DATA_DIR_RESOLVED/.env and restart: docker restart hermes"
+fi
+
+# Telegram channel (optional) — written to the same /opt/data/.env Hermes reads.
+if [ -n "$TG_TOKEN" ]; then
+  dataenv_set "$DATA_DIR_RESOLVED/.env" TELEGRAM_BOT_TOKEN "$TG_TOKEN"
+  dataenv_set "$DATA_DIR_RESOLVED/.env" TELEGRAM_ALLOWED_USERS "$TG_USERS"
+  chmod 600 "$DATA_DIR_RESOLVED/.env" 2>/dev/null || true
+  echo "✓ configured Telegram channel (bot token + allowed users) in $DATA_DIR_RESOLVED/.env"
+  # On a fresh install Hermes starts fresh in the next step and reads this; on a
+  # re-run it's already up, so restart it to pick up the new channel.
+  if [ "$(docker inspect -f '{{.State.Running}}' hermes 2>/dev/null)" = "true" ]; then
+    docker restart hermes >/dev/null 2>&1 || true
+  fi
 fi
 
 # ── 7. pull + up ─────────────────────────────────────────────────────────────
