@@ -58,9 +58,10 @@ secrets (`make secrets`), writes the provider key to `<DATA_DIR>/.env` (the file
 Hermes reads — same one the wizard produces), pulls images, starts the stack,
 sets the default model, probes Hermes end-to-end, enables the **Hindsight memory
 provider** (pass `--no-memory` to skip), and preps **Windmill** — creates the
-`main` workspace and pre-installs the worker Python (pass `--no-windmill` to
-skip). Other providers: `--provider anthropic|openai`; choose a model with
-`--model <id>`. Re-run any time; it only fills blanks.
+`main` workspace, pre-installs the worker Python, and registers Windmill with
+Hermes over MCP (pass `--no-windmill` to skip). Other providers:
+`--provider anthropic|openai`; choose a model with `--model <id>`. Re-run any
+time; it only fills blanks.
 
 > Catalog presence is not a callability guarantee — a model can be **listed** by
 > the provider yet rejected for your key/tier (e.g. OpenRouter returns 404 "No
@@ -588,6 +589,51 @@ name the gateway actually serves — run `client.py` (or
 
 > Inside a worker, reach Hermes at `hermes:8642`, **not** `localhost` — localhost
 > is the worker itself. This works because the workers share the `agent` network.
+
+### Hermes ⇄ Windmill over MCP
+
+That covers Windmill calling Hermes. The reverse also works: **Windmill ships an
+MCP server, and Hermes is an MCP client**, so Windmill's scripts/flows *and* its
+management API become callable tools inside Hermes chat sessions. `install.sh`
+wires this up by default (skip with `--no-windmill`); the manual steps are below.
+
+Hermes reaches Windmill directly over the shared `agent`/`edge` networks at
+`windmill_server:8000` — no Caddy involved.
+
+```sh
+# 1. Mint a Windmill token WITH the mcp scope (a plain token can't list tools):
+TOKEN=$(curl -s http://windmill.localhost/api/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"admin@windmill.dev","password":"changeme"}')
+MCP=$(curl -s -X POST http://windmill.localhost/api/users/tokens/create \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"label":"hermes-mcp","scopes":["mcp:all"]}')
+
+# 2. Register it with Hermes (answer 'y' to auth, then paste the token):
+docker exec -it hermes hermes mcp add windmill \
+  --url http://windmill_server:8000/api/mcp/w/main/sse --auth header
+#   …then enter $MCP at the "API key / Bearer token" prompt.
+
+# 3. Verify:
+docker exec hermes hermes mcp test windmill     # lists the available tools
+```
+
+With `mcp:all` Hermes sees your workspace scripts/flows (e.g. `s-f_hermes_chat`,
+`s-f_hermes_client`) **plus** Windmill's admin tools (createSchedule,
+listWorkers, createVariable, …). Start a **new** Hermes session for the tools to
+become active.
+
+Gotchas (all enforced by Windmill):
+
+- The endpoint is **Streamable-HTTP `POST`**, despite the `/sse` in the path — a
+  `GET` returns `405`.
+- The token **must** have the `mcp:all` scope. Without it you get
+  `Unauthorized: missing mcp scope` on `tools/list`.
+- Auth is a **Bearer header** (or a `?token=` query param) — don't send both, an
+  empty bearer alongside a URL token yields `401`.
+- Hermes rewrites `config.yaml` on every command and **disables** a server that
+  fails to connect, so hand-editing the YAML won't stick — let `hermes mcp add`
+  record the auth.
 
 ## Make targets
 

@@ -23,8 +23,9 @@
 #    9. set the default model and probe Hermes end-to-end
 #   10. pull Hindsight's Ollama models + enable it as the memory provider
 #       (--no-memory to skip)
-#   11. prep Windmill: pre-install the worker Python + create the 'main'
-#       workspace (--no-windmill to skip)
+#   11. prep Windmill: pre-install the worker Python, create the 'main'
+#       workspace, and register Windmill with Hermes over MCP
+#       (--no-windmill to skip)
 # =============================================================================
 set -euo pipefail
 
@@ -144,6 +145,30 @@ setup_windmill() {
     echo "✓ created Windmill 'main' workspace"
   else
     echo "⚠ couldn't create the Windmill 'main' workspace — create it in the UI before 'wmill sync push'."
+  fi
+
+  # Connect Hermes to Windmill over MCP, so Windmill's scripts/flows AND its
+  # management API become callable tools inside Hermes sessions. Needs a token
+  # with the 'mcp:all' scope (a plain token can initialize but not list tools),
+  # passed as a Bearer header. Hermes reaches windmill_server directly over the
+  # shared docker networks. Idempotent: skip if already configured.
+  if docker exec hermes hermes mcp list 2>/dev/null | grep -qw windmill; then
+    echo "✓ Hermes already has the 'windmill' MCP server configured"
+    return 0
+  fi
+  local mcptoken
+  mcptoken="$(curl -fsS -H "Host: $hh" -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
+    -X POST "$base/api/users/tokens/create" -d '{"label":"hermes-mcp","scopes":["mcp:all"]}' 2>/dev/null)"
+  if [ -z "$mcptoken" ]; then
+    echo "⚠ couldn't mint a Windmill MCP token — skipping Hermes↔Windmill MCP wiring."
+    return 0
+  fi
+  # `hermes mcp add` is interactive: 'y' (server needs auth) then the token.
+  if printf 'y\n%s\n' "$mcptoken" | docker exec -i hermes hermes mcp add windmill \
+       --url "http://windmill_server:8000/api/mcp/w/main/sse" --auth header >/dev/null 2>&1; then
+    echo "✓ registered Windmill as an MCP server in Hermes (scripts/flows + admin API as tools)"
+  else
+    echo "⚠ couldn't register the Windmill MCP server in Hermes — wire it up manually (see README)."
   fi
 }
 
