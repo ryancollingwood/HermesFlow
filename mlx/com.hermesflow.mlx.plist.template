@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.hermesflow.mlx</string>
+
+    <key>ProgramArguments</key>
+    <array>
+        <string>__MLX_VENV_BIN__/mlx_lm.server</string>
+        <string>--model</string>
+        <string>__MLX_MODEL__</string>
+        <string>--host</string>
+        <string>0.0.0.0</string>
+        <string>--port</string>
+        <string>__MLX_PORT__</string>
+    </array>
+
+    <!-- Starts on login and restarts on crash or unexpected exit. Does NOT
+         restart after a clean `launchctl bootout` (used by uninstall-launchd.sh). -->
+    <key>RunAtLoad</key>
+    <true/>
+    <key>KeepAlive</key>
+    <true/>
+
+    <key>StandardOutPath</key>
+    <string>__LOG_DIR__/mlx.out.log</string>
+    <key>StandardErrorPath</key>
+    <string>__LOG_DIR__/mlx.err.log</string>
+
+    <key>WorkingDirectory</key>
+    <string>__HOME__</string>
+    <key>ProcessType</key>
+    <string>Interactive</string>
+</dict>
+</plist>

@@ -14,6 +14,7 @@ with the Windmill side pre-wired to call Hermes as an OpenAI-compatible endpoint
 | `Caddyfile` | Reverse-proxy routing for Windmill + Hermes dashboard/API + Hindsight UI |
 | `Makefile` | `bootstrap`, lifecycle, health, backups, key generation |
 | `windmill/` | wmill-syncable resource type, resource, secret, and example scripts |
+| `mlx/` | Host-native MLX inference server for Apple Silicon (setup + launch script) |
 
 ## Architecture
 
@@ -245,6 +246,27 @@ curl http://localhost:8888/health
 Keep `./hindsight-pg0-backup.zip` and the old `HINDSIGHT_DATA_DIR` bind mount
 around as a rollback safety net until you've confirmed pre-existing memories
 are present via the web UI / API.
+
+---
+
+## MLX inference (Apple Silicon)
+
+If you're running this stack on an M-series Mac, [MLX](https://github.com/ml-explore/mlx)
+gives faster, GPU-accelerated local inference than the CPU-only `ollama` container —
+but it can't run *in* `ollama` or any other container, since Docker Desktop on macOS
+doesn't pass the GPU through to containers. It runs as a native host process instead,
+reachable from the stack via `host.docker.internal` (same pattern as the LM Studio
+backend below).
+
+See [`mlx/README.md`](mlx/README.md) for setup, model sizing for 8/16/32 GB Macs, and
+how to point Hindsight and/or Hermes at it. Quick version:
+
+```sh
+pip install mlx-lm
+./mlx/serve.sh                 # manual: serves an OpenAI-compatible API on :8080
+./mlx/install-launchd.sh        # or: always-on launchd agent, restarts on crash/reboot
+make mlx                       # routes Hermes's own model calls through it
+```
 
 ---
 
