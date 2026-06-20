@@ -10,6 +10,7 @@ with the Windmill side pre-wired to call Hermes as an OpenAI-compatible endpoint
 | Path | Purpose |
 |---|---|
 | `docker-compose.yml` | The full stack: Hermes, Hindsight, Windmill (db/server/workers/LSP), Caddy |
+| `install.sh` / `install.py` | Non-interactive installer — bash and pure-Python (Windows-friendly) versions |
 | `.env.example` | Every configurable knob — copy to `.env` |
 | `Caddyfile` | Reverse-proxy routing for Windmill + Hermes dashboard/API + Hindsight UI |
 | `Makefile` | `bootstrap`, lifecycle, health, backups, key generation |
@@ -49,6 +50,18 @@ Two paths — pick one.
 OPENROUTER_API_KEY=sk-or-... ./install.sh
 # or: ./install.sh --provider openrouter --api-key sk-or-... --model openai/gpt-4o-mini
 ```
+
+**On Windows (or any host without bash/make/openssl/curl), use the Python port**
+— same flags, same steps, stdlib-only:
+
+```powershell
+$env:OPENROUTER_API_KEY="sk-or-..."; python install.py
+# or: python install.py --provider openrouter --api-key sk-or-... --model openai/gpt-4o-mini
+```
+
+Both installers are equivalent and idempotent; `install.py` needs only Python 3
+and Docker Desktop (no `make`). Flags: `--provider`, `--api-key`, `--model`,
+`--no-pull`, `--skip-model-check`, `--no-memory`, `--no-windmill`.
 
 `install.sh` is non-interactive and idempotent. It checks prerequisites,
 **validates the model against the provider's `/models` list** (failing early with
