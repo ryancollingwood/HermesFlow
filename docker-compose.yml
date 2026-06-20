@@ -663,16 +663,18 @@ services:
     logging: *default-logging
 
   # ---------------------------------------------------------------------------
-  #  Loki — log storage. Filesystem-backed, single-binary mode; no retention
-  #  policy configured by default (see loki/loki-config.yml). Queried from
-  #  Grafana's Explore tab via the Loki datasource — no Caddy route, nothing
-  #  here is meant to be browsed directly.
+  #  Loki — log storage. Filesystem-backed, single-binary mode. Retention is
+  #  set via LOKI_RETENTION_PERIOD in .env (see loki/loki-config.yml). Queried
+  #  from Grafana's Explore tab via the Loki datasource — no Caddy route,
+  #  nothing here is meant to be browsed directly.
   # ---------------------------------------------------------------------------
   loki:
     image: grafana/loki:${LOKI_VERSION:-latest}
     container_name: loki
     restart: unless-stopped
-    command: -config.file=/etc/loki/loki-config.yml
+    command: -config.file=/etc/loki/loki-config.yml -config.expand-env=true
+    environment:
+      LOKI_RETENTION_PERIOD: ${LOKI_RETENTION_PERIOD:-720h}
     volumes:
       - ./loki/loki-config.yml:/etc/loki/loki-config.yml:ro
       - ${MONITORING_DATA_DIR:-./data/monitoring}/loki:/loki
