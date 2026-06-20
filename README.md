@@ -114,7 +114,7 @@ Hermes Agent
 └── hindsight plugin (hindsight_retain / hindsight_recall / hindsight_reflect)
         ↓ http://hindsight:8888
     Hindsight container ── HINDSIGHT_API_DATABASE_URL ──→ hindsight_db container
-    ├── fact extraction (via LM Studio)                   (PostgreSQL 16 + pgvector)
+    ├── fact extraction                   (PostgreSQL 16 + pgvector)
     └── knowledge graph
 ```
 
