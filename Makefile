@@ -27,7 +27,25 @@ else
   ON_WINDOWS :=
 endif
 
-.PHONY: help check init apikey wizard secure fix-permissions pull up down restart logs ps health backup bootstrap lint validate ci headroom headroom-revert mlx mlx-revert
+.PHONY: help check init apikey secrets wizard secure fix-permissions pull up down restart logs ps health backup bootstrap lint validate ci headroom headroom-revert mlx mlx-revert
+
+# Fill an .env variable with a generated value when it is empty OR still set to a
+# known-weak default. Usage: $(call ensure_secret,VAR,GENERATOR,WEAK_DEFAULT)
+# WEAK_DEFAULT may be empty to only fill blanks.
+define ensure_secret
+	@CUR=$$(grep -E '^$(1)=' $(ENV_FILE) 2>/dev/null | head -1 | cut -d= -f2- | xargs); \
+	  if [ -z "$$CUR" ] || [ "$$CUR" = "$(3)" ]; then \
+	    VAL=$$($(2)); \
+	    if grep -qE '^$(1)=' $(ENV_FILE); then \
+	      sed -i.bak "s|^$(1)=.*|$(1)=$$VAL|" $(ENV_FILE) && rm -f $(ENV_FILE).bak; \
+	    else \
+	      echo "$(1)=$$VAL" >> $(ENV_FILE); \
+	    fi; \
+	    echo "✓ generated $(1)"; \
+	  else \
+	    echo "→ $(1) already set"; \
+	  fi
+endef
 
 help: ## Show this help
 	@echo "Hermes + Windmill stack"
@@ -65,6 +83,12 @@ apikey: ## Generate API_SERVER_KEY in .env if it's empty
 	    echo "API_SERVER_KEY=$$KEY" >> $(ENV_FILE); \
 	  fi; \
 	  echo "✓ generated API_SERVER_KEY"
+
+secrets: ## Generate every required secret in .env that's blank or still a weak default
+	$(call ensure_secret,API_SERVER_KEY,openssl rand -hex 32,)
+	$(call ensure_secret,WM_DB_PASSWORD,openssl rand -hex 32,windmill)
+	$(call ensure_secret,HINDSIGHT_DB_PASSWORD,openssl rand -hex 16,hindsight)
+	$(call ensure_secret,GRAFANA_ADMIN_PASSWORD,openssl rand -hex 16,changeme)
 
 wizard: ## Run the Hermes first-run setup wizard (interactive; writes ~/.hermes/.env + config)
 	@set -a; . ./$(ENV_FILE); set +a; \
@@ -193,9 +217,9 @@ backup: ## Snapshot Postgres (Windmill + Hindsight) + the Hermes data dir into .
 	  tar czf "backups/hermes-$$STAMP.tar.gz" -C "$${DATA_DIR:-$$HOME/.hermes/data}" . ; \
 	  echo "✓ wrote backups/windmill-$$STAMP.sql.gz, backups/hindsight-$$STAMP.sql.gz, and backups/hermes-$$STAMP.tar.gz"
 
-bootstrap: ## One-shot: check → init → apikey → wizard → secure → pull → up → health
+bootstrap: ## One-shot: check → init → secrets → wizard → secure → pull → up → health
 	@$(MAKE) init
-	@$(MAKE) apikey
+	@$(MAKE) secrets
 	@echo
 	@read -p "Have you filled in provider keys in .env (or will use the wizard)? [y/N] " ok; \
 	  [[ "$$ok" == "y" || "$$ok" == "Y" ]] || { echo "Edit .env first, then re-run 'make bootstrap'."; exit 1; }

@@ -1,0 +1,27 @@
+# =============================================================================
+#  GPU passthrough override for the `ollama` container (NVIDIA + the
+#  nvidia-container-toolkit). The base compose file leaves the GPU device
+#  reservation commented out because env vars alone can't grant a container the
+#  GPU — Compose has to reserve the device. This override adds it.
+#
+#  Enable it by layering this file on top of the base one. The installers do this
+#  for you with `--gpu`; manually, set in .env:
+#      COMPOSE_FILE=docker-compose.yml:docker-compose.gpu.yml
+#      CUDA_VISIBLE_DEVICES=0
+#      OLLAMA_NUM_GPU=999
+#  then `docker compose up -d` (or `make up`).
+#
+#  Requires: an NVIDIA GPU, recent driver, and the nvidia-container-toolkit on
+#  the host (`nvidia-ctk runtime configure` + a Docker restart). Not for macOS —
+#  Docker Desktop on Mac can't pass the GPU through (use mlx/ instead).
+#  AMD/ROCm needs a different mapping (/dev/kfd + /dev/dri); see ollama's docs.
+# =============================================================================
+services:
+  ollama:
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
