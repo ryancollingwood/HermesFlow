@@ -41,18 +41,58 @@ separate container).
 
 ## Quick start
 
+Two paths — pick one.
+
+### A. Scripted, no wizard (recommended for a fresh host)
+
+```sh
+OPENROUTER_API_KEY=sk-or-... ./install.sh
+# or: ./install.sh --provider openrouter --api-key sk-or-... --model openai/gpt-4o-mini
+```
+
+`install.sh` is non-interactive and idempotent. It checks prerequisites,
+**validates the model against the provider's `/models` list** (failing early with
+suggestions on a typo — pass `--skip-model-check` to bypass), creates `.env`,
+sets `HERMES_UID`/`HERMES_GID` to your host user, generates **all** required
+secrets (`make secrets`), writes the provider key to `<DATA_DIR>/.env` (the file
+Hermes reads — same one the wizard produces), pulls images, starts the stack,
+sets the default model, probes Hermes end-to-end, enables the **Hindsight memory
+provider** (pass `--no-memory` to skip), and preps **Windmill** — creates the
+`main` workspace and pre-installs the worker Python (pass `--no-windmill` to
+skip). Other providers: `--provider anthropic|openai`; choose a model with
+`--model <id>`. Re-run any time; it only fills blanks.
+
+> Catalog presence is not a callability guarantee — a model can be **listed** by
+> the provider yet rejected for your key/tier (e.g. OpenRouter returns 404 "No
+> allowed providers"). The list check rules out typos; the end-to-end probe at
+> the end is the real test.
+
+### B. Interactive wizard
+
 ```sh
 cp .env.example .env        # then edit it (see below)
-make bootstrap              # init → apikey → wizard → secure → pull → up → health
+make bootstrap              # init → secrets → wizard → secure → pull → up → health
 ```
 
 `make bootstrap` will:
 
 1. create `.env` and the data directories,
-2. generate `API_SERVER_KEY`,
-3. run the interactive Hermes setup wizard (writes `~/.hermes/.env`),
+2. generate every required secret — `API_SERVER_KEY`, `WM_DB_PASSWORD`,
+   `HINDSIGHT_DB_PASSWORD` (`make secrets`),
+3. run the interactive Hermes setup wizard (writes `<DATA_DIR>/.env`),
 4. `chmod 600` the secret files,
 5. pull images, start the stack, and probe health.
+
+> **Secrets must be generated _before_ the first `up`.** Both paths do this. If
+> you rotate `HINDSIGHT_DB_PASSWORD` or `WM_DB_PASSWORD` _after_ a database
+> volume has been initialized, Postgres keeps the original password and the
+> service fails auth — Postgres only applies `POSTGRES_PASSWORD` on first init.
+
+> **Provider key path.** The `hermes` service in `docker-compose.yml` leaves
+> `OPENROUTER_API_KEY` / `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` **commented out**
+> and reads them from `<DATA_DIR>/.env` instead. Setting them only in the
+> top-level `.env` does **not** reach Hermes — use the wizard, `install.sh`, or
+> uncomment those lines in the compose `hermes` environment.
 
 Run `make` on its own to list all targets.
 
@@ -109,24 +149,26 @@ Both model IDs should appear in the response.
 
 ### Installing the Hermes plugin
 
-The `hindsight-hermes` package registers itself automatically via Python entry
-points once installed — no manual plugin config file edits needed. It reaches
-Hindsight via the `HINDSIGHT_BASE_URL` and `HINDSIGHT_API_KEY` environment
-variables, which `docker-compose.yml` already passes into the `hermes`
-container (see [Hindsight configuration](#hindsight-configuration-env) above).
+> **`./install.sh` does all of this for you** (unless you pass `--no-memory`).
+> The steps below are the manual equivalent, also used by the interactive
+> (`make bootstrap`) path.
 
-**1. Install the package and restart:**
+**No manual `pip install` is needed.** The `hindsight-client` package ships in
+the hermes image and registers `hindsight` as a memory provider via Python entry
+points; Hermes also auto-installs/upgrades it on session start if it's missing or
+outdated. You only have to point Hermes at the provider.
 
-```bash
-docker exec hermes uv pip install hindsight-hermes
-docker restart hermes
-```
+The provider reaches Hindsight via the **`HINDSIGHT_API_URL`** environment
+variable (current versions read `HINDSIGHT_API_URL`, _not_ `HINDSIGHT_BASE_URL`);
+`docker-compose.yml` passes both into the `hermes` container, pointed at the
+internal `http://hindsight:8888` (see
+[Hindsight configuration](#hindsight-configuration-env)). For a local, no-auth
+Hindsight no API key is required — `HINDSIGHT_API_KEY` is optional.
 
-**2. Enable memory in Hermes's own config** — installing the package makes
-`hindsight` available as a provider, but Hermes still needs to be told to use
-it. This is a `memory:` block in `/opt/data/config.yaml` (the bind-mounted
-Hermes data directory), set via `hermes config set`, the same mechanism used
-for [Headroom routing](#one-time-setup-after-first-boot):
+**Enable memory** — tell Hermes to use the provider. This sets a `memory:` block
+in `/opt/data/config.yaml` (the bind-mounted Hermes data directory) via
+`hermes config set`, the same mechanism used for
+[Headroom routing](#one-time-setup-after-first-boot):
 
 ```sh
 make memory
@@ -181,7 +223,18 @@ The three URLs and where each is used:
 
 ### Testing memory
 
-**1. Check Hindsight is healthy:**
+**1. Confirm Hermes sees the provider as active _and_ reachable:**
+
+```bash
+docker exec hermes hermes memory status
+```
+
+Look for `Provider: hindsight`, `Plugin: installed ✓`, and `Status: available ✓`.
+A `Status: not available ✗` with `Missing: HINDSIGHT_API_KEY` usually means the
+plugin can't reach Hindsight — confirm `HINDSIGHT_API_URL` is reaching the
+container (`docker exec hermes printenv HINDSIGHT_API_URL` → `http://hindsight:8888`).
+
+**2. Check Hindsight is healthy:**
 
 ```bash
 curl http://localhost:8888/health
@@ -192,12 +245,12 @@ For windows:
 Invoke-RestMethod -Uri "http://localhost:8888/health"
 ```
 
-**2. Open the memory browser:**
+**3. Open the memory browser:**
 ```
 http://localhost:9999
 ```
 
-**3. Test retain/recall from Hermes** (in a Hermes chat session):
+**4. Test retain/recall from Hermes** (in a Hermes chat session):
 ```
 Remember this: I work at ACME in Melbourne as an Engineer.
 ```
@@ -208,6 +261,17 @@ What do you know about where I work?
 ```
 
 Hindsight should surface the retained fact via `hindsight_recall`.
+
+> **Extraction speed depends entirely on the Hindsight LLM backend.** Fact
+> extraction runs the `HINDSIGHT_*_LLM_MODEL` models for every retain. On a
+> **CPU-only Ollama** backend this is very slow — a single retain of a couple of
+> sentences took ~16 minutes with `qwen2.5:3b` on CPU, long enough that a
+> synchronous `hermes` call looks hung. For usable latency, run the models on a
+> GPU, point Hindsight at a host-native [MLX server](#mlx-inference-apple-silicon)
+> or [LM Studio](#lm-studio-setup) (set `HINDSIGHT_LLM_BASE_URL`), or use a
+> smaller/faster model. Embeddings are always local (`BAAI/bge-small-en-v1.5`)
+> and fast. `install.sh` pulls the configured Ollama models automatically when
+> Hindsight points at the bundled `ollama` service.
 
 ### Managing zombie operations
 
@@ -474,20 +538,40 @@ windmill/
 
 ### Push it
 
-This assumes you've installed the wmill cli (`npm install -g windmill-cli`):
+This assumes you've installed the wmill cli (`npm install -g windmill-cli`).
+
+**First, make sure a `main` workspace exists on the server.** A fresh Windmill CE
+has none, and `wmill workspace add` only registers the workspace *locally in the
+CLI* — it does not create it server-side, so the first `wmill sync push` fails
+without it. `install.sh` creates it for you; to do it by hand, open
+`http://windmill.localhost`, log in (default superadmin `admin@windmill.dev` /
+`changeme`), and create a workspace with id `main`.
 
 ```sh
 cd windmill
-wmill workspace add main main http://windmill.localhost   # one-time
-# set the real key into the secret before pushing:
-#   edit f/hermes/api_key.variable.yaml  (value: <your API_SERVER_KEY>)
+wmill workspace add main main http://windmill.localhost   # one-time (registers the CLI profile)
 wmill generate-metadata          # creates .script.yaml + lockfiles
-wmill sync push
+wmill sync push                  # pushes the resource type, resource, and scripts
 ```
 
-Prefer the UI? Create a resource type `hermes_endpoint` with two string fields
-(`base_url`, `api_key`), a secret variable `f/hermes/api_key`, and a resource
-`f/hermes/local` of that type — then paste `client.py` / `chat.py` into new scripts.
+**Don't put the API key in the YAML.** `wmill.yaml` keeps `skipSecrets: true`, so
+the secret variable is intentionally **not** pushed (and you should never write a
+real key into the tracked `api_key.variable.yaml`). Set its value server-side
+instead — in the UI (Variables → `f/hermes/api_key` → set value to your
+`API_SERVER_KEY`), or via the API:
+
+```sh
+TOKEN=$(curl -s -H 'Content-Type: application/json' http://windmill.localhost/api/auth/login \
+  -d '{"email":"admin@windmill.dev","password":"changeme"}')
+curl -s -X POST http://windmill.localhost/api/w/main/variables/create \
+  -H "Authorization: Bearer $TOKEN" -H 'Content-Type: application/json' \
+  -d '{"path":"f/hermes/api_key","value":"<your API_SERVER_KEY>","is_secret":true}'
+```
+
+Prefer the UI entirely? Create a resource type `hermes_endpoint` with two string
+fields (`base_url`, `api_key`), the secret variable `f/hermes/api_key`, and a
+resource `f/hermes/local` of that type — then paste `client.py` / `chat.py` into
+new scripts.
 
 ### Use it in any script
 
@@ -514,6 +598,7 @@ name the gateway actually serves — run `client.py` (or
 | `make logs` / `ps` | Follow logs / status |
 | `make health` | Probe Hermes `/health` and Windmill `/api/version` |
 | `make apikey` | Generate `API_SERVER_KEY` into `.env` if empty |
+| `make secrets` | Generate every required secret (`API_SERVER_KEY`, `WM_DB_PASSWORD`, `HINDSIGHT_DB_PASSWORD`) that's blank or a weak default |
 | `make backup` | `pg_dump` of Windmill + Hindsight Postgres, tar of Hermes `/opt/data` → `./backups/` |
 | `make pull` | Pull latest images |
 
@@ -537,10 +622,33 @@ name the gateway actually serves — run `client.py` (or
   (commented in `docker-compose.yml`).
 - **LSP cache permission errors** — non-critical; `chown` `WM_LSP_CACHE_DIR` to
   the container UID or remove the mount.
+- **Windmill Python scripts fail to deploy with `Couldn't locate the interpreter`**
+  — the first Python job makes `uv` download a managed CPython into the shared
+  worker cache; with multiple worker replicas this can race and leave a corrupt
+  half-install that uv won't repair, so *every* Python script then fails. Fix:
+  clear the bad interpreter and re-install it once, then redeploy the script:
+  ```sh
+  docker compose exec --index 1 windmill_worker \
+    sh -c 'rm -rf /tmp/windmill/cache/py_runtime/cpython-* /tmp/windmill/cache/py_runtime/.temp; \
+           UV_PYTHON_INSTALL_DIR=/tmp/windmill/cache/py_runtime uv python install 3.12'
+  ```
+  `install.sh` pre-installs the worker Python up front to avoid this race. A
+  cached deployment error sticks to the script — delete and re-push it (or save a
+  new version) to force a clean re-lock once the interpreter is in place.
+- **Windmill `wmill sync push` fails / workspace not found** — a fresh Windmill
+  CE has no `main` workspace and `wmill workspace add` doesn't create one
+  server-side. Create it in the UI (or let `install.sh` do it). See
+  [Push it](#push-it).
 - **Hindsight can't reach LM Studio** — confirm `host.docker.internal` resolves
   from inside the container: `docker exec hindsight curl http://host.docker.internal:1234/v1/models`
 - **Hermes plugin can't reach Hindsight** — use `http://hindsight:8888` not
   `http://hindsight.localhost` (see [Installing the Hermes plugin](#installing-the-hermes-plugin)).
+- **Hermes returns HTTP 404 "No allowed providers" / "No endpoints found"** —
+  the request authenticated fine (not a 401), but the configured model id isn't
+  served by your provider. The image seeds a default that may not exist on
+  OpenRouter; point it at a real model:
+  `docker exec hermes hermes config set model.default openai/gpt-4o-mini`
+  (`install.sh` does this for you).
 - **Hermes errors after `make headroom`** — check Headroom is running:
   `docker compose ps headroom` and `docker compose logs headroom`. Ensure
   `OPENROUTER_API_KEY` is set in `.env`. Revert with `make headroom-revert`.

@@ -114,9 +114,13 @@ services:
       # - OPENAI_API_KEY=${OPENAI_API_KEY}
       # - TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
       # - DISCORD_BOT_TOKEN=${DISCORD_BOT_TOKEN}
-      # Hindsight memory plugin — forwarded so the plugin can reach the API
+      # Hindsight memory plugin — forwarded so the plugin can reach the API.
+      # The hindsight memory provider (hindsight-client, bundled in the image)
+      # reads HINDSIGHT_API_URL; HINDSIGHT_BASE_URL is kept for backwards-compat /
+      # docs. Both point at the same internal host.
       - HINDSIGHT_API_KEY=${HINDSIGHT_API_KEY:-}
       - HINDSIGHT_BASE_URL=${HINDSIGHT_BASE_URL:-http://hindsight:8888}
+      - HINDSIGHT_API_URL=${HINDSIGHT_BASE_URL:-http://hindsight:8888}
     volumes:
       - ${DATA_DIR:-./data/hermes}:/opt/data
       - ${SHARED_DIR:-./data/shared}:/shared
