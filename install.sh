@@ -522,19 +522,17 @@ make --no-print-directory init
 set -a; . ./.env; set +a
 DATA_DIR_RESOLVED="$(eval echo "${DATA_DIR:-$HOME/.hermes}")"
 
-# ── 6. provider key → <DATA_DIR>/.env ────────────────────────────────────────
+# ── 6. provider key → <DATA_DIR>/.env  AND top-level .env ────────────────────
 # The compose `hermes` service leaves provider keys commented out and reads them
-# from /opt/data/.env instead (what the wizard writes). We write it directly so
-# no interactive wizard is needed.
+# from /opt/data/.env instead (what the wizard writes). Other services substitute
+# the key from the TOP-LEVEL .env via ${OPENROUTER_API_KEY} (Headroom) and
+# ${HINDSIGHT_LLM_API_KEY} (remote Hindsight) — so write both; both survive a
+# redeploy.
 if [ -n "$API_KEY" ]; then
-  mkdir -p "$DATA_DIR_RESOLVED"
-  if [ -f "$DATA_DIR_RESOLVED/.env" ] && grep -qE "^$KEY_VAR=" "$DATA_DIR_RESOLVED/.env"; then
-    sed -i.bak -E "s|^$KEY_VAR=.*|$KEY_VAR=$API_KEY|" "$DATA_DIR_RESOLVED/.env" && rm -f "$DATA_DIR_RESOLVED/.env.bak"
-  else
-    printf '%s=%s\n' "$KEY_VAR" "$API_KEY" >> "$DATA_DIR_RESOLVED/.env"
-  fi
+  dataenv_set "$DATA_DIR_RESOLVED/.env" "$KEY_VAR" "$API_KEY"
   chmod 600 "$DATA_DIR_RESOLVED/.env"
-  echo "✓ wrote $KEY_VAR to $DATA_DIR_RESOLVED/.env"
+  env_put "$KEY_VAR" "$API_KEY"
+  echo "✓ wrote $KEY_VAR to $DATA_DIR_RESOLVED/.env and .env"
 else
   echo "⚠ no API key supplied for $PROVIDER — set $KEY_VAR or pass --api-key."
   echo "  The stack will start but Hermes won't be able to call the provider until"

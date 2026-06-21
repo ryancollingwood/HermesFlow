@@ -661,9 +661,12 @@ def main() -> None:
     make_dirs_and_fix_perms()
     data_dir = resolve_data_dir()
 
-    # 7. provider key → <DATA_DIR>/.env
+    # 7. provider key → <DATA_DIR>/.env (Hermes reads it) AND top-level .env
+    #    (compose substitution: Headroom's ${OPENROUTER_API_KEY}, remote Hindsight's
+    #    ${HINDSIGHT_LLM_API_KEY}). Both are needed and both survive a redeploy.
     if api_key:
         write_provider_key(data_dir, key_var, api_key)
+        env_set(key_var, api_key)
     else:
         say(f"{WARN} no API key supplied for {args.provider} — set {key_var} or pass --api-key.")
         say(f"  Add it to {Path(data_dir) / '.env'} later and run: docker restart hermes")
