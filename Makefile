@@ -27,7 +27,7 @@ else
   ON_WINDOWS :=
 endif
 
-.PHONY: help check init apikey secrets wizard secure fix-permissions pull up down restart logs ps health backup bootstrap lint validate ci headroom headroom-revert mlx mlx-revert memory memory-revert hindsight-mlx hindsight-mlx-revert
+.PHONY: help check init apikey secrets wizard secure fix-permissions pull up down restart logs ps health backup bootstrap lint validate ci headroom headroom-revert mlx mlx-revert mlx-status memory memory-revert hindsight-mlx hindsight-mlx-revert
 
 # Fill an .env variable with a generated value when it is empty OR still set to a
 # known-weak default. Usage: $(call ensure_secret,VAR,GENERATOR,WEAK_DEFAULT)
@@ -179,6 +179,40 @@ mlx: ## Route Hermes to a host-native MLX server (Apple Silicon — see mlx/READ
 	@echo "  Make sure mlx_lm.server is running on the host first — see mlx/README.md"
 
 mlx-revert: headroom-revert ## Revert Hermes to direct provider routing (alias of headroom-revert)
+
+mlx-status: ## Show host MLX install (path, version, model) and test the endpoint
+	@set -a; . ./$(ENV_FILE) 2>/dev/null; set +a; \
+	  VENV="$${MLX_VENV_DIR:-$$HOME/.mlx-venv}"; \
+	  PORT="$${MLX_HOST_PORT:-8080}"; \
+	  MODEL="$${MLX_MODEL:-mlx-community/Qwen2.5-7B-Instruct-4bit}"; \
+	  echo "MLX install:"; \
+	  echo "  venv:      $$VENV"; \
+	  if [ -x "$$VENV/bin/mlx_lm.server" ]; then \
+	    VER=$$("$$VENV/bin/pip" show mlx-lm 2>/dev/null | awk '/^Version:/{print $$2}'); \
+	    echo "  mlx-lm:    $${VER:-installed}"; \
+	    echo "  server:    $$VENV/bin/mlx_lm.server"; \
+	  else \
+	    echo "  mlx-lm:    not installed (run ./install.sh --with-mlx, or pip install mlx-lm)"; \
+	  fi; \
+	  echo "  model:     $$MODEL"; \
+	  echo "  endpoint:  http://localhost:$$PORT/v1"; \
+	  if command -v launchctl >/dev/null 2>&1; then \
+	    launchctl print "gui/$$(id -u)/com.hermesflow.mlx" >/dev/null 2>&1 \
+	      && echo "  launchd:   loaded (com.hermesflow.mlx)" \
+	      || echo "  launchd:   not loaded (manual start: ./mlx/serve.sh)"; \
+	  fi; \
+	  echo; echo "→ testing http://localhost:$$PORT …"; \
+	  if ! curl -fsS -m 5 "http://localhost:$$PORT/v1/models" >/dev/null 2>&1; then \
+	    echo "✗ no response on :$$PORT — start the server (make mlx / ./mlx/serve.sh)"; exit 1; \
+	  fi; \
+	  echo "✓ /v1/models reachable:"; \
+	  curl -fsS -m 5 "http://localhost:$$PORT/v1/models" \
+	    | python3 -c 'import sys,json; [print("    -",m["id"]) for m in json.load(sys.stdin).get("data",[])]' 2>/dev/null || true; \
+	  echo "→ chat completion test (may load the model on first call)…"; \
+	  RESP=$$(curl -fsS -m 120 "http://localhost:$$PORT/v1/chat/completions" -H 'Content-Type: application/json' \
+	    -d "{\"model\":\"$$MODEL\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with just: PONG\"}],\"max_tokens\":16}" 2>/dev/null); \
+	  echo "$$RESP" | python3 -c 'import sys,json; print("✓ reply:", json.load(sys.stdin)["choices"][0]["message"]["content"].strip())' 2>/dev/null \
+	    || { echo "✗ chat completion failed:"; echo "$$RESP" | head -c 300; echo; exit 1; }
 
 memory: ## Enable Hindsight as Hermes's memory provider (see README "Hindsight memory")
 	@docker exec hermes hermes config set memory.memory_enabled true

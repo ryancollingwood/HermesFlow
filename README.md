@@ -422,7 +422,13 @@ pip install mlx-lm
 ./mlx/install-launchd.sh        # or: always-on launchd agent, restarts on crash/reboot
 make mlx                       # routes Hermes's own model calls through it
 make hindsight-mlx             # routes Hindsight memory extraction through it
+make mlx-status                # show install (path, version, model) + test the endpoint
 ```
+
+`make mlx-status` reports the venv path, `mlx-lm` version, configured model, and
+launchd state, then probes `/v1/models` and runs a one-shot chat completion
+against the host server — a quick way to confirm MLX is up before routing
+Hermes/Hindsight at it.
 
 `make hindsight-mlx` rewrites the `HINDSIGHT_LLM_*` vars in `.env` to the MLX
 endpoint (`MLX_BASE_URL` / `MLX_MODEL`) and recreates the `hindsight` container;
