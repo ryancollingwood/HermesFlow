@@ -293,7 +293,7 @@ validate_model() {
   [ "$CHECK_MODEL" -eq 1 ] || { echo "→ skipping model check (--skip-model-check)"; return 0; }
   [ -n "$API_KEY" ] || { echo "→ no API key — skipping model check"; return 0; }
 
-  echo "→ validating model '$MODEL' against $PROVIDER…"
+  echo "→ validating model '$MODEL' against ${PROVIDER}…"
   local ids; ids="$(fetch_model_ids)"
   if [ -z "$ids" ]; then
     echo "⚠ could not fetch $PROVIDER model list (network/auth?) — skipping check."
