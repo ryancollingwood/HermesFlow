@@ -349,13 +349,10 @@ def wm_http(method: str, path: str, *, bearer: str | None = None,
 
 
 def setup_windmill() -> None:
-    say(f"{ARROW} preparing Windmill workers (pre-installing Python to avoid first-run races)…")
-    if run_ok(["docker", "compose", "exec", "-T", "--index", "1", "windmill_worker",
-               "sh", "-c",
-               "UV_PYTHON_INSTALL_DIR=/tmp/windmill/cache/py_runtime uv python install 3.12"]):
-        say(f"{OK} worker Python 3.12 pre-installed into the shared cache")
-    else:
-        say(f"{WARN} could not pre-install worker Python (non-fatal — the first job will try).")
+    # Pre-installing the worker Python used to happen here, but that race is
+    # now handled by the `windmill_cache_init` service in docker-compose.yml,
+    # which validates/repairs the shared interpreter cache before any worker
+    # replica starts — on every `docker compose up`, not just at install time.
 
     # Wait for the Windmill API.
     for _ in range(24):

@@ -170,8 +170,10 @@ end-to-end verification that the provider, key, and model all work.
   API health endpoint.
 
 ### 11. Windmill prep (skip with `--no-windmill`)
-- **Pre-installs the worker Python** into the shared cache to avoid a first-run
-  race between worker replicas that can leave a corrupt interpreter.
+- The shared worker Python cache is self-healing: the `windmill_cache_init`
+  service in `docker-compose.yml` validates every cached interpreter and
+  repairs or reinstalls it before any worker replica starts, on every
+  `docker compose up` — not just at install time.
 - **Creates the `main` workspace** (a fresh Windmill CE has none; `wmill
   workspace add` only registers it locally).
 - **Registers Windmill with Hermes over MCP** — mints an `mcp:all`-scoped token

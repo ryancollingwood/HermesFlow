@@ -445,6 +445,47 @@ services:
     logging: *default-logging
 
   # ---------------------------------------------------------------------------
+  #  Windmill worker Python cache healer — runs once per `docker compose up`,
+  #  before any worker starts. uv's managed-Python install into the shared
+  #  cache is not crash-safe: a worker killed mid-extraction (or two replicas
+  #  racing on a brand-new interpreter) leaves a half-extracted `cpython-*`
+  #  dir that uv will not repair on its own, so every Python job then fails
+  #  with "Couldn't locate the interpreter" until someone manually deletes it.
+  #  This container validates every cached interpreter actually runs, deletes
+  #  any that don't, and (re)installs 3.12 if missing — serially, before the
+  #  worker replicas race on it themselves.
+  # ---------------------------------------------------------------------------
+  windmill_cache_init:
+    image: *wm-image
+    pull_policy: always
+    container_name: windmill_cache_init
+    restart: "no"
+    entrypoint: ["sh", "-c"]
+    command:
+      - |
+        set -e
+        CACHE=/tmp/windmill/cache/py_runtime
+        mkdir -p "$$CACHE"
+        for d in "$$CACHE"/cpython-*; do
+          [ -d "$$d" ] || continue
+          ver=$$(basename "$$d" | sed -E 's/^cpython-([0-9]+\.[0-9]+)\..*/\1/')
+          bin="$$d/bin/python$$ver"
+          if [ ! -x "$$bin" ] || ! "$$bin" --version >/dev/null 2>&1; then
+            echo "✗ repairing corrupt interpreter: $$(basename "$$d")"
+            rm -rf "$$d"
+          fi
+        done
+        if ! ls "$$CACHE"/cpython-3.12.* >/dev/null 2>&1; then
+          echo "→ installing Python 3.12 into shared worker cache"
+          UV_PYTHON_INSTALL_DIR="$$CACHE" uv python install 3.12
+        fi
+        echo "✓ worker Python cache healthy"
+    volumes:
+      - ${WM_DATA_DIR:-./data/windmill}/cache:/tmp/windmill/cache
+    networks: [backend]
+    logging: *default-logging
+
+  # ---------------------------------------------------------------------------
   #  Windmill workers (default group) — privileged, so capped
   # ---------------------------------------------------------------------------
   windmill_worker:
@@ -469,6 +510,8 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      windmill_cache_init:
+        condition: service_completed_successfully
     volumes:
       - ${WM_DATA_DIR:-./data/windmill}/cache:/tmp/windmill/cache
       - ${WM_DATA_DIR:-./data/windmill}/logs:/tmp/windmill/logs
