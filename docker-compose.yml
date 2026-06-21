@@ -242,6 +242,11 @@ services:
       - HINDSIGHT_API_LLM_MODEL=${HINDSIGHT_LLM_MODEL:-qwen2.5:14b}
       - HINDSIGHT_API_LLM_PROVIDER=${HINDSIGHT_LLM_PROVIDER:-openai}
       - HINDSIGHT_API_LLM_RESPONSE_FORMAT=${HINDSIGHT_LLM_RESPONSE_FORMAT:-json_schema}
+      # Grammar-enforce structured output via the provider's strongest schema
+      # mode. Some OpenAI-compatible backends (e.g. LM Studio) reject the
+      # soft `json_object` fallback outright (400: response_format.type must
+      # be 'json_schema' or 'text'), so this must be true for those backends.
+      - HINDSIGHT_API_LLM_STRICT_SCHEMA=${HINDSIGHT_LLM_STRICT_SCHEMA:-true}
       - HINDSIGHT_API_LLM_TIMEOUT=${HINDSIGHT_API_LLM_TIMEOUT:-8400}
       - HINDSIGHT_API_LLM_MAX_CONCURRENT=${HINDSIGHT_LLM_MAX_CONCURRENT:-1}
       - HINDSIGHT_API_LLM_REASONING_EFFORT=${HINDSIGHT_LLM_REASONING_EFFORT:-low}
