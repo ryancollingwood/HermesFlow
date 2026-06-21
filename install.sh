@@ -193,25 +193,13 @@ pull_hindsight_models() {
   done
 }
 
-# Prepare Windmill: pre-install the worker Python and ensure a 'main' workspace.
+# Prepare Windmill: ensure a 'main' workspace exists.
 #
-# Why pre-install Python: the first Python job makes `uv` download managed
-# CPython into the shared worker cache. With multiple worker replicas hitting a
-# brand-new script at once, they race installing into the same directory and can
-# leave a corrupt half-install that uv then refuses to repair — every Python
-# script then fails to deploy with "Couldn't locate the interpreter". Installing
-# it once up front (single, serial) avoids that race. UV_PYTHON_INSTALL_DIR must
-# match the path Windmill uses so the warmed interpreter is the one it picks up.
+# Pre-installing the worker Python used to happen here, but that race is now
+# handled by the `windmill_cache_init` service in docker-compose.yml, which
+# validates/repairs the shared interpreter cache before any worker replica
+# starts — on every `docker compose up`, not just at install time.
 setup_windmill() {
-  echo "→ preparing Windmill workers (pre-installing Python to avoid first-run races)…"
-  if docker compose exec -T --index 1 windmill_worker \
-       sh -c 'UV_PYTHON_INSTALL_DIR=/tmp/windmill/cache/py_runtime uv python install 3.12' \
-       >/dev/null 2>&1; then
-    echo "✓ worker Python 3.12 pre-installed into the shared cache"
-  else
-    echo "⚠ could not pre-install worker Python (non-fatal — the first job will try)."
-  fi
-
   # Ensure a 'main' workspace exists. A fresh Windmill CE has none, and
   # `wmill workspace add` only registers it locally — it does not create it
   # server-side, so the first `wmill sync push` would fail without this.

@@ -729,18 +729,21 @@ Gotchas (all enforced by Windmill):
 - **LSP cache permission errors** — non-critical; `chown` `WM_LSP_CACHE_DIR` to
   the container UID or remove the mount.
 - **Windmill Python scripts fail to deploy with `Couldn't locate the interpreter`**
-  — the first Python job makes `uv` download a managed CPython into the shared
-  worker cache; with multiple worker replicas this can race and leave a corrupt
-  half-install that uv won't repair, so *every* Python script then fails. Fix:
-  clear the bad interpreter and re-install it once, then redeploy the script:
+  — `uv` downloads a managed CPython into the shared worker cache on first use;
+  a worker killed mid-extraction (or multiple replicas racing on a brand-new
+  interpreter) can leave a corrupt half-install that uv won't repair, so *every*
+  Python script then fails. The `windmill_cache_init` service in
+  `docker-compose.yml` runs before every `docker compose up` / restart and
+  self-heals this: it checks each cached interpreter actually runs, deletes any
+  that don't, and reinstalls 3.12 if missing — `windmill_worker` won't start
+  until it finishes. If you hit the error anyway (e.g. corruption happened
+  between healer runs), force a heal manually:
   ```sh
-  docker compose exec --index 1 windmill_worker \
-    sh -c 'rm -rf /tmp/windmill/cache/py_runtime/cpython-* /tmp/windmill/cache/py_runtime/.temp; \
-           UV_PYTHON_INSTALL_DIR=/tmp/windmill/cache/py_runtime uv python install 3.12'
+  docker compose up windmill_cache_init
   ```
-  `install.sh` pre-installs the worker Python up front to avoid this race. A
-  cached deployment error sticks to the script — delete and re-push it (or save a
-  new version) to force a clean re-lock once the interpreter is in place.
+  A cached deployment error sticks to the script even after the interpreter is
+  fixed — delete and re-push it (or save a new version) to force a clean
+  re-lock once the interpreter is in place.
 - **Windmill `wmill sync push` fails / workspace not found** — a fresh Windmill
   CE has no `main` workspace and `wmill workspace add` doesn't create one
   server-side. Create it in the UI (or let `install.sh` do it). See
