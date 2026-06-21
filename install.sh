@@ -51,6 +51,7 @@
 #    --hindsight-consolidation-model <id>  override just the consolidation scope
 #    --hindsight-reflect-model <id>        override just the reflect scope
 #    --hindsight-base-url <url>            Hindsight LLM endpoint (ollama/LMStudio/MLX)
+#    --hindsight-mlx                       point Hindsight at the host MLX server
 #    --hindsight-api-key <key>             bearer token protecting the Hindsight API
 #
 #  Other optional channels / toggles:
@@ -82,6 +83,7 @@ HS_CONSOLIDATION=""
 HS_REFLECT=""
 HS_BASE_URL=""
 HS_API_KEY=""
+HS_MLX=0
 DISCORD_TOKEN=""
 DISCORD_USERS=""
 WITH_HEADROOM=0
@@ -340,6 +342,7 @@ while [ $# -gt 0 ]; do
     --hindsight-reflect-model) HS_REFLECT="$2"; shift 2 ;;
     --hindsight-base-url) HS_BASE_URL="$2"; shift 2 ;;
     --hindsight-api-key) HS_API_KEY="$2"; shift 2 ;;
+    --hindsight-mlx) HS_MLX=1; shift ;;
     --discord-bot-token) DISCORD_TOKEN="$2"; shift 2 ;;
     --discord-allowed-users) DISCORD_USERS="$2"; shift 2 ;;
     --with-headroom) WITH_HEADROOM=1; shift ;;
@@ -392,6 +395,13 @@ if { [ -n "$DISCORD_TOKEN" ] || [ -n "$DISCORD_USERS" ]; } && { [ -z "$DISCORD_T
   echo "✗ Discord needs BOTH --discord-bot-token and --discord-allowed-users" >&2
   echo "  (allowed user IDs are required for the Hermes Discord channel)." >&2
   exit 1
+fi
+
+# --hindsight-mlx: point Hindsight's extraction LLM at the host MLX server (uses
+# MLX_BASE_URL / MLX_MODEL or their defaults; explicit --hindsight-* flags win).
+if [ "$HS_MLX" -eq 1 ]; then
+  [ -z "$HS_BASE_URL" ] && HS_BASE_URL="${MLX_BASE_URL:-http://host.docker.internal:8080/v1}"
+  [ -z "$HS_MODEL" ] && HS_MODEL="${MLX_MODEL:-mlx-community/Qwen2.5-7B-Instruct-4bit}"
 fi
 
 # 'remote' profile: route Hindsight's extraction LLM at the cloud provider so no
@@ -469,6 +479,8 @@ HS_REFLECT="${HS_REFLECT:-$HS_MODEL}"
 [ -n "$HS_BASE_URL" ]      && env_put HINDSIGHT_LLM_BASE_URL "$HS_BASE_URL"
 # remote profile: Hindsight authenticates to the cloud provider with the same key.
 [ "$HS_REMOTE" -eq 1 ] && [ -n "$API_KEY" ] && env_put HINDSIGHT_LLM_API_KEY "$API_KEY"
+# --hindsight-mlx: MLX needs no real key (placeholder).
+[ "$HS_MLX" -eq 1 ] && env_put HINDSIGHT_LLM_API_KEY mlx
 [ -n "$HS_MODEL$HS_RETAIN$HS_CONSOLIDATION$HS_REFLECT$HS_BASE_URL" ] \
   && echo "✓ applied Hindsight model/backend overrides to .env"
 
@@ -522,19 +534,17 @@ make --no-print-directory init
 set -a; . ./.env; set +a
 DATA_DIR_RESOLVED="$(eval echo "${DATA_DIR:-$HOME/.hermes}")"
 
-# ── 6. provider key → <DATA_DIR>/.env ────────────────────────────────────────
+# ── 6. provider key → <DATA_DIR>/.env  AND top-level .env ────────────────────
 # The compose `hermes` service leaves provider keys commented out and reads them
-# from /opt/data/.env instead (what the wizard writes). We write it directly so
-# no interactive wizard is needed.
+# from /opt/data/.env instead (what the wizard writes). Other services substitute
+# the key from the TOP-LEVEL .env via ${OPENROUTER_API_KEY} (Headroom) and
+# ${HINDSIGHT_LLM_API_KEY} (remote Hindsight) — so write both; both survive a
+# redeploy.
 if [ -n "$API_KEY" ]; then
-  mkdir -p "$DATA_DIR_RESOLVED"
-  if [ -f "$DATA_DIR_RESOLVED/.env" ] && grep -qE "^$KEY_VAR=" "$DATA_DIR_RESOLVED/.env"; then
-    sed -i.bak -E "s|^$KEY_VAR=.*|$KEY_VAR=$API_KEY|" "$DATA_DIR_RESOLVED/.env" && rm -f "$DATA_DIR_RESOLVED/.env.bak"
-  else
-    printf '%s=%s\n' "$KEY_VAR" "$API_KEY" >> "$DATA_DIR_RESOLVED/.env"
-  fi
+  dataenv_set "$DATA_DIR_RESOLVED/.env" "$KEY_VAR" "$API_KEY"
   chmod 600 "$DATA_DIR_RESOLVED/.env"
-  echo "✓ wrote $KEY_VAR to $DATA_DIR_RESOLVED/.env"
+  env_put "$KEY_VAR" "$API_KEY"
+  echo "✓ wrote $KEY_VAR to $DATA_DIR_RESOLVED/.env and .env"
 else
   echo "⚠ no API key supplied for $PROVIDER — set $KEY_VAR or pass --api-key."
   echo "  The stack will start but Hermes won't be able to call the provider until"

@@ -76,7 +76,8 @@ host-native MLX server), `--with-headroom` (route through the compression proxy)
 `--bind-lan` (expose on `0.0.0.0`), `--gpu` (NVIDIA passthrough for Ollama),
 Hindsight overrides (`--hindsight-model` /
 `--hindsight-{retain,consolidation,reflect}-model` / `--hindsight-base-url` /
-`--hindsight-api-key`), and `--env KEY=VALUE` to set any other `.env` variable.
+`--hindsight-mlx` / `--hindsight-api-key`), and `--env KEY=VALUE` to set any
+other `.env` variable.
 See [INSTALL.md](INSTALL.md) for the full table.
 
 **See [INSTALL.md](INSTALL.md) for a step-by-step walkthrough** of everything the
@@ -420,7 +421,19 @@ pip install mlx-lm
 ./mlx/serve.sh                 # manual: serves an OpenAI-compatible API on :8080
 ./mlx/install-launchd.sh        # or: always-on launchd agent, restarts on crash/reboot
 make mlx                       # routes Hermes's own model calls through it
+make hindsight-mlx             # routes Hindsight memory extraction through it
+make mlx-status                # show install (path, version, model) + test the endpoint
 ```
+
+`make mlx-status` reports the venv path, `mlx-lm` version, configured model, and
+launchd state, then probes `/v1/models` and runs a one-shot chat completion
+against the host server — a quick way to confirm MLX is up before routing
+Hermes/Hindsight at it.
+
+`make hindsight-mlx` rewrites the `HINDSIGHT_LLM_*` vars in `.env` to the MLX
+endpoint (`MLX_BASE_URL` / `MLX_MODEL`) and recreates the `hindsight` container;
+`make hindsight-mlx-revert` switches back to the bundled Ollama. The installers do
+the same with `--hindsight-mlx` (e.g. `./install.sh --with-mlx --hindsight-mlx`).
 
 ---
 

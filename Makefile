@@ -27,7 +27,7 @@ else
   ON_WINDOWS :=
 endif
 
-.PHONY: help check init apikey secrets wizard secure fix-permissions pull up down restart logs ps health backup bootstrap lint validate ci headroom headroom-revert mlx mlx-revert
+.PHONY: help check init apikey secrets wizard secure fix-permissions pull up down restart logs ps health backup bootstrap lint validate ci headroom headroom-revert mlx mlx-revert mlx-status memory memory-revert hindsight-mlx hindsight-mlx-revert
 
 # Fill an .env variable with a generated value when it is empty OR still set to a
 # known-weak default. Usage: $(call ensure_secret,VAR,GENERATOR,WEAK_DEFAULT)
@@ -180,6 +180,40 @@ mlx: ## Route Hermes to a host-native MLX server (Apple Silicon — see mlx/READ
 
 mlx-revert: headroom-revert ## Revert Hermes to direct provider routing (alias of headroom-revert)
 
+mlx-status: ## Show host MLX install (path, version, model) and test the endpoint
+	@set -a; . ./$(ENV_FILE) 2>/dev/null; set +a; \
+	  VENV="$${MLX_VENV_DIR:-$$HOME/.mlx-venv}"; \
+	  PORT="$${MLX_HOST_PORT:-8080}"; \
+	  MODEL="$${MLX_MODEL:-mlx-community/Qwen2.5-7B-Instruct-4bit}"; \
+	  echo "MLX install:"; \
+	  echo "  venv:      $$VENV"; \
+	  if [ -x "$$VENV/bin/mlx_lm.server" ]; then \
+	    VER=$$("$$VENV/bin/pip" show mlx-lm 2>/dev/null | awk '/^Version:/{print $$2}'); \
+	    echo "  mlx-lm:    $${VER:-installed}"; \
+	    echo "  server:    $$VENV/bin/mlx_lm.server"; \
+	  else \
+	    echo "  mlx-lm:    not installed (run ./install.sh --with-mlx, or pip install mlx-lm)"; \
+	  fi; \
+	  echo "  model:     $$MODEL"; \
+	  echo "  endpoint:  http://localhost:$$PORT/v1"; \
+	  if command -v launchctl >/dev/null 2>&1; then \
+	    launchctl print "gui/$$(id -u)/com.hermesflow.mlx" >/dev/null 2>&1 \
+	      && echo "  launchd:   loaded (com.hermesflow.mlx)" \
+	      || echo "  launchd:   not loaded (manual start: ./mlx/serve.sh)"; \
+	  fi; \
+	  echo; echo "→ testing http://localhost:$$PORT …"; \
+	  if ! curl -fsS -m 5 "http://localhost:$$PORT/v1/models" >/dev/null 2>&1; then \
+	    echo "✗ no response on :$$PORT — start the server (make mlx / ./mlx/serve.sh)"; exit 1; \
+	  fi; \
+	  echo "✓ /v1/models reachable:"; \
+	  curl -fsS -m 5 "http://localhost:$$PORT/v1/models" \
+	    | python3 -c 'import sys,json; [print("    -",m["id"]) for m in json.load(sys.stdin).get("data",[])]' 2>/dev/null || true; \
+	  echo "→ chat completion test (may load the model on first call)…"; \
+	  RESP=$$(curl -fsS -m 120 "http://localhost:$$PORT/v1/chat/completions" -H 'Content-Type: application/json' \
+	    -d "{\"model\":\"$$MODEL\",\"messages\":[{\"role\":\"user\",\"content\":\"Reply with just: PONG\"}],\"max_tokens\":16}" 2>/dev/null); \
+	  echo "$$RESP" | python3 -c 'import sys,json; print("✓ reply:", json.load(sys.stdin)["choices"][0]["message"]["content"].strip())' 2>/dev/null \
+	    || { echo "✗ chat completion failed:"; echo "$$RESP" | head -c 300; echo; exit 1; }
+
 memory: ## Enable Hindsight as Hermes's memory provider (see README "Hindsight memory")
 	@docker exec hermes hermes config set memory.memory_enabled true
 	@docker exec hermes hermes config set memory.provider hindsight
@@ -194,6 +228,32 @@ memory-revert: ## Disable the Hindsight memory provider
 	@docker exec hermes hermes config set memory.memory_enabled false
 	@$(COMPOSE) restart hermes
 	@echo "✓ Hermes memory disabled"
+
+hindsight-mlx: ## Point Hindsight memory extraction at the host MLX server (recreates hindsight)
+	@set -a; . ./$(ENV_FILE); set +a; \
+	  URL="$${MLX_BASE_URL:-http://host.docker.internal:8080/v1}"; \
+	  MDL="$${MLX_MODEL:-mlx-community/Qwen2.5-7B-Instruct-4bit}"; \
+	  for kv in "HINDSIGHT_LLM_BASE_URL=$$URL" "HINDSIGHT_LLM_API_KEY=mlx" \
+	            "HINDSIGHT_LLM_MODEL=$$MDL" "HINDSIGHT_RETAIN_LLM_MODEL=$$MDL" \
+	            "HINDSIGHT_CONSOLIDATION_LLM_MODEL=$$MDL" "HINDSIGHT_REFLECT_LLM_MODEL=$$MDL"; do \
+	    k="$${kv%%=*}"; v="$${kv#*=}"; \
+	    if grep -qE "^$$k=" $(ENV_FILE); then sed -i.bak "s|^$$k=.*|$$k=$$v|" $(ENV_FILE) && rm -f $(ENV_FILE).bak; \
+	    else echo "$$kv" >> $(ENV_FILE); fi; \
+	  done; \
+	  echo "✓ Hindsight LLM → $$URL ($$MDL)"
+	@$(COMPOSE) up -d hindsight
+	@echo "  Make sure mlx_lm.server is running on the host (make mlx / ./mlx/serve.sh)."
+
+hindsight-mlx-revert: ## Revert Hindsight memory extraction to the bundled Ollama
+	@for kv in "HINDSIGHT_LLM_BASE_URL=http://ollama:11434/v1" "HINDSIGHT_LLM_API_KEY=openai" \
+	           "HINDSIGHT_LLM_MODEL=qwen2.5:14b" "HINDSIGHT_RETAIN_LLM_MODEL=qwen2.5:3b" \
+	           "HINDSIGHT_CONSOLIDATION_LLM_MODEL=qwen2.5:14b" "HINDSIGHT_REFLECT_LLM_MODEL=qwen2.5:14b"; do \
+	    k="$${kv%%=*}"; v="$${kv#*=}"; \
+	    if grep -qE "^$$k=" $(ENV_FILE); then sed -i.bak "s|^$$k=.*|$$k=$$v|" $(ENV_FILE) && rm -f $(ENV_FILE).bak; \
+	    else echo "$$kv" >> $(ENV_FILE); fi; \
+	  done
+	@$(COMPOSE) up -d hindsight
+	@echo "✓ Hindsight memory extraction reverted to the bundled Ollama"
 
 validate: ## Validate docker-compose.yml (mirrors CI)
 	@test -f .env || cp .env.example .env

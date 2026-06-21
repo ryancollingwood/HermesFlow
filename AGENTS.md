@@ -67,12 +67,17 @@ start / flags) and `INSTALL.md` (flag table + step description).
   `GRAFANA_ADMIN_PASSWORD` when blank or still a known-weak default. If you add a
   service that needs a password, add it to **both** places — do **not** ship a
   `${FOO:-changeme}` default in `docker-compose.yml` as the only protection.
-- **Hermes reads provider keys and bot tokens from `<DATA_DIR>/.env`, not the
-  top-level `.env`.** The `OPENROUTER_API_KEY` / `ANTHROPIC_API_KEY` /
-  `OPENAI_API_KEY` / `TELEGRAM_BOT_TOKEN` / `DISCORD_BOT_TOKEN` lines in the
-  `hermes` service are intentionally **commented out** so they come from the
-  wizard/installer-written `<DATA_DIR>/.env` (mapped to `/opt/data/.env`). Write
-  Hermes-consumed secrets there, `chmod 600`, not to the top-level `.env`.
+- **Hermes reads provider keys and bot tokens from `<DATA_DIR>/.env`.** The
+  `OPENROUTER_API_KEY` / `ANTHROPIC_API_KEY` / `OPENAI_API_KEY` /
+  `TELEGRAM_BOT_TOKEN` / `DISCORD_BOT_TOKEN` lines in the `hermes` service are
+  intentionally **commented out** so they come from the wizard/installer-written
+  `<DATA_DIR>/.env` (mapped to `/opt/data/.env`). Write Hermes-consumed secrets
+  there, `chmod 600`.
+- **The provider key must ALSO go in the top-level `.env`.** Other services
+  substitute it directly — `headroom` uses `${OPENROUTER_API_KEY}` and remote
+  Hindsight uses `${HINDSIGHT_LLM_API_KEY}`. If the key is only in
+  `<DATA_DIR>/.env`, those come up blank and stay blank across redeploys. The
+  installers write the provider key to **both** files; keep it that way.
 - **Never write a real secret into a tracked file.** `windmill/f/hermes/
   api_key.variable.yaml` keeps a placeholder; the real value is set server-side
   (UI/API), and `wmill.yaml` keeps `skipSecrets: true`. `.env`, `<DATA_DIR>`, and

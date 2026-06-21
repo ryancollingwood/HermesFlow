@@ -78,6 +78,7 @@ preview exactly what an install would do:
 | `--hindsight-consolidation-model <id>` | — | Override just the consolidation scope. |
 | `--hindsight-reflect-model <id>` | — | Override just the reflect scope. |
 | `--hindsight-base-url <url>` | from `.env` | Hindsight LLM endpoint (Ollama / LM Studio / MLX). |
+| `--hindsight-mlx` | off | Point Hindsight's extraction LLM at the host MLX server (`MLX_BASE_URL`/`MLX_MODEL`). Pairs with `--with-mlx`. |
 | `--hindsight-api-key <key>` | — | Bearer token protecting the Hindsight API (auto-generated if `--bind-lan` and unset). |
 | `--discord-bot-token <token>` | — | Discord bot token. **Requires** `--discord-allowed-users`. |
 | `--discord-allowed-users <id,id,…>` | — | Comma-separated Discord user IDs allowed to use the bot. **Requires** `--discord-bot-token`. |
