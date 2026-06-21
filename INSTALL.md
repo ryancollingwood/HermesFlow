@@ -19,6 +19,14 @@ OPENROUTER_API_KEY=sk-or-... ./install.sh
 python install.py --provider openrouter --api-key sk-or-...
 ```
 
+## Examples
+
+Install on Mac
+
+```bash
+OPENROUTER_API_KEY=sk-or-v1-******************** python3 install.py --profile mac --hindsight-model qwen2.5:3b --model deepseek/deepseek-v4-flash --with-headroom --telegram-bot-token ****************** --telegram-allowed-users ************
+```
+
 ## Profiles
 
 `--profile <name>` applies a preset bundle of flags for a common scenario. Any
