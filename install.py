@@ -39,6 +39,7 @@ Optional Hindsight (memory) model overrides — written to .env before 'up':
     --hindsight-consolidation-model <id>  override just the consolidation scope
     --hindsight-reflect-model <id>        override just the reflect scope
     --hindsight-base-url <url>            Hindsight LLM endpoint (ollama/LMStudio/MLX)
+    --hindsight-mlx                       point Hindsight at the host MLX server
     --hindsight-api-key <key>             bearer token protecting the Hindsight API
 
 Profiles (presets; explicit flags still override them):
@@ -468,6 +469,8 @@ def main() -> None:
                     help="Hindsight LLM endpoint (ollama / LM Studio / MLX)")
     ap.add_argument("--hindsight-api-key", default="",
                     help="bearer token protecting the Hindsight API")
+    ap.add_argument("--hindsight-mlx", action="store_true",
+                    help="point Hindsight's extraction LLM at the host MLX server")
     ap.add_argument("--discord-bot-token", default="",
                     help="Discord bot token (requires --discord-allowed-users)")
     ap.add_argument("--discord-allowed-users", default="",
@@ -520,6 +523,15 @@ def main() -> None:
     if (dc_token or dc_users) and not (dc_token and dc_users):
         die(f"{CROSS} Discord needs BOTH --discord-bot-token and --discord-allowed-users\n"
             "  (allowed user IDs are required for the Hermes Discord channel).")
+
+    # --hindsight-mlx: point Hindsight's extraction LLM at the host MLX server
+    # (MLX_BASE_URL / MLX_MODEL or their defaults; explicit --hindsight-* win).
+    if args.hindsight_mlx:
+        mlx_url = os.environ.get("MLX_BASE_URL") or \
+            f"http://host.docker.internal:{os.environ.get('MLX_HOST_PORT', '8080')}/v1"
+        args.hindsight_base_url = args.hindsight_base_url or mlx_url
+        args.hindsight_model = args.hindsight_model or \
+            os.environ.get("MLX_MODEL", "mlx-community/Qwen2.5-7B-Instruct-4bit")
 
     # 'remote' profile: route Hindsight's extraction LLM at the cloud provider so
     # no local Ollama models are needed (good for low-powered hosts). Needs an
@@ -616,6 +628,9 @@ def main() -> None:
     # remote profile: Hindsight authenticates to the cloud provider with the key.
     if hs_remote and api_key:
         env_set("HINDSIGHT_LLM_API_KEY", api_key)
+    # --hindsight-mlx: MLX needs no real key (placeholder).
+    if args.hindsight_mlx:
+        env_set("HINDSIGHT_LLM_API_KEY", "mlx")
 
     # NVIDIA GPU passthrough for the ollama container.
     if args.gpu:

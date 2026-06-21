@@ -27,7 +27,7 @@ else
   ON_WINDOWS :=
 endif
 
-.PHONY: help check init apikey secrets wizard secure fix-permissions pull up down restart logs ps health backup bootstrap lint validate ci headroom headroom-revert mlx mlx-revert
+.PHONY: help check init apikey secrets wizard secure fix-permissions pull up down restart logs ps health backup bootstrap lint validate ci headroom headroom-revert mlx mlx-revert memory memory-revert hindsight-mlx hindsight-mlx-revert
 
 # Fill an .env variable with a generated value when it is empty OR still set to a
 # known-weak default. Usage: $(call ensure_secret,VAR,GENERATOR,WEAK_DEFAULT)
@@ -194,6 +194,32 @@ memory-revert: ## Disable the Hindsight memory provider
 	@docker exec hermes hermes config set memory.memory_enabled false
 	@$(COMPOSE) restart hermes
 	@echo "✓ Hermes memory disabled"
+
+hindsight-mlx: ## Point Hindsight memory extraction at the host MLX server (recreates hindsight)
+	@set -a; . ./$(ENV_FILE); set +a; \
+	  URL="$${MLX_BASE_URL:-http://host.docker.internal:8080/v1}"; \
+	  MDL="$${MLX_MODEL:-mlx-community/Qwen2.5-7B-Instruct-4bit}"; \
+	  for kv in "HINDSIGHT_LLM_BASE_URL=$$URL" "HINDSIGHT_LLM_API_KEY=mlx" \
+	            "HINDSIGHT_LLM_MODEL=$$MDL" "HINDSIGHT_RETAIN_LLM_MODEL=$$MDL" \
+	            "HINDSIGHT_CONSOLIDATION_LLM_MODEL=$$MDL" "HINDSIGHT_REFLECT_LLM_MODEL=$$MDL"; do \
+	    k="$${kv%%=*}"; v="$${kv#*=}"; \
+	    if grep -qE "^$$k=" $(ENV_FILE); then sed -i.bak "s|^$$k=.*|$$k=$$v|" $(ENV_FILE) && rm -f $(ENV_FILE).bak; \
+	    else echo "$$kv" >> $(ENV_FILE); fi; \
+	  done; \
+	  echo "✓ Hindsight LLM → $$URL ($$MDL)"
+	@$(COMPOSE) up -d hindsight
+	@echo "  Make sure mlx_lm.server is running on the host (make mlx / ./mlx/serve.sh)."
+
+hindsight-mlx-revert: ## Revert Hindsight memory extraction to the bundled Ollama
+	@for kv in "HINDSIGHT_LLM_BASE_URL=http://ollama:11434/v1" "HINDSIGHT_LLM_API_KEY=openai" \
+	           "HINDSIGHT_LLM_MODEL=qwen2.5:14b" "HINDSIGHT_RETAIN_LLM_MODEL=qwen2.5:3b" \
+	           "HINDSIGHT_CONSOLIDATION_LLM_MODEL=qwen2.5:14b" "HINDSIGHT_REFLECT_LLM_MODEL=qwen2.5:14b"; do \
+	    k="$${kv%%=*}"; v="$${kv#*=}"; \
+	    if grep -qE "^$$k=" $(ENV_FILE); then sed -i.bak "s|^$$k=.*|$$k=$$v|" $(ENV_FILE) && rm -f $(ENV_FILE).bak; \
+	    else echo "$$kv" >> $(ENV_FILE); fi; \
+	  done
+	@$(COMPOSE) up -d hindsight
+	@echo "✓ Hindsight memory extraction reverted to the bundled Ollama"
 
 validate: ## Validate docker-compose.yml (mirrors CI)
 	@test -f .env || cp .env.example .env
