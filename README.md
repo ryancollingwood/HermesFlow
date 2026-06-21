@@ -54,8 +54,10 @@ OPENROUTER_API_KEY=sk-or-... ./install.sh
 
 Pick a **profile** for common scenarios (explicit flags still override it):
 `--profile minimal` (gateway only), `full` (+ Headroom), `gpu` (NVIDIA host),
-`mac` (Apple Silicon, RAM-friendly model), `server` (LAN). E.g.
-`./install.sh --profile gpu --api-key sk-or-...`.
+`mac` (Apple Silicon, RAM-friendly model), `server` (LAN), `remote` (all
+inference at the cloud provider — no local Ollama, for low-powered hosts). E.g.
+`./install.sh --profile gpu --api-key sk-or-...`. Add **`--dry-run`** to preview
+the full plan without changing anything.
 
 **On Windows (or any host without bash/make/openssl/curl), use the Python port**
 — same flags, same steps, stdlib-only:

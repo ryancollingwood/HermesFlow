@@ -47,6 +47,10 @@ Profiles (presets; explicit flags still override them):
     --profile gpu       --gpu (Linux NVIDIA host, in-container Ollama)
     --profile mac       --hindsight-model qwen2.5:3b (Apple Silicon, RAM-friendly)
     --profile server    --bind-lan (LAN exposure + auto Hindsight API key)
+    --profile remote    route Hindsight at the cloud provider — no local Ollama
+                        models (for low-powered hosts)
+
+    --dry-run           print the resolved plan and exit without changing anything
 
 Other optional channels / toggles:
     --discord-bot-token <token>           Discord bot token (needs allowed-users)
@@ -476,12 +480,15 @@ def main() -> None:
                     help="NVIDIA GPU passthrough for Ollama (Linux/WSL2 + nvidia-container-toolkit)")
     ap.add_argument("--env", action="append", default=[], metavar="KEY=VALUE",
                     help="set any other .env variable (repeatable)")
-    ap.add_argument("--profile", choices=["minimal", "full", "gpu", "mac", "server"],
+    ap.add_argument("--profile", choices=["minimal", "full", "gpu", "mac", "server", "remote"],
                     help="preset bundle of flags (explicit flags still override)")
+    ap.add_argument("--dry-run", action="store_true",
+                    help="print the resolved plan and exit without changing anything")
     args = ap.parse_args()
 
     # Apply the chosen profile, but only to settings the user left at their
-    # default — so explicit flags always win.
+    # default — so explicit flags always win. ('remote' is resolved below, once
+    # the provider/key are known.)
     PROFILES = {
         "minimal": {"no_memory": True, "no_windmill": True},
         "full":    {"with_headroom": True},
@@ -490,7 +497,7 @@ def main() -> None:
         "server":  {"bind_lan": True},
     }
     if args.profile:
-        for attr, val in PROFILES[args.profile].items():
+        for attr, val in PROFILES.get(args.profile, {}).items():
             if getattr(args, attr) in (False, ""):
                 setattr(args, attr, val)
         say(f"{ARROW} applying profile '{args.profile}'")
@@ -513,6 +520,49 @@ def main() -> None:
     if (dc_token or dc_users) and not (dc_token and dc_users):
         die(f"{CROSS} Discord needs BOTH --discord-bot-token and --discord-allowed-users\n"
             "  (allowed user IDs are required for the Hermes Discord channel).")
+
+    # 'remote' profile: route Hindsight's extraction LLM at the cloud provider so
+    # no local Ollama models are needed (good for low-powered hosts). Needs an
+    # OpenAI-compatible provider; explicit --hindsight-* flags still win.
+    hs_remote = args.profile == "remote"
+    if hs_remote:
+        remote_map = {"openrouter": ("https://openrouter.ai/api/v1", "openai/gpt-4o-mini"),
+                      "openai": ("https://api.openai.com/v1", "gpt-4o-mini")}
+        if args.provider in remote_map:
+            rbase, rmodel = remote_map[args.provider]
+            args.hindsight_base_url = args.hindsight_base_url or rbase
+            args.hindsight_model = args.hindsight_model or rmodel
+        else:
+            say(f"{WARN} --profile remote needs an OpenAI-compatible provider "
+                f"(openrouter/openai); '{args.provider}' isn't — leaving Hindsight on its .env backend.")
+
+    # Dry run: print the resolved plan and exit before changing anything.
+    if args.dry_run:
+        yn = lambda b: "yes" if b else "no"
+        print()
+        say("Dry run — no files written, no containers touched. Planned install:")
+        say(f"  Provider:        {args.provider} (api key: {'present' if api_key else 'ABSENT'})")
+        say(f"  Default model:   {model}")
+        say(f"  Profile:         {args.profile or 'none'}")
+        say("  Secrets:         generate any blank/weak of API_SERVER_KEY, WM_DB_PASSWORD, "
+            "HINDSIGHT_DB_PASSWORD, GRAFANA_ADMIN_PASSWORD")
+        say(f"  Memory:          {yn(not args.no_memory)}" + (f" (remote via {args.provider})" if hs_remote else ""))
+        if args.hindsight_model or args.hindsight_base_url:
+            say(f"  Hindsight LLM:   model={args.hindsight_model or '<.env>'} base={args.hindsight_base_url or '<.env>'}")
+        say(f"  Windmill:        {yn(not args.no_windmill)}")
+        say(f"  MLX server:      {yn(args.with_mlx)}    Headroom: {yn(args.with_headroom)}    "
+            f"GPU passthrough: {yn(args.gpu)}    LAN bind: {yn(args.bind_lan)}")
+        say(f"  Telegram:        {'configured' if tg_token else 'none'}    "
+            f"Discord: {'configured' if dc_token else 'none'}")
+        if args.env:
+            say(f"  Extra .env:      {' '.join(args.env)}")
+        steps = (["pull"] if not args.no_pull else []) + ["up", "set-model", "probe"]
+        steps += (["memory"] if not args.no_memory else []) + (["windmill"] if not args.no_windmill else [])
+        steps += (["mlx"] if args.with_mlx else []) + (["headroom"] if args.with_headroom else [])
+        say(f"  Steps:           {' → '.join(steps)}")
+        print()
+        say("Re-run without --dry-run to apply.")
+        return
 
     # 1. prerequisites
     say(f"{ARROW} checking prerequisites…")
@@ -563,6 +613,9 @@ def main() -> None:
             if v:
                 env_set(k, v)
         say(f"{OK} applied Hindsight model/backend overrides to .env")
+    # remote profile: Hindsight authenticates to the cloud provider with the key.
+    if hs_remote and api_key:
+        env_set("HINDSIGHT_LLM_API_KEY", api_key)
 
     # NVIDIA GPU passthrough for the ollama container.
     if args.gpu:
