@@ -19,6 +19,38 @@ OPENROUTER_API_KEY=sk-or-... ./install.sh
 python install.py --provider openrouter --api-key sk-or-...
 ```
 
+## Profiles
+
+`--profile <name>` applies a preset bundle of flags for a common scenario. Any
+explicit flag you also pass **overrides** the profile, so you can start from a
+preset and tweak (e.g. `--profile gpu --bind-lan`).
+
+| Profile | Bundles | For |
+|---|---|---|
+| `minimal` | `--no-memory --no-windmill` | Just the Hermes gateway + provider. |
+| `full` | `--with-headroom` (memory + windmill are on by default) | Everything, plus context compression. |
+| `gpu` | `--gpu` | Linux/WSL2 NVIDIA host — in-container Ollama with the GPU and full-size models. |
+| `mac` | `--hindsight-model qwen2.5:3b` | Apple Silicon — one small RAM-friendly model (avoids the two-model reload thrash on the CPU-only container). |
+| `server` | `--bind-lan` | Expose on the LAN (auto-generates a Hindsight API key). |
+| `remote` | routes Hindsight's LLM at the cloud provider (no local Ollama models pulled) | Low-powered hosts — all inference is remote. Needs an OpenAI-compatible provider (`openrouter`/`openai`). |
+
+```sh
+./install.sh --profile minimal
+python install.py --profile gpu --api-key sk-or-...
+./install.sh --profile remote --api-key sk-or-...   # all inference remote
+```
+
+### Dry run
+
+`--dry-run` prints the fully-resolved plan (provider, model, profile, every
+toggle, the secrets it would generate, and the ordered steps) and exits **without
+writing `.env`, creating directories, or touching any container**. Use it to
+preview exactly what an install would do:
+
+```sh
+./install.sh --profile remote --api-key sk-or-... --dry-run
+```
+
 ## Options
 
 | Flag | Default | Purpose |
@@ -45,6 +77,8 @@ python install.py --provider openrouter --api-key sk-or-...
 | `--bind-lan` | off | Expose Hermes/Hindsight/Ollama on `0.0.0.0` instead of loopback. |
 | `--gpu` | off | NVIDIA GPU passthrough for the Ollama container (Linux/WSL2 + nvidia-container-toolkit). No-op on macOS. |
 | `--env KEY=VALUE` | — | Set any other `.env` variable. Repeatable. |
+| `--profile <name>` | — | Apply a preset bundle (see [Profiles](#profiles)). |
+| `--dry-run` | off | Print the resolved plan and exit without changing anything. |
 
 ## Steps
 

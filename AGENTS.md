@@ -22,6 +22,86 @@ Networks: `backend`, `edge`, `agent`, `memory`, `inference`, `monitoring`.
 
 ---
 
+## Installers & first-run
+
+There are two non-interactive installers plus the interactive `make bootstrap`:
+
+| Path | Notes |
+|---|---|
+| `install.sh` | bash; uses `make`, `openssl`, `curl`. |
+| `install.py` | pure Python **standard library only** (Windows-friendly — no `make`/`bash`/`openssl`/`curl`). |
+| `make bootstrap` | interactive Hermes setup wizard. |
+| `INSTALL.md` | step-by-step walkthrough of the installers. |
+
+Hard rules when touching the installers:
+
+- **Keep `install.sh` and `install.py` at parity.** Same flags, same steps, same
+  behaviour. A change to one must be mirrored in the other (and in the
+  `--help`/docstring header), or don't make it.
+- **`install.py` stays stdlib-only.** No `pip` dependencies — it must run on a
+  fresh Windows host with just Python 3 + Docker Desktop.
+- **Both are idempotent.** Re-running fills blanks only; never clobber existing
+  secrets or user-set values.
+- **Never run the real installer to "test" it** — it writes `.env`, creates
+  dirs, pulls images, and starts/restarts containers. Validate with
+  `--dry-run`, `bash -n install.sh`, and `python3 -m py_compile install.py`.
+  `--dry-run` prints the resolved plan and exits before any side effect; it must
+  stay genuinely side-effect-free.
+- **Profiles** (`--profile minimal|full|gpu|mac|server|remote`) are presets that
+  seed flag defaults *before* explicit flags, so explicit flags always win. Keep
+  the preset table identical in both installers.
+- Steps live in a fixed order (prereqs → model check → `.env` → secrets → data
+  dirs → keys → up → probe → memory → windmill → mlx → headroom). New work slots
+  into that sequence; reflect it in the header comment and `INSTALL.md`.
+
+When you add or change installer behaviour, update **both** `README.md` (Quick
+start / flags) and `INSTALL.md` (flag table + step description).
+
+---
+
+## Secrets & credential handling
+
+- **Required secrets are auto-generated, never left to a weak compose default.**
+  `make secrets` (and `install.py`'s `ensure_secret` calls) generate
+  `API_SERVER_KEY`, `WM_DB_PASSWORD`, `HINDSIGHT_DB_PASSWORD`,
+  `GRAFANA_ADMIN_PASSWORD` when blank or still a known-weak default. If you add a
+  service that needs a password, add it to **both** places — do **not** ship a
+  `${FOO:-changeme}` default in `docker-compose.yml` as the only protection.
+- **Hermes reads provider keys and bot tokens from `<DATA_DIR>/.env`, not the
+  top-level `.env`.** The `OPENROUTER_API_KEY` / `ANTHROPIC_API_KEY` /
+  `OPENAI_API_KEY` / `TELEGRAM_BOT_TOKEN` / `DISCORD_BOT_TOKEN` lines in the
+  `hermes` service are intentionally **commented out** so they come from the
+  wizard/installer-written `<DATA_DIR>/.env` (mapped to `/opt/data/.env`). Write
+  Hermes-consumed secrets there, `chmod 600`, not to the top-level `.env`.
+- **Never write a real secret into a tracked file.** `windmill/f/hermes/
+  api_key.variable.yaml` keeps a placeholder; the real value is set server-side
+  (UI/API), and `wmill.yaml` keeps `skipSecrets: true`. `.env`, `<DATA_DIR>`, and
+  `backups/` are git-ignored — keep real keys only there.
+- Generating a DB password only helps **before** the volume is initialized —
+  Postgres applies `POSTGRES_PASSWORD` once, on first init. Rotating it later
+  breaks auth. Installers therefore generate secrets before the first `up`.
+
+---
+
+## Optional features = compose overrides, not edits to the base file
+
+Optional capabilities are layered with an override file toggled via `COMPOSE_FILE`
+in `.env`, leaving the default behaviour untouched:
+
+- `docker-compose.gpu.yml` adds the NVIDIA device reservation to `ollama`
+  (`--gpu` sets `COMPOSE_FILE=docker-compose.yml:docker-compose.gpu.yml`). Docker
+  Compose reads `COMPOSE_FILE` from `.env`, so every `docker compose` / `make`
+  call picks it up. Prefer this pattern over uncommenting blocks in the base file.
+
+Inference notes worth knowing: Docker Desktop on **macOS cannot pass the GPU**
+into containers, so the bundled `ollama` is CPU-only there (use host-native
+`mlx/` or remote inference). On a **Linux/NVIDIA** host, `--gpu` makes the
+in-container `ollama` GPU-accelerated. The Hindsight memory provider reads
+`HINDSIGHT_API_URL` (the `hindsight-client` package ships in the hermes image —
+no `pip install` needed; just set `memory.provider`).
+
+---
+
 ## Adding a new container
 
 Work through **every** section below in order. Each section is a hard
@@ -140,6 +220,15 @@ Add every configurable variable to `.env.example` with:
 - A `${VAR_NAME_DATA_DIR}` path variable if the service writes state, so
   the operator can redirect it alongside the other data directories
 
+If the variable is a **secret** (password / token / key):
+- Mark it `# <REQUIRED>` and leave the value blank in `.env.example`.
+- Add it to `make secrets` (an `ensure_secret` call) **and** the matching
+  `ensure_secret(...)` in `install.py` so it's auto-generated — see
+  [Secrets & credential handling](#secrets--credential-handling). Never rely on a
+  weak `${FOO:-changeme}` default in `docker-compose.yml`.
+- If Hermes consumes it (provider key, bot token), it must be read from
+  `<DATA_DIR>/.env`, not the top-level `.env`.
+
 ### 7. Use the shared logging anchor
 
 All services must include:
@@ -191,12 +280,28 @@ no per-service action is needed for CPU, memory, network, and disk I/O.
 ## Validation before committing
 
 ```bash
-# Confirm the compose file is syntactically valid
-docker compose config --quiet
+# Compose (mirrors CI): syntax + ${VAR} expansion against .env.example
+make validate                       # = docker compose config --quiet
+make ci                             # validate + lint (ruff + py_compile of windmill/)
 
 # Confirm every service has resource limits
 docker compose config | grep -A5 'deploy:' | grep -c 'cpus'
 
 # Confirm every non-monitoring service has logging configured
 docker compose config | grep 'driver: json-file' | wc -l
+
+# If a docker-compose override changed, validate the merged result too
+docker compose -f docker-compose.yml -f docker-compose.gpu.yml config -q
 ```
+
+If you changed the installers:
+
+```bash
+bash -n install.sh                  # bash syntax
+python3 -m py_compile install.py    # python syntax
+./install.sh --dry-run              # preview; must make NO changes
+```
+
+Never "test" an installer by actually running it — use `--dry-run`. Keep
+`install.sh`, `install.py`, `README.md`, and `INSTALL.md` in sync in the same
+change.

@@ -9,6 +9,17 @@
 #    OPENROUTER_API_KEY=sk-or-... ./install.sh
 #    ./install.sh --provider openrouter --api-key sk-or-... --model openai/gpt-4o-mini
 #
+#  Profiles (presets; explicit flags still override them):
+#    --profile minimal   --no-memory --no-windmill (just the gateway + provider)
+#    --profile full       memory + windmill + --with-headroom
+#    --profile gpu        --gpu (Linux NVIDIA host, in-container Ollama)
+#    --profile mac        --hindsight-model qwen2.5:3b (Apple Silicon, RAM-friendly)
+#    --profile server     --bind-lan (LAN exposure + auto Hindsight API key)
+#    --profile remote     route Hindsight at the cloud provider — no local Ollama
+#                         models (for low-powered hosts)
+#
+#  --dry-run                print the resolved plan and exit without changing anything
+#
 #  What it does (mirrors `make bootstrap`, minus the TTY wizard):
 #    1. check prerequisites (docker, compose, openssl, curl, make)
 #    2. validate the model against the provider's /models list (--skip-model-check
@@ -76,7 +87,25 @@ DISCORD_USERS=""
 WITH_HEADROOM=0
 BIND_LAN=0
 GPU=0
+PROFILE=""
+DRY_RUN=0
+HS_REMOTE=0
 EXTRA_ENV=()
+
+# Install profiles: presets applied BEFORE explicit flags (so flags override).
+# Pre-scan argv for --profile <name> (space form), then seed the matching vars.
+prev=""; for a in "$@"; do [ "$prev" = "--profile" ] && PROFILE="$a"; prev="$a"; done
+case "$PROFILE" in
+  "")      : ;;
+  minimal) WITH_MEMORY=0; WITH_WINDMILL=0 ;;
+  full)    WITH_HEADROOM=1 ;;
+  gpu)     GPU=1 ;;
+  mac)     HS_MODEL="qwen2.5:3b" ;;
+  server)  BIND_LAN=1 ;;
+  remote)  HS_REMOTE=1 ;;
+  *) echo "✗ unknown --profile '$PROFILE' (minimal|full|gpu|mac|server|remote)" >&2; exit 1 ;;
+esac
+[ -n "$PROFILE" ] && echo "→ applying profile '$PROFILE'"
 
 usage() {
   # Print the header comment block (between the two ==== dividers).
@@ -316,6 +345,8 @@ while [ $# -gt 0 ]; do
     --with-headroom) WITH_HEADROOM=1; shift ;;
     --bind-lan) BIND_LAN=1; shift ;;
     --gpu) GPU=1; shift ;;
+    --profile) shift 2 ;;
+    --dry-run) DRY_RUN=1; shift ;;
     --env) EXTRA_ENV+=("$2"); shift 2 ;;
     -h|--help)  usage 0 ;;
     *) echo "✗ unknown argument: $1" >&2; usage 1 ;;
@@ -363,6 +394,38 @@ if { [ -n "$DISCORD_TOKEN" ] || [ -n "$DISCORD_USERS" ]; } && { [ -z "$DISCORD_T
   exit 1
 fi
 
+# 'remote' profile: route Hindsight's extraction LLM at the cloud provider so no
+# local Ollama models are needed (good for low-powered hosts). Needs an
+# OpenAI-compatible provider; explicit --hindsight-* flags still win.
+if [ "$HS_REMOTE" -eq 1 ]; then
+  case "$PROVIDER" in
+    openrouter) [ -z "$HS_BASE_URL" ] && HS_BASE_URL="https://openrouter.ai/api/v1"; [ -z "$HS_MODEL" ] && HS_MODEL="openai/gpt-4o-mini" ;;
+    openai)     [ -z "$HS_BASE_URL" ] && HS_BASE_URL="https://api.openai.com/v1";    [ -z "$HS_MODEL" ] && HS_MODEL="gpt-4o-mini" ;;
+    *) echo "⚠ --profile remote needs an OpenAI-compatible provider (openrouter/openai) for Hindsight; '$PROVIDER' isn't — leaving Hindsight on its .env backend." >&2 ;;
+  esac
+fi
+
+# Dry run: print the resolved plan and exit before changing anything.
+if [ "$DRY_RUN" -eq 1 ]; then
+  yn() { [ "$1" -eq 1 ] && echo yes || echo no; }
+  echo
+  echo "Dry run — no files written, no containers touched. Planned install:"
+  echo "  Provider:        $PROVIDER (api key: $([ -n "$API_KEY" ] && echo present || echo ABSENT))"
+  echo "  Default model:   $MODEL"
+  echo "  Profile:         ${PROFILE:-none}"
+  echo "  Secrets:         generate any blank/weak of API_SERVER_KEY, WM_DB_PASSWORD, HINDSIGHT_DB_PASSWORD, GRAFANA_ADMIN_PASSWORD"
+  echo "  Memory:          $(yn $WITH_MEMORY)$([ "$HS_REMOTE" -eq 1 ] && echo " (remote via $PROVIDER)")"
+  [ -n "$HS_MODEL$HS_BASE_URL" ] && echo "  Hindsight LLM:   model=${HS_MODEL:-<.env>} base=${HS_BASE_URL:-<.env>}"
+  echo "  Windmill:        $(yn $WITH_WINDMILL)"
+  echo "  MLX server:      $(yn $WITH_MLX)    Headroom: $(yn $WITH_HEADROOM)    GPU passthrough: $(yn $GPU)    LAN bind: $(yn $BIND_LAN)"
+  echo "  Telegram:        $([ -n "$TG_TOKEN" ] && echo configured || echo none)    Discord: $([ -n "$DISCORD_TOKEN" ] && echo configured || echo none)"
+  [ "${#EXTRA_ENV[@]}" -gt 0 ] && echo "  Extra .env:      ${EXTRA_ENV[*]}"
+  echo "  Steps:           $([ "$DO_PULL" -eq 1 ] && echo 'pull → ')up → set-model → probe$([ "$WITH_MEMORY" -eq 1 ] && echo ' → memory')$([ "$WITH_WINDMILL" -eq 1 ] && echo ' → windmill')$([ "$WITH_MLX" -eq 1 ] && echo ' → mlx')$([ "$WITH_HEADROOM" -eq 1 ] && echo ' → headroom')"
+  echo
+  echo "Re-run without --dry-run to apply."
+  exit 0
+fi
+
 # ── 1. prerequisites ─────────────────────────────────────────────────────────
 echo "→ checking prerequisites…"
 for bin in docker make openssl curl; do
@@ -404,6 +467,8 @@ HS_REFLECT="${HS_REFLECT:-$HS_MODEL}"
 [ -n "$HS_CONSOLIDATION" ] && env_put HINDSIGHT_CONSOLIDATION_LLM_MODEL "$HS_CONSOLIDATION"
 [ -n "$HS_REFLECT" ]       && env_put HINDSIGHT_REFLECT_LLM_MODEL "$HS_REFLECT"
 [ -n "$HS_BASE_URL" ]      && env_put HINDSIGHT_LLM_BASE_URL "$HS_BASE_URL"
+# remote profile: Hindsight authenticates to the cloud provider with the same key.
+[ "$HS_REMOTE" -eq 1 ] && [ -n "$API_KEY" ] && env_put HINDSIGHT_LLM_API_KEY "$API_KEY"
 [ -n "$HS_MODEL$HS_RETAIN$HS_CONSOLIDATION$HS_REFLECT$HS_BASE_URL" ] \
   && echo "✓ applied Hindsight model/backend overrides to .env"
 
