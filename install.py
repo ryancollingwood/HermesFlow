@@ -69,6 +69,7 @@ import os
 import platform
 import re
 import secrets
+import shutil
 import subprocess
 import sys
 import time
@@ -348,6 +349,69 @@ def wm_http(method: str, path: str, *, bearer: str | None = None,
         return None, None
 
 
+def push_windmill_assets(token: str) -> None:
+    """Push the tracked windmill/ assets with the `wmill` CLI, then seed the
+    secret variable that sync intentionally skips. Best-effort and idempotent:
+    if the CLI isn't installed, print how to do it by hand and return — the
+    installer never hard-depends on node/npm.
+    """
+    if not shutil.which("wmill"):
+        say(f"{ARROW} Windmill assets not pushed: 'wmill' CLI not found.")
+        say("  Install it (npm install -g windmill-cli) then run:  make windmill-push")
+        return
+    # The CLI talks to the workspace's public URL (it can't replay the Host-header
+    # trick the API calls use), so it relies on windmill.localhost resolving.
+    remote = env_value("WM_BASE_URL", "http://windmill.localhost") or "http://windmill.localhost"
+    say(f"{ARROW} pushing windmill/ assets to {remote} (workspace 'main')…")
+    wd = Path("windmill")
+    # Register a CLI profile non-interactively with the admin token (idempotent).
+    subprocess.run(["wmill", "workspace", "add", "main", "main", remote, "--token", token],
+                   cwd=wd, capture_output=True, text=True)
+    # Regenerate .script.yaml + lockfiles so new/edited scripts lock cleanly
+    # (needs the server, which is up here). Best-effort: don't block the push.
+    subprocess.run(["wmill", "generate-metadata"], cwd=wd, capture_output=True, text=True)
+    # Safety: `wmill sync push` mirrors local→remote and DELETES/ARCHIVES any
+    # remote item absent locally. Dry-run first and refuse if anything would be
+    # removed, so re-running the installer can't wipe assets built in the UI.
+    # Override deliberately with WMILL_FORCE_PUSH=1.
+    dry = subprocess.run(["wmill", "sync", "push", "--dry-run", "--yes"],
+                         cwd=wd, capture_output=True, text=True)
+    plain = re.sub(r"\x1b\[[0-9;]*m", "", (dry.stdout or "") + (dry.stderr or ""))
+    dels = [ln for ln in plain.splitlines() if re.match(
+        r"- (folder|variable|resource|resource-type|script|flow|app|schedule|trigger|user|group|settings)( |$)", ln)]
+    if dels and os.environ.get("WMILL_FORCE_PUSH", "0") != "1":
+        say(f"{WARN} Windmill push skipped — it would DELETE/ARCHIVE remote items not tracked in windmill/:")
+        for ln in dels:
+            say(f"    {ln}")
+        say("  Bring them into the repo first:  make windmill-pull")
+        say("  Or mirror anyway (destructive):  WMILL_FORCE_PUSH=1 python install.py …")
+        return
+    push = subprocess.run(["wmill", "sync", "push", "--yes"],
+                          cwd=wd, capture_output=True, text=True)
+    if push.returncode == 0:
+        say(f"{OK} pushed windmill/ assets (resource type, f/hermes/local, client.py, chat.py)")
+    else:
+        say(f"{WARN} 'wmill sync push' failed — run it by hand from windmill/ (see README 'Push it').")
+        return
+    # sync keeps secrets out of git (skipSecrets: true), so f/hermes/api_key is
+    # never pushed. Seed it server-side from API_SERVER_KEY so the resource works.
+    api_key = env_value("API_SERVER_KEY")
+    if api_key:
+        vp = "f/hermes/api_key"
+        cst, _ = wm_http("POST", "/api/w/main/variables/create", bearer=token,
+                         json_body={"path": vp, "value": api_key, "is_secret": True,
+                                    "description": "Hermes gateway API_SERVER_KEY"})
+        if cst in (200, 201):
+            say(f"{OK} created secret variable {vp}")
+        else:
+            ust, _ = wm_http("POST", f"/api/w/main/variables/update/{vp}", bearer=token,
+                             json_body={"value": api_key})
+            if ust in (200, 201):
+                say(f"{OK} updated secret variable {vp}")
+            else:
+                say(f"{WARN} couldn't set {vp} — set it in the UI (Variables → {vp}) to your API_SERVER_KEY.")
+
+
 def setup_windmill() -> None:
     # Pre-installing the worker Python used to happen here, but that race is
     # now handled by the `windmill_cache_init` service in docker-compose.yml,
@@ -378,6 +442,24 @@ def setup_windmill() -> None:
             say(f"{OK} created Windmill 'main' workspace")
         else:
             say(f"{WARN} couldn't create the Windmill 'main' workspace — create it in the UI before 'wmill sync push'.")
+
+    # Ensure the runtime-state folder exists (create-or-no-op). Scripts store
+    # NON-secret Hermes state here (e.g. last-run timestamps). It is deliberately
+    # OUTSIDE wmill.yaml's sync scope, so a mirror push never deletes it and it
+    # is never versioned in the repo. See windmill/SYNC.md.
+    fst, _ = wm_http("GET", "/api/w/main/folders/get/hermes_state", bearer=token)
+    if fst == 200:
+        say(f"{OK} Windmill folder f/hermes_state already exists")
+    else:
+        cst, _ = wm_http("POST", "/api/w/main/folders/create", bearer=token,
+                         json_body={"name": "hermes_state"})
+        if cst in (200, 201):
+            say(f"{OK} created Windmill folder f/hermes_state (runtime state; not synced)")
+        else:
+            say(f"{WARN} couldn't create f/hermes_state — create it in the UI (Folders → New) so scripts can store state.")
+
+    # Push the tracked windmill/ assets now that the workspace exists.
+    push_windmill_assets(token)
 
     # Register Windmill with Hermes over MCP (idempotent).
     if "windmill" in out(["docker", "exec", "hermes", "hermes", "mcp", "list"]):

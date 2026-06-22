@@ -588,25 +588,53 @@ instead of hardcoding the URL/key each time.
 
 ```
 windmill/
-├── wmill.yaml                          # sync config (edit baseUrl)
+├── wmill.yaml                          # sync config (scope: f/hermes/** only)
+├── SYNC.md                             # what push/pull do to your content — read before forcing a push
 ├── hermes_endpoint.resource-type.yaml  # resource type: { base_url, api_key }
-└── f/hermes/
+└── f/hermes/                           # VERSIONED Hermes code/config (this is the only synced folder)
+    ├── folder.meta.yaml                # folder permissions/owners (tracked so a push won't strip them)
     ├── api_key.variable.yaml           # secret variable (placeholder)
     ├── local.resource.yaml             # a hermes_endpoint resource → $var:f/hermes/api_key
     ├── client.py                       # shared module: get_client(), chat(), main()=model list
     └── chat.py                         # example consumer: from f.hermes.client import chat
 ```
 
+> **Two folders, two purposes.** `f/hermes/` is **versioned code/config** and is
+> the *only* folder sync touches. Non-secret **runtime state** (last-run
+> timestamps, cursors, …) belongs in **`f/hermes_state/`** — a folder the
+> installer creates but which is **deliberately outside sync scope**, so a mirror
+> push never deletes it and it never lands in git. Everything else (`u/*`, other
+> `f/*`, inherited resource-types, secret variables) is ignored by sync too.
+> [**windmill/SYNC.md**](windmill/SYNC.md) has the full per-scenario breakdown.
+
 ### Push it
 
-This assumes you've installed the wmill cli (`npm install -g windmill-cli`).
+**The installer does this for you** when the `wmill` CLI is present. `install.sh`
+/ `install.py` create the `main` workspace, then run `wmill sync push` and seed
+the `f/hermes/api_key` secret from your `API_SERVER_KEY`. If the CLI isn't
+installed it prints how to do it later — nothing else in the install depends on
+node/npm. Once the CLI is installed you can (re)push any time:
 
+```sh
+make windmill-push       # registers the CLI profile, pushes assets, seeds the api_key secret
+```
+
+> **`sync push` is a mirror, not an upload.** It makes the remote workspace match
+> `windmill/`, which means it **deletes or archives any non-secret server item
+> that isn't tracked here** (secret variables are untouched thanks to
+> `skipSecrets`). To avoid clobbering work authored in the UI, the installer and
+> `make windmill-push` **dry-run first and abort if the push would remove
+> anything**, printing what it would delete. Reconcile with `make windmill-pull`,
+> or override deliberately: `make windmill-push FORCE=1` (or `WMILL_FORCE_PUSH=1`
+> for the installer). Use `make windmill-check` any time to see drift first.
+
+To push by hand instead, install the wmill cli (`npm install -g windmill-cli`).
 **First, make sure a `main` workspace exists on the server.** A fresh Windmill CE
 has none, and `wmill workspace add` only registers the workspace *locally in the
 CLI* — it does not create it server-side, so the first `wmill sync push` fails
-without it. `install.sh` creates it for you; to do it by hand, open
-`http://windmill.localhost`, log in (default superadmin `admin@windmill.dev` /
-`changeme`), and create a workspace with id `main`.
+without it. `install.sh` / `make windmill-push` create it for you; to do it by
+hand, open `http://windmill.localhost`, log in (default superadmin
+`admin@windmill.dev` / `changeme`), and create a workspace with id `main`.
 
 ```sh
 cd windmill
@@ -649,6 +677,30 @@ name the gateway actually serves — run `client.py` (or
 
 > Inside a worker, reach Hermes at `hermes:8642`, **not** `localhost` — localhost
 > is the worker itself. This works because the workers share the `agent` network.
+
+### Pull it back (version-control what's on the server)
+
+`push` is one-way: repo → server. When you build or edit scripts/flows/resources
+**in the Windmill UI**, pull them back into this repo so they're tracked in git:
+
+```sh
+make windmill-pull       # server → windmill/  (then review and commit)
+git -C windmill status   # see what changed
+git add windmill/ && git commit -m "windmill: sync from server"
+```
+
+What gets written is governed by [`windmill/wmill.yaml`](windmill/wmill.yaml):
+`includes: ["f/**", "*.resource-type.yaml"]` scopes the pull to the `f/`
+namespace (so personal `u/<you>/…` drafts stay out of the repo), and
+`skipSecrets: true` writes a **placeholder** for secret variables instead of the
+real value — so `git diff` never leaks `f/hermes/api_key`. Widen `includes` if you
+want flows or other folders tracked too. The round-trip is just
+`make windmill-pull` (author in the UI) ↔ `make windmill-push` (author in the repo).
+
+To see whether the live server has drifted from what's committed — without
+writing anything — run `make windmill-check`. It requires a clean `windmill/`
+tree, pulls into it, diffs against git, prints any drift, then reverts. Exit code
+is non-zero on drift, so it doubles as a pre-push or scheduled guard.
 
 ### Hermes ⇄ Windmill over MCP
 
@@ -771,6 +823,7 @@ Gotchas (all enforced by Windmill):
 
 - **compose** — `docker compose config` (validates structure + `${VAR}` expansion against `.env.example`) and `caddy validate` on the `Caddyfile`.
 - **python** — `ruff check`, `py_compile`, and a YAML parse pass over `windmill/`.
+- **windmill-consistency** — checks that every tracked script has its generated `*.script.yaml` and that every referenced inline lockfile exists, so assets edited in the UI and pulled without their metadata can't slip into the repo. This is a server-free guard; for a true repo-vs-live-server diff run `make windmill-check`.
 
 Run the same checks locally before pushing:
 

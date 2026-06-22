@@ -5,5 +5,26 @@ kind: script
 schema:
   $schema: https://json-schema.org/draft/2020-12/schema
   type: object
-  properties: {}
-  required: []
+  properties:
+    hermes:
+      type: object
+      description: ''
+      default: null
+      format: resource-hermes_endpoint
+    model:
+      type: string
+      description: ''
+      default: hermes
+      originalType: string
+    prompt:
+      type: string
+      description: ''
+      default: Give me one sentence on why sunscreen is beneficial.
+      originalType: string
+    system:
+      type: string
+      description: ''
+      default: You are a concise assistant.
+      originalType: string
+  required:
+    - hermes

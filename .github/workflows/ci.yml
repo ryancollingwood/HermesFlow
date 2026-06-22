@@ -1,0 +1,81 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  compose:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Validate docker-compose.yml
+        run: |
+          cp .env.example .env
+          docker compose config -q
+          echo "✓ compose config valid"
+      - name: Validate Caddyfile
+        run: |
+          docker run --rm -v "$PWD/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2 \
+            caddy validate --config /etc/caddy/Caddyfile --adapter caddyfile
+
+  python:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: pip install ruff pyyaml
+      - name: Ruff
+        run: ruff check windmill/
+      - name: py_compile
+        run: find windmill -name '*.py' -exec python -m py_compile {} +
+      - name: YAML parse (windmill/)
+        run: |
+          python - <<'PY'
+          import pathlib, sys, yaml
+          errs = []
+          for f in sorted(pathlib.Path("windmill").rglob("*.yaml")):
+              try:
+                  list(yaml.safe_load_all(f.read_text()))
+              except yaml.YAMLError as e:
+                  errs.append(f"{f}: {e}")
+          if errs:
+              print("✗ YAML parse errors:"); [print("  -", e) for e in errs]; sys.exit(1)
+          print("✓ all windmill/ YAML parses")
+          PY
+
+  windmill-consistency:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      # Server-free drift guard: catches assets edited in the Windmill UI and
+      # pulled without their generated metadata/lockfiles being committed.
+      # (A true repo-vs-live-server diff needs a running server — see
+      # `make windmill-check`.)
+      - name: Check script ↔ metadata ↔ lock parity
+        run: |
+          python - <<'PY'
+          import pathlib, re, sys
+          root = pathlib.Path("windmill/f")
+          errs = []
+          for py in sorted(root.rglob("*.py")):
+              meta = py.with_name(py.stem + ".script.yaml")
+              if not meta.exists():
+                  errs.append(f"{py}: missing {meta.name} — run 'wmill generate-metadata' and commit it")
+          for meta in sorted(root.rglob("*.script.yaml")):
+              base = meta.name[:-len(".script.yaml")]
+              py = meta.with_name(base + ".py")
+              if not py.exists():
+                  errs.append(f"{meta}: references script {py.name} which is missing")
+              m = re.search(r"""!inline\s+([^'"\s]+)""", meta.read_text())
+              if m and not (pathlib.Path("windmill") / m.group(1)).exists():
+                  errs.append(f"{meta}: inline lock {m.group(1)} is missing")
+          if errs:
+              print("✗ windmill/ consistency errors:"); [print("  -", e) for e in errs]; sys.exit(1)
+          print("✓ windmill/ scripts, metadata, and lockfiles are consistent")
+          PY
