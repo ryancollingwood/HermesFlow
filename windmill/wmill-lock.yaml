@@ -1,2 +1,4 @@
 version: v2
-locks: {}
+locks:
+  f/hermes/chat: e8d58cf77c012bc4312bc1c9696e850213e8f75f6714a931ba788a9186a9b830
+  f/hermes/client: 718f0db16e26856211e6fd76023ff8af80c04b3ec014deb86521e36a135f31d4

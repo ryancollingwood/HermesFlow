@@ -193,7 +193,70 @@ pull_hindsight_models() {
   done
 }
 
-# Prepare Windmill: ensure a 'main' workspace exists.
+# Push the tracked windmill/ assets (resource type, resource, example scripts)
+# to the server with the `wmill` CLI, then seed the secret variable that sync
+# intentionally skips. Best-effort and idempotent: if the CLI isn't installed we
+# print how to do it by hand and move on — the installer never hard-depends on
+# node/npm. Args: $1 = admin bearer token, $2 = base URL, $3 = Host header.
+push_windmill_assets() {
+  local token="$1" base="$2" hh="$3" remote
+  if ! command -v wmill >/dev/null 2>&1; then
+    echo "→ Windmill assets not pushed: 'wmill' CLI not found."
+    echo "  Install it (npm install -g windmill-cli) then run:  make windmill-push"
+    return 0
+  fi
+  # The CLI talks to the workspace's public URL (it can't replay the Host-header
+  # trick the API calls use), so it relies on windmill.localhost resolving.
+  remote="${WM_BASE_URL:-http://windmill.localhost}"
+  echo "→ pushing windmill/ assets to $remote (workspace 'main')…"
+  # Register a CLI profile non-interactively with the admin token. Idempotent:
+  # re-adding an existing profile just refreshes it; ignore a benign failure.
+  ( cd windmill && wmill workspace add main main "$remote" --token "$token" >/dev/null 2>&1 ) || true
+  # Regenerate .script.yaml + lockfiles so new/edited scripts lock cleanly
+  # (needs the server, which is up here). Best-effort: don't block the push.
+  ( cd windmill && wmill generate-metadata >/dev/null 2>&1 ) || true
+  # Safety: `wmill sync push` mirrors local→remote and DELETES/ARCHIVES any
+  # remote item absent locally. Dry-run first and refuse if anything would be
+  # removed, so re-running the installer can't wipe assets built in the UI.
+  # Override deliberately with WMILL_FORCE_PUSH=1.
+  local esc dels
+  esc=$(printf '\033')
+  dels="$( ( cd windmill && wmill sync push --dry-run --yes 2>&1 ) \
+    | sed "s/${esc}\[[0-9;]*m//g" \
+    | grep -E '^- (folder|variable|resource|resource-type|script|flow|app|schedule|trigger|user|group|settings)( |$)' || true)"
+  if [ -n "$dels" ] && [ "${WMILL_FORCE_PUSH:-0}" != "1" ]; then
+    echo "⚠ Windmill push skipped — it would DELETE/ARCHIVE remote items not tracked in windmill/:"
+    printf '%s\n' "$dels" | sed 's/^/    /'
+    echo "  Bring them into the repo first:  make windmill-pull"
+    echo "  Or mirror anyway (destructive):  WMILL_FORCE_PUSH=1 ./install.sh …"
+    return 0
+  fi
+  if ( cd windmill && wmill sync push --yes >/dev/null 2>&1 ); then
+    echo "✓ pushed windmill/ assets (resource type, f/hermes/local, client.py, chat.py)"
+  else
+    echo "⚠ 'wmill sync push' failed — run it by hand from windmill/ (see README 'Push it')."
+    return 0
+  fi
+  # sync keeps secrets out of git (skipSecrets: true), so f/hermes/api_key is
+  # never pushed. Seed it server-side from API_SERVER_KEY so the resource works.
+  if [ -n "${API_KEY:-}" ]; then
+    local vp="f/hermes/api_key"
+    # create, else update if it already exists — keeps the value current on re-runs.
+    if curl -fsS -H "Host: $hh" -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
+         -X POST "$base/api/w/main/variables/create" \
+         -d "{\"path\":\"$vp\",\"value\":\"$API_KEY\",\"is_secret\":true,\"description\":\"Hermes gateway API_SERVER_KEY\"}" >/dev/null 2>&1; then
+      echo "✓ created secret variable $vp"
+    elif curl -fsS -H "Host: $hh" -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
+         -X POST "$base/api/w/main/variables/update/$vp" \
+         -d "{\"value\":\"$API_KEY\"}" >/dev/null 2>&1; then
+      echo "✓ updated secret variable $vp"
+    else
+      echo "⚠ couldn't set $vp — set it in the UI (Variables → $vp) to your API_SERVER_KEY."
+    fi
+  fi
+}
+
+# Prepare Windmill: ensure a 'main' workspace exists, push the tracked assets.
 #
 # Pre-installing the worker Python used to happen here, but that race is now
 # handled by the `windmill_cache_init` service in docker-compose.yml, which
@@ -225,6 +288,23 @@ setup_windmill() {
   else
     echo "⚠ couldn't create the Windmill 'main' workspace — create it in the UI before 'wmill sync push'."
   fi
+
+  # Ensure the runtime-state folder exists (create-or-no-op). Scripts store
+  # NON-secret Hermes state here (e.g. last-run timestamps). It is deliberately
+  # OUTSIDE wmill.yaml's sync scope, so a mirror push never deletes it and it is
+  # never versioned in the repo. See windmill/SYNC.md.
+  if curl -fsS -o /dev/null -H "Host: $hh" -H "Authorization: Bearer $token" \
+       "$base/api/w/main/folders/get/hermes_state" 2>/dev/null; then
+    echo "✓ Windmill folder f/hermes_state already exists"
+  elif curl -fsS -H "Host: $hh" -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
+         -X POST "$base/api/w/main/folders/create" -d '{"name":"hermes_state"}' >/dev/null 2>&1; then
+    echo "✓ created Windmill folder f/hermes_state (runtime state; not synced)"
+  else
+    echo "⚠ couldn't create f/hermes_state — create it in the UI (Folders → New) so scripts can store state."
+  fi
+
+  # Push the tracked windmill/ assets now that the workspace exists.
+  push_windmill_assets "$token" "$base" "$hh"
 
   # Connect Hermes to Windmill over MCP, so Windmill's scripts/flows AND its
   # management API become callable tools inside Hermes sessions. Needs a token

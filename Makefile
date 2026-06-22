@@ -27,7 +27,7 @@ else
   ON_WINDOWS :=
 endif
 
-.PHONY: help check init apikey secrets wizard secure fix-permissions pull up down restart logs ps health backup bootstrap lint validate ci headroom headroom-revert mlx mlx-revert mlx-status memory memory-revert hindsight-mlx hindsight-mlx-revert
+.PHONY: help check init apikey secrets wizard secure fix-permissions pull up down restart logs ps health backup bootstrap lint validate ci headroom headroom-revert mlx mlx-revert mlx-status memory memory-revert hindsight-mlx hindsight-mlx-revert windmill-push windmill-pull windmill-check
 
 # Fill an .env variable with a generated value when it is empty OR still set to a
 # known-weak default. Usage: $(call ensure_secret,VAR,GENERATOR,WEAK_DEFAULT)
@@ -264,6 +264,71 @@ lint: ## Ruff + py_compile the Windmill scripts (mirrors CI)
 	@find windmill -name '*.py' -exec python3 -m py_compile {} + && echo "✓ python syntax OK"
 
 ci: validate lint ## Run the same checks as GitHub Actions
+
+windmill-push: ## Push windmill/ assets (resource type, resource, scripts) to the server — needs the wmill CLI
+	@command -v wmill >/dev/null || { echo "✗ 'wmill' CLI not found — npm install -g windmill-cli"; exit 1; }
+	@set -a; . ./$(ENV_FILE) 2>/dev/null; set +a; \
+	  remote="$${WM_BASE_URL:-http://windmill.localhost}"; \
+	  base="http://127.0.0.1:$${CADDY_HTTP_PORT:-80}"; hh="windmill.localhost"; \
+	  token=$$(curl -fsS -H "Host: $$hh" -H 'Content-Type: application/json' -X POST "$$base/api/auth/login" \
+	    -d '{"email":"admin@windmill.dev","password":"changeme"}' 2>/dev/null | tr -d '"'); \
+	  if [ -n "$$token" ]; then (cd windmill && wmill workspace add main main "$$remote" --token "$$token" >/dev/null 2>&1) || true; \
+	  else echo "→ default admin login failed — relying on your existing wmill profile (run 'wmill workspace add' once if none)"; fi; \
+	  (cd windmill && wmill generate-metadata >/dev/null 2>&1) || true; \
+	  esc=$$(printf '\033'); \
+	  dels="$$( (cd windmill && wmill sync push --dry-run --yes 2>&1) | sed "s/$${esc}\[[0-9;]*m//g" \
+	    | grep -E '^- (folder|variable|resource|resource-type|script|flow|app|schedule|trigger|user|group|settings)( |$$)' || true)"; \
+	  if [ -n "$$dels" ] && [ "$(FORCE)" != "1" ]; then \
+	    echo "✗ push aborted — it would DELETE/ARCHIVE remote items not tracked in windmill/:"; \
+	    printf '%s\n' "$$dels" | sed 's/^/    /'; \
+	    echo "  Reconcile:  make windmill-pull         (bring them into the repo first)"; \
+	    echo "  Or force:   make windmill-push FORCE=1 (destructive mirror)"; \
+	    exit 1; \
+	  fi; \
+	  (cd windmill && wmill sync push --yes) || { echo "✗ wmill sync push failed"; exit 1; }; \
+	  echo "✓ pushed windmill/ assets"; \
+	  if [ -n "$$token" ] && [ -n "$${API_SERVER_KEY:-}" ]; then \
+	    vp="f/hermes/api_key"; \
+	    if curl -fsS -H "Host: $$hh" -H "Authorization: Bearer $$token" -H 'Content-Type: application/json' \
+	         -X POST "$$base/api/w/main/variables/create" \
+	         -d "{\"path\":\"$$vp\",\"value\":\"$$API_SERVER_KEY\",\"is_secret\":true}" >/dev/null 2>&1; then \
+	      echo "✓ created secret variable $$vp"; \
+	    elif curl -fsS -H "Host: $$hh" -H "Authorization: Bearer $$token" -H 'Content-Type: application/json' \
+	         -X POST "$$base/api/w/main/variables/update/$$vp" -d "{\"value\":\"$$API_SERVER_KEY\"}" >/dev/null 2>&1; then \
+	      echo "✓ updated secret variable $$vp"; \
+	    else echo "⚠ couldn't set $$vp — set it in the UI (Variables → $$vp)"; fi; \
+	  fi
+
+windmill-pull: ## Pull windmill/ assets FROM the server into the repo for version control — needs the wmill CLI
+	@command -v wmill >/dev/null || { echo "✗ 'wmill' CLI not found — npm install -g windmill-cli"; exit 1; }
+	@set -a; . ./$(ENV_FILE) 2>/dev/null; set +a; \
+	  remote="$${WM_BASE_URL:-http://windmill.localhost}"; \
+	  base="http://127.0.0.1:$${CADDY_HTTP_PORT:-80}"; hh="windmill.localhost"; \
+	  token=$$(curl -fsS -H "Host: $$hh" -H 'Content-Type: application/json' -X POST "$$base/api/auth/login" \
+	    -d '{"email":"admin@windmill.dev","password":"changeme"}' 2>/dev/null | tr -d '"'); \
+	  if [ -n "$$token" ]; then (cd windmill && wmill workspace add main main "$$remote" --token "$$token" >/dev/null 2>&1) || true; fi; \
+	  (cd windmill && wmill sync pull --yes) || { echo "✗ wmill sync pull failed"; exit 1; }; \
+	  echo "✓ pulled windmill/ assets into windmill/ — review 'git diff' before committing"; \
+	  echo "  skipSecrets keeps secret values out of YAML — only placeholders are written."
+
+windmill-check: ## Report whether the live Windmill server has drifted from windmill/ in git (needs the wmill CLI + running server)
+	@command -v wmill >/dev/null || { echo "✗ 'wmill' CLI not found — npm install -g windmill-cli"; exit 1; }
+	@git diff --quiet -- windmill/ && git diff --cached --quiet -- windmill/ \
+	  || { echo "✗ windmill/ has uncommitted changes — commit or stash them first so the check can revert cleanly"; exit 1; }
+	@set -a; . ./$(ENV_FILE) 2>/dev/null; set +a; \
+	  remote="$${WM_BASE_URL:-http://windmill.localhost}"; \
+	  base="http://127.0.0.1:$${CADDY_HTTP_PORT:-80}"; hh="windmill.localhost"; \
+	  token=$$(curl -fsS -H "Host: $$hh" -H 'Content-Type: application/json' -X POST "$$base/api/auth/login" \
+	    -d '{"email":"admin@windmill.dev","password":"changeme"}' 2>/dev/null | tr -d '"'); \
+	  if [ -n "$$token" ]; then (cd windmill && wmill workspace add main main "$$remote" --token "$$token" >/dev/null 2>&1) || true; fi; \
+	  (cd windmill && wmill sync pull --yes >/dev/null 2>&1) || { echo "✗ wmill sync pull failed (is the server running?)"; git checkout -- windmill/; exit 1; }; \
+	  if git diff --quiet -- windmill/; then \
+	    echo "✓ windmill/ is in sync with the server"; rc=0; \
+	  else \
+	    echo "✗ DRIFT: the server differs from windmill/ in git —"; git --no-pager diff --stat -- windmill/; \
+	    echo "  Run 'make windmill-pull' to bring changes into the repo, or 'make windmill-push' to overwrite the server."; rc=1; \
+	  fi; \
+	  git checkout -- windmill/; exit $$rc
 
 backup: ## Snapshot Postgres (Windmill + Hindsight) + the Hermes data dir into ./backups/
 	@mkdir -p backups

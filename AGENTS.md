@@ -88,6 +88,38 @@ start / flags) and `INSTALL.md` (flag table + step description).
 
 ---
 
+## Windmill assets & sync conventions
+
+`wmill sync` is a **mirror** (`push` makes the server match the repo and
+**deletes/archives** anything in scope that isn't tracked). Scope is set by
+`includes` in `windmill/wmill.yaml` and is deliberately narrow:
+`f/hermes/**` + the `hermes_endpoint` resource-type. Full breakdown in
+[`windmill/SYNC.md`](windmill/SYNC.md). When you author or generate a Windmill
+script, follow these rules so a push can never wipe data:
+
+- **Code/config that must be versioned → `f/hermes/`.** This is the only synced
+  folder. Commit it; it round-trips via `make windmill-push` / `make windmill-pull`.
+- **Non-secret runtime state → `f/hermes_state/`, never `f/hermes/`.** Any
+  variable a script *writes at runtime* — last-run timestamps, cursors, sync
+  markers, paging state — goes under `f/hermes_state/` (e.g.
+  `f/hermes_state/<thing>_last_run`). That folder is **outside sync scope**, so it
+  is never versioned and a mirror push never deletes it. The installers
+  create-or-no-op `f/hermes_state`. Putting state in `f/hermes/` is a bug: the
+  next push deletes it (this is exactly how `f/hermes/karakeep_last_run` was lost).
+- **Secrets → a secret variable, value set server-side.** Never write a real key
+  into a tracked file; `skipSecrets: true` keeps secret variables out of sync
+  entirely (see the secrets section above). The placeholder
+  `f/hermes/api_key.variable.yaml` is the pattern.
+- **Everything else (`u/*`, other `f/*` folders) is out of scope by design.** If a
+  script provisions, say, a `u/hermes` service user, that is a runtime/admin
+  action — do **not** add it to `includes` or expect sync to manage it.
+- **Don't widen `includes` casually.** Narrow scope is the safety mechanism; a
+  push's blast radius is whatever `includes` covers. Track folder permissions by
+  committing each in-scope folder's `folder.meta.yaml` (generate with
+  `wmill folder add-missing`) so pushes don't strip them.
+
+---
+
 ## Optional features = compose overrides, not edits to the base file
 
 Optional capabilities are layered with an override file toggled via `COMPOSE_FILE`
