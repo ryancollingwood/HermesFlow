@@ -1,3 +1,6 @@
+description: Local Hermes gateway (OpenAI-compatible API)
+format_extension: null
+is_fileset: false
 schema:
   $schema: https://json-schema.org/draft/2020-12/schema
   type: object
@@ -5,14 +8,13 @@ schema:
     - base_url
     - api_key
   properties:
+    api_key:
+      type: string
+      description: Hermes gateway API_SERVER_KEY
     base_url:
       type: string
       description: Base URL of the OpenAI-compatible endpoint
       default: http://hermes:8642/v1
-    api_key:
-      type: string
-      description: Hermes gateway API_SERVER_KEY
   required:
     - base_url
     - api_key
-description: Local Hermes gateway (OpenAI-compatible API)
