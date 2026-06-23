@@ -67,6 +67,7 @@ preview exactly what an install would do:
 | `--api-key <key>` | from `$OPENROUTER_API_KEY` etc. | Provider API key. Falls back to the matching environment variable. |
 | `--model <id>` | provider default (`openai/gpt-4o-mini` for OpenRouter) | Model Hermes defaults to. |
 | `--no-pull` | off | Skip `docker compose pull` (use already-pulled images). |
+| `--no-build` | off | Skip building the local Hermes image (use only if it's already built). |
 | `--skip-model-check` | off | Don't validate the model against the provider's `/models` list. |
 | `--no-memory` | off | Don't enable the Hindsight memory provider. |
 | `--no-windmill` | off | Don't pre-install the Windmill worker Python, create the workspace, or wire up MCP. |
@@ -148,9 +149,12 @@ allow-list together — a channel is never configured with a token but no
 allow-list, so the bot is never left open. On a re-run with the stack already up,
 Hermes is restarted to pick up the new channel.
 
-### 8. Pull images and start the stack
-`docker compose pull` (unless `--no-pull`) then `docker compose up -d`, then waits
-for the `hermes` container to pass its healthcheck.
+### 8. Pull images, build the Hermes image, and start the stack
+`docker compose pull --ignore-buildable` (unless `--no-pull`), then
+`docker compose build hermes` (unless `--no-build`) to bake the extra Python
+packages from `hermes/requirements.txt` into the image, then `docker compose up -d`,
+then waits for the `hermes` container to pass its healthcheck. See
+[hermes/README.md](hermes/README.md) for what the build does and why.
 
 ### 9. Set the default model and probe
 Sets `model.default` (the image seeds an invalid default on OpenRouter), then

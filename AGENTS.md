@@ -292,6 +292,32 @@ documented operational reason.
 
 ---
 
+## Adding Python packages for Hermes
+
+Hermes does **not** run the upstream image directly — it runs a thin derived
+image built from `hermes/Dockerfile` (the `hermes` service uses `build:`). This
+exists because the upstream `nousresearch/hermes-agent` image disables runtime
+lazy installs (`HERMES_DISABLE_LAZY_INSTALLS=1`) **and** ships a read-only,
+root-owned venv, so the agent cannot pip-install at runtime — by design, to stop
+a prompt-injected session from self-modifying its own venv.
+
+To add a package:
+
+1. Find its **exact pinned spec** in Hermes' `LAZY_DEPS` allowlist:
+   `docker exec hermes grep -n -B2 '<package>' /opt/hermes/tools/lazy_deps.py`.
+2. Add that spec to `hermes/requirements.txt` (it's baked into the venv at build
+   time, then the venv is re-locked — runtime privilege is unchanged).
+3. Redeploy: `docker compose build hermes && docker compose up -d hermes`.
+
+The pin **must** match `LAZY_DEPS` so `ensure()` treats the feature as already
+satisfied and never reaches the disabled install path. **Never** unset the
+disable flag, chown/chmod the venv writable, or add a writable `PYTHONPATH`
+dir — all weaken the security model. CI (`.github/workflows/hermes-image.yml`,
+path-filtered to `hermes/**`) builds the image to validate every pin resolves.
+Full rationale: `hermes/README.md`.
+
+---
+
 ## Observability reference
 
 | What | Where |

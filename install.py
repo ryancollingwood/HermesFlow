@@ -20,7 +20,7 @@ What it does (mirrors install.sh / `make bootstrap`, minus the TTY wizard):
     5.  generate every required secret (API_SERVER_KEY, WM_DB_PASSWORD, HINDSIGHT_DB_PASSWORD)
     6.  create data dirs (+ fix ownership on POSIX)
     7.  write the provider key into <DATA_DIR>/.env — the file Hermes reads
-    8.  pull images + start the stack
+    8.  pull images, build the local Hermes image, + start the stack
     9.  set the default model and probe Hermes end-to-end
     10. pull Hindsight's Ollama models + enable it as the memory provider (--no-memory)
     11. prep Windmill: pre-install the worker Python, create the 'main' workspace,
@@ -529,6 +529,8 @@ def main() -> None:
     ap.add_argument("--api-key", default="")
     ap.add_argument("--model", default="")
     ap.add_argument("--no-pull", action="store_true", help="skip 'docker compose pull'")
+    ap.add_argument("--no-build", action="store_true",
+                    help="skip building the local Hermes image (use only if already built)")
     ap.add_argument("--skip-model-check", action="store_true")
     ap.add_argument("--no-memory", action="store_true")
     ap.add_argument("--no-windmill", action="store_true")
@@ -647,7 +649,7 @@ def main() -> None:
             f"Discord: {'configured' if dc_token else 'none'}")
         if args.env:
             say(f"  Extra .env:      {' '.join(args.env)}")
-        steps = (["pull"] if not args.no_pull else []) + ["up", "set-model", "probe"]
+        steps = (["pull"] if not args.no_pull else []) + (["build"] if not args.no_build else []) + ["up", "set-model", "probe"]
         steps += (["memory"] if not args.no_memory else []) + (["windmill"] if not args.no_windmill else [])
         steps += (["mlx"] if args.with_mlx else []) + (["headroom"] if args.with_headroom else [])
         say(f"  Steps:           {' → '.join(steps)}")
@@ -782,10 +784,13 @@ def main() -> None:
         if out(["docker", "inspect", "-f", "{{.State.Running}}", "hermes"]) == "true":
             run(["docker", "restart", "hermes"])
 
-    # 8. pull + up
+    # 8. pull + build + up
     if not args.no_pull:
         say(f"{ARROW} pulling images…")
-        run(["docker", "compose", "pull"], quiet=False)
+        run(["docker", "compose", "pull", "--ignore-buildable"], quiet=False)
+    if not args.no_build:
+        say(f"{ARROW} building the local Hermes image…")
+        run(["docker", "compose", "build", "hermes"], quiet=False)
     say(f"{ARROW} starting the stack…")
     run(["docker", "compose", "up", "-d"], quiet=False)
     wait_hermes_healthy()

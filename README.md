@@ -17,6 +17,7 @@ with the Windmill side pre-wired to call Hermes as an OpenAI-compatible endpoint
 | `Makefile` | `bootstrap`, lifecycle, health, backups, key generation |
 | `windmill/` | wmill-syncable resource type, resource, secret, and example scripts |
 | `mlx/` | Host-native MLX inference server for Apple Silicon (setup + launch script) |
+| `hermes/` | Thin derived Hermes image — bakes extra Python packages into the venv ([how & why](hermes/README.md)) |
 
 ## Architecture
 

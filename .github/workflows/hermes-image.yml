@@ -1,0 +1,29 @@
+name: Hermes image
+
+# Build the thin derived Hermes image whenever its inputs change, to prove the
+# base layer pulls and every pin in hermes/requirements.txt resolves against the
+# venv. Validation only — nothing is published. The host still deploys with
+# `docker compose build hermes`. See hermes/README.md.
+on:
+  push:
+    paths:
+      - 'hermes/**'
+      - '.github/workflows/hermes-image.yml'
+  pull_request:
+    paths:
+      - 'hermes/**'
+      - '.github/workflows/hermes-image.yml'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build derived Hermes image (validation only)
+        uses: docker/build-push-action@v6
+        with:
+          context: ./hermes
+          push: false
+          build-args: |
+            HERMES_VERSION=latest
+          tags: hermesflow/hermes:ci
