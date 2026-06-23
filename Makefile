@@ -154,6 +154,14 @@ health: ## Probe Hermes /health and Windmill /api/version
 	  echo -n "Hermes:   "; curl -fsS "http://127.0.0.1:$${API_SERVER_PORT:-8642}/health" || echo "unreachable"; echo; \
 	  echo -n "Windmill: "; curl -fsS -H "Host: windmill.localhost" "http://127.0.0.1:$${CADDY_HTTP_PORT:-80}/api/version" || echo "unreachable"; echo
 
+hermes-pkg: ## Install a pure-Python package for Hermes tools without unlocking the venv (PKG=firecrawl-py==4.17.0)
+	@test -n "$(PKG)" || { echo "Usage: make hermes-pkg PKG=firecrawl-py==4.17.0"; exit 1; }
+	@docker exec hermes mkdir -p /opt/data/.hermes-extras
+	@docker exec hermes uv pip install --python /opt/hermes/.venv/bin/python \
+	  --target /opt/data/.hermes-extras "$(PKG)"
+	@$(COMPOSE) restart hermes
+	@echo "✓ $(PKG) installed to /opt/data/.hermes-extras (importable via PYTHONPATH)"
+
 headroom: ## Route Hermes through the Headroom context-compression proxy
 	@docker exec hermes hermes config set model.provider custom
 	@docker exec hermes hermes config set model.base_url http://headroom:8787/v1

@@ -121,6 +121,13 @@ services:
       - HINDSIGHT_API_KEY=${HINDSIGHT_API_KEY:-}
       - HINDSIGHT_BASE_URL=${HINDSIGHT_BASE_URL:-http://hindsight:8888}
       - HINDSIGHT_API_URL=${HINDSIGHT_BASE_URL:-http://hindsight:8888}
+      # /opt/hermes (incl. the venv) is read-only and HERMES_DISABLE_LAZY_INSTALLS=1
+      # blocks runtime `pip install` by design — both are intentional hardening
+      # against a prompt-injected install. This adds a writable, pure-Python
+      # import path on the /opt/data bind mount so optional tool deps (e.g.
+      # firecrawl-py) can be added with `make hermes-pkg PKG=...` without
+      # loosening either control. Empty/missing dir is a harmless no-op.
+      - PYTHONPATH=/opt/data/.hermes-extras
     volumes:
       - ${DATA_DIR:-./data/hermes}:/opt/data
       - ${SHARED_DIR:-./data/shared}:/shared

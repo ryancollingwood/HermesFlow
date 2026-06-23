@@ -759,6 +759,7 @@ Gotchas (all enforced by Windmill):
 | `make secrets` | Generate every required secret (`API_SERVER_KEY`, `WM_DB_PASSWORD`, `HINDSIGHT_DB_PASSWORD`, `GRAFANA_ADMIN_PASSWORD`) that's blank or a weak default |
 | `make backup` | `pg_dump` of Windmill + Hindsight Postgres, tar of Hermes `/opt/data` → `./backups/` |
 | `make pull` | Pull latest images |
+| `make hermes-pkg PKG=...` | Install a pure-Python package for Hermes tools (e.g. `firecrawl-py`) into the writable extras dir — see [Troubleshooting](#troubleshooting) |
 
 ## Security notes
 
@@ -816,6 +817,19 @@ Gotchas (all enforced by Windmill):
 - **`savings_percent` stays 0** — expected for the first few requests while
   Headroom calibrates. Check `/v1/compress` with a test payload to confirm
   compression is active.
+- **Hermes tool needs a package that isn't in the image (e.g. `firecrawl-py`
+  for `web.backend: firecrawl`) and lazy install fails with "Permission
+  denied"** — this is intentional, two-layered hardening: the image sets
+  `HERMES_DISABLE_LAZY_INSTALLS=1` and ships `/opt/hermes` (including the
+  venv) read-only, so a prompt-injected `pip install` can't land malicious
+  code in the gateway. Don't unset the env var or `chown` the venv to work
+  around this — that disables the protection for every package, not just the
+  one you need. Instead install the package into the writable `/opt/data`
+  bind mount, which is already on `PYTHONPATH` (`docker-compose.yml`):
+  `make hermes-pkg PKG=firecrawl-py==4.17.0`. This only works for pure-Python
+  packages (no compiled extensions, no console-script entry points), since
+  it's a `--target` install outside the venv's own package metadata — fine
+  for `firecrawl-py`.
 
 ## CI
 
