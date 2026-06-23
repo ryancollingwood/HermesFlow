@@ -76,7 +76,14 @@ services:
   #  No `init:` — the image runs s6-overlay as PID 1 (reaps + forwards signals).
   # ---------------------------------------------------------------------------
   hermes:
-    image: nousresearch/hermes-agent:${HERMES_VERSION:-latest}
+    # Thin derived image: bakes extra Python packages (hermes/requirements.txt)
+    # into the upstream image's read-only venv at build time. See hermes/README.md.
+    # Deploy package changes with: docker compose build hermes && docker compose up -d hermes
+    build:
+      context: ./hermes
+      args:
+        HERMES_VERSION: ${HERMES_VERSION:-latest}
+    image: hermesflow/hermes:${HERMES_VERSION:-latest}
     container_name: hermes
     restart: unless-stopped
     depends_on:

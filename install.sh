@@ -30,7 +30,7 @@
 #    6. create data dirs + fix ownership (make init)
 #    7. write the provider key into <DATA_DIR>/.env — the file Hermes reads,
 #       the same one the wizard would produce
-#    8. pull images + start the stack
+#    8. pull images, build the local Hermes image, + start the stack
 #    9. set the default model and probe Hermes end-to-end
 #   10. pull Hindsight's Ollama models + enable it as the memory provider
 #       (--no-memory to skip)
@@ -55,6 +55,8 @@
 #    --hindsight-api-key <key>             bearer token protecting the Hindsight API
 #
 #  Other optional channels / toggles:
+#    --no-build                            skip building the local Hermes image
+#                                          (use only if it's already built)
 #    --discord-bot-token <token>           Discord bot token (needs allowed-users)
 #    --discord-allowed-users <id,id,...>   Discord user IDs allowed to use the bot
 #    --with-headroom                       route Hermes through the Headroom proxy
@@ -71,6 +73,7 @@ PROVIDER="openrouter"
 API_KEY=""
 MODEL=""
 DO_PULL=1
+DO_BUILD=1
 CHECK_MODEL=1
 WITH_MEMORY=1
 WITH_WINDMILL=1
@@ -398,6 +401,7 @@ while [ $# -gt 0 ]; do
     --api-key)  API_KEY="$2";  shift 2 ;;
     --model)    MODEL="$2";    shift 2 ;;
     --no-pull)  DO_PULL=0;     shift ;;
+    --no-build) DO_BUILD=0;    shift ;;
     --skip-model-check) CHECK_MODEL=0; shift ;;
     --no-memory) WITH_MEMORY=0; shift ;;
     --no-windmill) WITH_WINDMILL=0; shift ;;
@@ -498,7 +502,7 @@ if [ "$DRY_RUN" -eq 1 ]; then
   echo "  MLX server:      $(yn $WITH_MLX)    Headroom: $(yn $WITH_HEADROOM)    GPU passthrough: $(yn $GPU)    LAN bind: $(yn $BIND_LAN)"
   echo "  Telegram:        $([ -n "$TG_TOKEN" ] && echo configured || echo none)    Discord: $([ -n "$DISCORD_TOKEN" ] && echo configured || echo none)"
   [ "${#EXTRA_ENV[@]}" -gt 0 ] && echo "  Extra .env:      ${EXTRA_ENV[*]}"
-  echo "  Steps:           $([ "$DO_PULL" -eq 1 ] && echo 'pull → ')up → set-model → probe$([ "$WITH_MEMORY" -eq 1 ] && echo ' → memory')$([ "$WITH_WINDMILL" -eq 1 ] && echo ' → windmill')$([ "$WITH_MLX" -eq 1 ] && echo ' → mlx')$([ "$WITH_HEADROOM" -eq 1 ] && echo ' → headroom')"
+  echo "  Steps:           $([ "$DO_PULL" -eq 1 ] && echo 'pull → ')$([ "$DO_BUILD" -eq 1 ] && echo 'build → ')up → set-model → probe$([ "$WITH_MEMORY" -eq 1 ] && echo ' → memory')$([ "$WITH_WINDMILL" -eq 1 ] && echo ' → windmill')$([ "$WITH_MLX" -eq 1 ] && echo ' → mlx')$([ "$WITH_HEADROOM" -eq 1 ] && echo ' → headroom')"
   echo
   echo "Re-run without --dry-run to apply."
   exit 0
@@ -643,8 +647,9 @@ if [ -n "$DISCORD_TOKEN" ]; then
   fi
 fi
 
-# ── 7. pull + up ─────────────────────────────────────────────────────────────
+# ── 7. pull + build + up ─────────────────────────────────────────────────────
 [ "$DO_PULL" -eq 1 ] && make --no-print-directory pull
+[ "$DO_BUILD" -eq 1 ] && make --no-print-directory build
 make --no-print-directory up
 wait_hermes_healthy
 

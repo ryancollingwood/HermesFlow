@@ -27,7 +27,7 @@ else
   ON_WINDOWS :=
 endif
 
-.PHONY: help check init apikey secrets wizard secure fix-permissions pull up down restart logs ps health backup bootstrap lint validate ci headroom headroom-revert mlx mlx-revert mlx-status memory memory-revert hindsight-mlx hindsight-mlx-revert windmill-push windmill-pull windmill-check
+.PHONY: help check init apikey secrets wizard secure fix-permissions pull build up down restart logs ps health backup bootstrap lint validate ci headroom headroom-revert mlx mlx-revert mlx-status memory memory-revert hindsight-mlx hindsight-mlx-revert windmill-push windmill-pull windmill-check
 
 # Fill an .env variable with a generated value when it is empty OR still set to a
 # known-weak default. Usage: $(call ensure_secret,VAR,GENERATOR,WEAK_DEFAULT)
@@ -130,8 +130,11 @@ fix-permissions: ## Chown bind-mount dirs to HERMES_UID:HERMES_GID so containers
 	    sh -c "chown -R $$UID_VAL:$$GID_VAL /mnt/data /mnt/shared /mnt/wm /mnt/wm_lsp /mnt/caddy_data /mnt/caddy_config && chmod -R u+rwX /mnt/data /mnt/shared /mnt/wm /mnt/wm_lsp /mnt/caddy_data /mnt/caddy_config"; \
 	  echo "✓ ownership corrected"
 
-pull: ## Pull the latest images
-	@$(COMPOSE) pull
+pull: ## Pull the latest images (skips the locally-built Hermes image)
+	@$(COMPOSE) pull --ignore-buildable
+
+build: ## Build the local Hermes image (bakes in hermes/requirements.txt packages)
+	@$(COMPOSE) build hermes
 
 up: ## Start the stack (detached)
 	@$(COMPOSE) up -d
@@ -342,7 +345,7 @@ backup: ## Snapshot Postgres (Windmill + Hindsight) + the Hermes data dir into .
 	  tar czf "backups/hermes-$$STAMP.tar.gz" -C "$${DATA_DIR:-$$HOME/.hermes/data}" . ; \
 	  echo "✓ wrote backups/windmill-$$STAMP.sql.gz, backups/hindsight-$$STAMP.sql.gz, and backups/hermes-$$STAMP.tar.gz"
 
-bootstrap: ## One-shot: check → init → secrets → wizard → secure → pull → up → health
+bootstrap: ## One-shot: check → init → secrets → wizard → secure → pull → build → up → health
 	@$(MAKE) init
 	@$(MAKE) secrets
 	@echo
@@ -351,6 +354,7 @@ bootstrap: ## One-shot: check → init → secrets → wizard → secure → pul
 	@$(MAKE) wizard
 	@$(MAKE) secure
 	@$(MAKE) pull
+	@$(MAKE) build
 	@$(MAKE) up
 	@sleep 8
 	@$(MAKE) health
