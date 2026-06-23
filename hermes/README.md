@@ -113,3 +113,39 @@ package that fails to resolve is caught on push / PR.
 
 All of the above either weaken the security model or break the `LAZY_DEPS`
 no-op behaviour. Baking pinned packages at build time is the supported path.
+
+## Troubleshooting: stray package overlays (`hermes-heal`)
+
+A Hermes **agent session** can't edit this Dockerfile or `docker-compose.yml`
+from inside the container — its only writable lever is `/opt/data` (its home).
+If it ever decides it needs a package, it may "self-heal" by installing into a
+writable overlay (e.g. `/opt/data/.hermes-extras`) and adding
+`PYTHONPATH=/opt/data/.hermes-extras` to `/opt/data/.env`.
+
+**This is drift, not a fix, and it's actively harmful.** A `PYTHONPATH` directory
+sorts at `sys.path[0]`, *ahead* of the venv, so its packages **shadow** the
+venv's — including pinned, CVE-patched core dependencies. (Observed in practice:
+an overlay's `aiohttp 3.14.1` shadowing the venv's CVE-pinned `aiohttp 3.13.4`.)
+The `.env` edit lives in the bind-mounted data dir, so it **survives restarts**.
+
+The baked venv is the single source of truth, so the overlay is also redundant.
+Deployments neutralize this drift automatically:
+
+```bash
+make hermes-heal     # idempotent: removes /opt/data/.hermes-extras,
+                     # strips the PYTHONPATH line from /opt/data/.env
+                     # (backup .env.bak), and restarts hermes if it changed
+```
+
+`make bootstrap` runs this after `up`, and both installers run it too. Run it
+ad-hoc any time you suspect overlay drift; on a clean stack it's a no-op. Verify
+imports resolve from the venv (not the overlay):
+
+```bash
+docker exec -u hermes hermes /opt/hermes/.venv/bin/python -c \
+  "import firecrawl, aiohttp; print(firecrawl.__file__); print('aiohttp', aiohttp.__version__)"
+# firecrawl path under /opt/hermes/.venv/...  (NOT /opt/data); aiohttp 3.13.4
+```
+
+If the agent genuinely needs a new package, add it to `requirements.txt` and
+rebuild (above) — never via an overlay.
