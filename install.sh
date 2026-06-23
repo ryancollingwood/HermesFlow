@@ -502,7 +502,7 @@ if [ "$DRY_RUN" -eq 1 ]; then
   echo "  MLX server:      $(yn $WITH_MLX)    Headroom: $(yn $WITH_HEADROOM)    GPU passthrough: $(yn $GPU)    LAN bind: $(yn $BIND_LAN)"
   echo "  Telegram:        $([ -n "$TG_TOKEN" ] && echo configured || echo none)    Discord: $([ -n "$DISCORD_TOKEN" ] && echo configured || echo none)"
   [ "${#EXTRA_ENV[@]}" -gt 0 ] && echo "  Extra .env:      ${EXTRA_ENV[*]}"
-  echo "  Steps:           $([ "$DO_PULL" -eq 1 ] && echo 'pull → ')$([ "$DO_BUILD" -eq 1 ] && echo 'build → ')up → set-model → probe$([ "$WITH_MEMORY" -eq 1 ] && echo ' → memory')$([ "$WITH_WINDMILL" -eq 1 ] && echo ' → windmill')$([ "$WITH_MLX" -eq 1 ] && echo ' → mlx')$([ "$WITH_HEADROOM" -eq 1 ] && echo ' → headroom')"
+  echo "  Steps:           $([ "$DO_PULL" -eq 1 ] && echo 'pull → ')$([ "$DO_BUILD" -eq 1 ] && echo 'build → ')up → heal → set-model → probe$([ "$WITH_MEMORY" -eq 1 ] && echo ' → memory')$([ "$WITH_WINDMILL" -eq 1 ] && echo ' → windmill')$([ "$WITH_MLX" -eq 1 ] && echo ' → mlx')$([ "$WITH_HEADROOM" -eq 1 ] && echo ' → headroom')"
   echo
   echo "Re-run without --dry-run to apply."
   exit 0
@@ -651,6 +651,9 @@ fi
 [ "$DO_PULL" -eq 1 ] && make --no-print-directory pull
 [ "$DO_BUILD" -eq 1 ] && make --no-print-directory build
 make --no-print-directory up
+# Neutralize any stray agent-installed package overlay + PYTHONPATH drift so the
+# baked venv stays authoritative (idempotent; no-op on a clean install).
+make --no-print-directory hermes-heal
 wait_hermes_healthy
 
 # ── 8. set a valid default model + end-to-end probe ──────────────────────────

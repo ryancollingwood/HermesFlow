@@ -27,7 +27,7 @@ else
   ON_WINDOWS :=
 endif
 
-.PHONY: help check init apikey secrets wizard secure fix-permissions pull build up down restart logs ps health backup bootstrap lint validate ci headroom headroom-revert mlx mlx-revert mlx-status memory memory-revert hindsight-mlx hindsight-mlx-revert windmill-push windmill-pull windmill-check
+.PHONY: help check init apikey secrets wizard secure fix-permissions pull build up down restart logs ps health backup bootstrap hermes-heal lint validate ci headroom headroom-revert mlx mlx-revert mlx-status memory memory-revert hindsight-mlx hindsight-mlx-revert windmill-push windmill-pull windmill-check
 
 # Fill an .env variable with a generated value when it is empty OR still set to a
 # known-weak default. Usage: $(call ensure_secret,VAR,GENERATOR,WEAK_DEFAULT)
@@ -135,6 +135,21 @@ pull: ## Pull the latest images (skips the locally-built Hermes image)
 
 build: ## Build the local Hermes image (bakes in hermes/requirements.txt packages)
 	@$(COMPOSE) build hermes
+
+hermes-heal: ## Remove stray agent-installed package overlay + PYTHONPATH drift (idempotent)
+	@docker ps --format '{{.Names}}' | grep -qx hermes || { \
+	  echo "✗ hermes not running — 'make up' first"; exit 1; }
+	@changed=0; \
+	if docker exec hermes test -e /opt/data/.hermes-extras 2>/dev/null; then \
+	  echo "→ removing redundant overlay /opt/data/.hermes-extras (firecrawl is in the venv)"; \
+	  docker exec hermes rm -rf /opt/data/.hermes-extras; changed=1; fi; \
+	if docker exec hermes sh -c 'grep -qE "^PYTHONPATH=.*hermes-extras" /opt/data/.env 2>/dev/null'; then \
+	  echo "→ stripping PYTHONPATH drift from /opt/data/.env (backup: .env.bak)"; \
+	  docker exec hermes sh -c 'cp /opt/data/.env /opt/data/.env.bak && grep -vE "^PYTHONPATH=.*hermes-extras" /opt/data/.env.bak > /opt/data/.env'; changed=1; fi; \
+	if [ "$$changed" = 1 ]; then \
+	  echo "→ restarting hermes to apply"; $(COMPOSE) restart hermes >/dev/null; \
+	  echo "✓ drift neutralized — venv is authoritative"; \
+	else echo "✓ no overlay drift (venv is authoritative)"; fi
 
 up: ## Start the stack (detached)
 	@$(COMPOSE) up -d
@@ -345,7 +360,7 @@ backup: ## Snapshot Postgres (Windmill + Hindsight) + the Hermes data dir into .
 	  tar czf "backups/hermes-$$STAMP.tar.gz" -C "$${DATA_DIR:-$$HOME/.hermes/data}" . ; \
 	  echo "✓ wrote backups/windmill-$$STAMP.sql.gz, backups/hindsight-$$STAMP.sql.gz, and backups/hermes-$$STAMP.tar.gz"
 
-bootstrap: ## One-shot: check → init → secrets → wizard → secure → pull → build → up → health
+bootstrap: ## One-shot: check → init → secrets → wizard → secure → pull → build → up → heal → health
 	@$(MAKE) init
 	@$(MAKE) secrets
 	@echo
@@ -356,6 +371,7 @@ bootstrap: ## One-shot: check → init → secrets → wizard → secure → pul
 	@$(MAKE) pull
 	@$(MAKE) build
 	@$(MAKE) up
+	@$(MAKE) hermes-heal
 	@sleep 8
 	@$(MAKE) health
 	@echo

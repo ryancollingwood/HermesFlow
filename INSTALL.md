@@ -152,8 +152,10 @@ Hermes is restarted to pick up the new channel.
 ### 8. Pull images, build the Hermes image, and start the stack
 `docker compose pull --ignore-buildable` (unless `--no-pull`), then
 `docker compose build hermes` (unless `--no-build`) to bake the extra Python
-packages from `hermes/requirements.txt` into the image, then `docker compose up -d`,
-then waits for the `hermes` container to pass its healthcheck. See
+packages from `hermes/requirements.txt` into the image, then `docker compose up -d`.
+It then runs `make hermes-heal` — idempotent cleanup that removes any stray
+agent-installed package overlay + `PYTHONPATH` drift so the baked venv stays
+authoritative — and waits for the `hermes` container to pass its healthcheck. See
 [hermes/README.md](hermes/README.md) for what the build does and why.
 
 ### 9. Set the default model and probe

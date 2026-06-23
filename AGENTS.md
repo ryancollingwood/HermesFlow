@@ -316,6 +316,14 @@ dir — all weaken the security model. CI (`.github/workflows/hermes-image.yml`,
 path-filtered to `hermes/**`) builds the image to validate every pin resolves.
 Full rationale: `hermes/README.md`.
 
+**Invariant — the baked venv is the single source of truth.** A `PYTHONPATH`
+overlay under `/opt/data` (e.g. `/opt/data/.hermes-extras`, plus a `PYTHONPATH=`
+line a self-healing agent session may write into `/opt/data/.env`) is **drift**,
+never a fix: it sorts ahead of the venv on `sys.path` and shadows pinned,
+CVE-patched core packages. Deploys neutralize it with `make hermes-heal`
+(idempotent; run automatically by `bootstrap` and both installers). If you find
+such an overlay, run `make hermes-heal` — don't sanction it.
+
 ---
 
 ## Observability reference

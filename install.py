@@ -20,7 +20,8 @@ What it does (mirrors install.sh / `make bootstrap`, minus the TTY wizard):
     5.  generate every required secret (API_SERVER_KEY, WM_DB_PASSWORD, HINDSIGHT_DB_PASSWORD)
     6.  create data dirs (+ fix ownership on POSIX)
     7.  write the provider key into <DATA_DIR>/.env — the file Hermes reads
-    8.  pull images, build the local Hermes image, + start the stack
+    8.  pull images, build the local Hermes image, start the stack, + heal
+        any stray package-overlay drift so the baked venv stays authoritative
     9.  set the default model and probe Hermes end-to-end
     10. pull Hindsight's Ollama models + enable it as the memory provider (--no-memory)
     11. prep Windmill: pre-install the worker Python, create the 'main' workspace,
@@ -649,7 +650,7 @@ def main() -> None:
             f"Discord: {'configured' if dc_token else 'none'}")
         if args.env:
             say(f"  Extra .env:      {' '.join(args.env)}")
-        steps = (["pull"] if not args.no_pull else []) + (["build"] if not args.no_build else []) + ["up", "set-model", "probe"]
+        steps = (["pull"] if not args.no_pull else []) + (["build"] if not args.no_build else []) + ["up", "heal", "set-model", "probe"]
         steps += (["memory"] if not args.no_memory else []) + (["windmill"] if not args.no_windmill else [])
         steps += (["mlx"] if args.with_mlx else []) + (["headroom"] if args.with_headroom else [])
         say(f"  Steps:           {' → '.join(steps)}")
@@ -793,6 +794,24 @@ def main() -> None:
         run(["docker", "compose", "build", "hermes"], quiet=False)
     say(f"{ARROW} starting the stack…")
     run(["docker", "compose", "up", "-d"], quiet=False)
+
+    # 8b. Neutralize stray agent-installed package overlay + PYTHONPATH drift so
+    # the baked venv stays authoritative (idempotent; no-op on a clean install).
+    heal_changed = False
+    if run_ok(["docker", "exec", "hermes", "test", "-e", "/opt/data/.hermes-extras"]):
+        say(f"{ARROW} removing redundant /opt/data/.hermes-extras overlay…")
+        run(["docker", "exec", "hermes", "rm", "-rf", "/opt/data/.hermes-extras"])
+        heal_changed = True
+    if run_ok(["docker", "exec", "hermes", "sh", "-c",
+               "grep -qE '^PYTHONPATH=.*hermes-extras' /opt/data/.env"]):
+        say(f"{ARROW} stripping PYTHONPATH drift from /opt/data/.env (backup .env.bak)…")
+        run(["docker", "exec", "hermes", "sh", "-c",
+             "cp /opt/data/.env /opt/data/.env.bak && "
+             "grep -vE '^PYTHONPATH=.*hermes-extras' /opt/data/.env.bak > /opt/data/.env"])
+        heal_changed = True
+    if heal_changed:
+        run(["docker", "compose", "restart", "hermes"], quiet=False)
+
     wait_hermes_healthy()
 
     # 9. default model + probe
