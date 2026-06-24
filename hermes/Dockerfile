@@ -15,7 +15,11 @@ USER root
 # untouched by the venv re-lock below and don't interact with hermes-heal.
 RUN apt-get update && apt-get install -y --no-install-recommends tmux && \
     rm -rf /var/lib/apt/lists/*
-RUN npm install -g @anthropic-ai/claude-code opencode-ai@latest
+# mcp-remote bridges Hermes (stdio MCP client) to MCP servers that only speak
+# the legacy HTTP+SSE transport — e.g. Baserow. Baking it in (vs. `npx` at
+# runtime) keeps startup fast enough for Hermes's stdio connect deadline; see
+# `make baserow-mcp`.
+RUN npm install -g @anthropic-ai/claude-code opencode-ai@latest mcp-remote
 
 COPY requirements.txt /tmp/hermes-extra-requirements.txt
 

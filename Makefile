@@ -27,7 +27,7 @@ else
   ON_WINDOWS :=
 endif
 
-.PHONY: help check init apikey secrets wizard secure fix-permissions pull build up down restart logs ps health backup bootstrap hermes-heal hermes-workspace hermes-secure lint validate ci headroom headroom-revert mlx mlx-revert mlx-status memory memory-revert hindsight-mlx hindsight-mlx-revert aux-cloud aux-local aux-hindsight aux-status windmill-push windmill-pull windmill-check
+.PHONY: help check init apikey secrets wizard secure fix-permissions pull build up down restart logs ps health backup bootstrap hermes-heal hermes-workspace hermes-secure lint validate ci headroom headroom-revert mlx mlx-revert mlx-status memory memory-revert hindsight-mlx hindsight-mlx-revert aux-cloud aux-local aux-hindsight aux-status windmill-push windmill-pull windmill-check baserow baserow-revert baserow-mcp
 
 # Fill an .env variable with a generated value when it is empty OR still set to a
 # known-weak default. Usage: $(call ensure_secret,VAR,GENERATOR,WEAK_DEFAULT)
@@ -89,6 +89,9 @@ secrets: ## Generate every required secret in .env that's blank or still a weak 
 	$(call ensure_secret,WM_DB_PASSWORD,openssl rand -hex 32,windmill)
 	$(call ensure_secret,HINDSIGHT_DB_PASSWORD,openssl rand -hex 16,hindsight)
 	$(call ensure_secret,GRAFANA_ADMIN_PASSWORD,openssl rand -hex 16,changeme)
+	$(call ensure_secret,BASEROW_SECRET_KEY,openssl rand -hex 32,)
+	$(call ensure_secret,BASEROW_DB_PASSWORD,openssl rand -hex 16,)
+	$(call ensure_secret,BASEROW_REDIS_PASSWORD,openssl rand -hex 16,)
 
 wizard: ## Run the Hermes first-run setup wizard (interactive; writes ~/.hermes/.env + config)
 	@set -a; . ./$(ENV_FILE); set +a; \
@@ -206,6 +209,67 @@ headroom-revert: ## Revert Hermes to direct provider routing (bypass Headroom)
 	@docker exec hermes hermes config set model.base_url ""
 	@$(COMPOSE) restart hermes
 	@echo "✓ Hermes is now routing directly to the provider"
+
+baserow: ## Start Baserow (structured-data UI + REST API); adds the override to COMPOSE_FILE
+	@$(MAKE) --no-print-directory secrets
+	@CUR=$$(grep -E '^COMPOSE_FILE=' $(ENV_FILE) 2>/dev/null | head -1 | cut -d= -f2- | xargs); \
+	  case ":$$CUR:" in \
+	    *:docker-compose.baserow.yml:*) NEW="$$CUR" ;; \
+	    *) if [ -z "$$CUR" ]; then NEW="docker-compose.yml:docker-compose.baserow.yml"; \
+	       else NEW="$$CUR:docker-compose.baserow.yml"; fi ;; \
+	  esac; \
+	  if grep -qE '^COMPOSE_FILE=' $(ENV_FILE); then \
+	    sed -i.bak "s|^COMPOSE_FILE=.*|COMPOSE_FILE=$$NEW|" $(ENV_FILE) && rm -f $(ENV_FILE).bak; \
+	  else \
+	    echo "COMPOSE_FILE=$$NEW" >> $(ENV_FILE); \
+	  fi; \
+	  echo "✓ COMPOSE_FILE=$$NEW"
+	@$(COMPOSE) up -d baserow_db baserow_redis baserow
+	@echo "✓ Baserow is starting (first boot runs DB migrations — give it a minute)"
+	@echo "  UI / API: http://baserow.localhost   (direct: http://localhost:$${BASEROW_PORT:-3010})"
+
+baserow-revert: ## Stop Baserow + drop its override from COMPOSE_FILE (volumes/data preserved)
+	@$(COMPOSE) rm -sf baserow baserow_redis baserow_db 2>/dev/null || true
+	@CUR=$$(grep -E '^COMPOSE_FILE=' $(ENV_FILE) 2>/dev/null | head -1 | cut -d= -f2- | xargs); \
+	  NEW=$$(echo "$$CUR" | sed -E 's|:?docker-compose\.baserow\.yml||'); \
+	  if [ -z "$$NEW" ] || [ "$$NEW" = "docker-compose.yml" ]; then NEW=""; fi; \
+	  sed -i.bak "s|^COMPOSE_FILE=.*|COMPOSE_FILE=$$NEW|" $(ENV_FILE) && rm -f $(ENV_FILE).bak; \
+	  echo "✓ COMPOSE_FILE=$${NEW:-(cleared)}"
+	@echo "✓ Baserow stopped (data preserved in volumes)"
+
+baserow-mcp: ## Register Baserow with Hermes as MCP tools (creates the endpoint + wires mcp-remote)
+	@command -v python3 >/dev/null || { echo "✗ python3 required"; exit 1; }
+	@docker ps --format '{{.Names}}' | grep -qx baserow || { echo "✗ Baserow isn't running — run 'make baserow' first"; exit 1; }
+	@docker exec hermes sh -c 'command -v mcp-remote >/dev/null' 2>/dev/null || { echo "✗ the running Hermes image lacks mcp-remote — rebuild it: make build && make up"; exit 1; }
+	@set -a; . ./$(ENV_FILE); set +a; \
+	  BURL="http://localhost:$${BASEROW_PORT:-3010}"; \
+	  EMAIL="$${BASEROW_EMAIL}"; PASS="$${BASEROW_PASSWORD}"; \
+	  if [ -z "$$EMAIL" ]; then read -p "Baserow email: " EMAIL; fi; \
+	  if [ -z "$$PASS" ]; then read -rsp "Baserow password: " PASS; echo; fi; \
+	  TOKEN=$$(curl -fsS -X POST "$$BURL/api/user/token-auth/" -H 'Content-Type: application/json' \
+	      -d "{\"email\":\"$$EMAIL\",\"password\":\"$$PASS\"}" 2>/dev/null \
+	    | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get("access_token") or d.get("token") or "")' 2>/dev/null); \
+	  if [ -z "$$TOKEN" ]; then echo "✗ Baserow login failed — create your account at http://baserow.localhost first, or set BASEROW_EMAIL/BASEROW_PASSWORD in .env"; exit 1; fi; \
+	  WSID=$$(curl -fsS "$$BURL/api/workspaces/" -H "Authorization: JWT $$TOKEN" \
+	    | WSNAME="$${BASEROW_MCP_WORKSPACE}" python3 -c 'import sys,os,json; ws=json.load(sys.stdin); want=os.environ.get("WSNAME",""); m=[w for w in ws if w["name"]==want] if want else ws; print(m[0]["id"] if m else "")'); \
+	  if [ -z "$$WSID" ]; then \
+	    WSID=$$(curl -fsS -X POST "$$BURL/api/workspaces/" -H "Authorization: JWT $$TOKEN" -H 'Content-Type: application/json' -d '{"name":"Hermes"}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])'); \
+	    echo "→ created workspace 'Hermes' (id $$WSID)"; \
+	  fi; \
+	  KEY=$$(curl -fsS "$$BURL/api/mcp/endpoints/" -H "Authorization: JWT $$TOKEN" \
+	    | python3 -c 'import sys,json; e=[x for x in json.load(sys.stdin) if x["name"]=="hermes"]; print(e[0]["key"] if e else "")'); \
+	  if [ -z "$$KEY" ]; then \
+	    KEY=$$(curl -fsS -X POST "$$BURL/api/mcp/endpoints/" -H "Authorization: JWT $$TOKEN" -H 'Content-Type: application/json' -d "{\"name\":\"hermes\",\"workspace_id\":$$WSID}" | python3 -c 'import sys,json;print(json.load(sys.stdin)["key"])'); \
+	    echo "→ created MCP endpoint 'hermes'"; \
+	  else echo "→ reusing existing MCP endpoint 'hermes'"; fi; \
+	  [ -n "$$KEY" ] || { echo "✗ could not obtain the MCP endpoint key"; exit 1; }; \
+	  docker exec hermes hermes mcp remove baserow >/dev/null 2>&1 || true; \
+	  printf 'Y\n' | docker exec -i hermes hermes mcp add baserow --command /usr/local/bin/mcp-remote \
+	    --args "http://baserow/mcp/$$KEY/sse" --allow-http --transport sse-only >/dev/null 2>&1; \
+	  echo "→ verifying connection…"; \
+	  docker exec hermes hermes mcp test baserow 2>&1 | grep -iE "Connected|Tools discovered" \
+	    || { echo "⚠ couldn't confirm — check: docker exec hermes hermes mcp test baserow"; exit 0; }; \
+	  echo "✓ Baserow MCP tools are available to Hermes (start a new session to use them)"
 
 mlx: ## Route Hermes to a host-native MLX server (Apple Silicon — see mlx/README.md)
 	@set -a; . ./$(ENV_FILE); set +a; \
@@ -414,9 +478,13 @@ backup: ## Snapshot Postgres (Windmill + Hindsight) + the Hermes data dir into .
 	  $(COMPOSE) exec -T db pg_dump -U postgres windmill | gzip > "backups/windmill-$$STAMP.sql.gz"; \
 	  echo "→ dumping Hindsight Postgres…"; \
 	  $(COMPOSE) exec -T hindsight_db pg_dump -U "$${HINDSIGHT_DB_USER:-hindsight}" "$${HINDSIGHT_DB_NAME:-hindsight}" | gzip > "backups/hindsight-$$STAMP.sql.gz"; \
+	  if docker ps --format '{{.Names}}' | grep -qx baserow_db; then \
+	    echo "→ dumping Baserow Postgres…"; \
+	    $(COMPOSE) exec -T baserow_db pg_dump -U "$${BASEROW_DB_USER:-baserow}" "$${BASEROW_DB_NAME:-baserow}" | gzip > "backups/baserow-$$STAMP.sql.gz"; \
+	  fi; \
 	  echo "→ archiving Hermes /data…"; \
 	  tar czf "backups/hermes-$$STAMP.tar.gz" -C "$${DATA_DIR:-$$HOME/.hermes/data}" . ; \
-	  echo "✓ wrote backups/windmill-$$STAMP.sql.gz, backups/hindsight-$$STAMP.sql.gz, and backups/hermes-$$STAMP.tar.gz"
+	  echo "✓ backups written to ./backups/ (stamp $$STAMP)"
 
 bootstrap: ## One-shot: check → init → secrets → wizard → secure → pull → build → up → heal → health
 	@$(MAKE) init

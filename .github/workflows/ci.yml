@@ -14,6 +14,11 @@ jobs:
           cp .env.example .env
           docker compose config -q
           echo "✓ compose config valid"
+      - name: Validate optional overrides (merged)
+        run: |
+          docker compose -f docker-compose.yml -f docker-compose.gpu.yml config -q
+          docker compose -f docker-compose.yml -f docker-compose.baserow.yml config -q
+          echo "✓ gpu + baserow overrides merge cleanly"
       - name: Validate Caddyfile
         run: |
           docker run --rm -v "$PWD/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2 \

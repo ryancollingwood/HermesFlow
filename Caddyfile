@@ -63,3 +63,10 @@ http://headroom.localhost {
 http://alertmanager.localhost {
     reverse_proxy alertmanager:9093
 }
+
+# --- Baserow (structured-data UI + REST API + MCP; has built-in auth) --------
+# Only resolves when the docker-compose.baserow.yml override is active
+# (COMPOSE_FILE / `make baserow`); otherwise this route 502s until Baserow is up.
+http://baserow.localhost {
+    reverse_proxy baserow:80
+}
