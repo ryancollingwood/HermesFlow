@@ -132,6 +132,14 @@ services:
       # resolves there by default — keeps config on the bind-mounted volume
       # so auth/session state survives container rebuilds.
       - CLAUDE_CONFIG_DIR=/opt/data/.claude
+      # Codex CLI home dir (auth.json, sessions) — same rationale as
+      # CLAUDE_CONFIG_DIR above. Not baked into the image yet (see
+      # hermes/CODING_AGENTS.md) but harmless to set ahead of time.
+      - CODEX_HOME=/opt/data/.codex
+      # OpenCode's explicit config file path, same rationale as
+      # CLAUDE_CONFIG_DIR — keeps it on the bind-mounted volume even though
+      # HOME=/opt/data already places the default XDG path there.
+      - OPENCODE_CONFIG=/opt/data/.config/opencode/opencode.json
     volumes:
       - ${DATA_DIR:-./data/hermes}:/opt/data
       - ${SHARED_DIR:-./data/shared}:/shared

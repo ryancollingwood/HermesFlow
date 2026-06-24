@@ -47,19 +47,22 @@ per-deployment, manually, after the container is running:
   (`/opt/data/.claude`, set explicitly in `docker-compose.yml` even though
   `HOME=/opt/data` for the `hermes` user would already resolve there).
 - **opencode**: run `opencode auth login` inside the container, or set a
-  provider env var (e.g. `OPENROUTER_API_KEY`). Config follows
-  `$HOME`-based XDG paths (`~/.config/opencode`, `~/.local/share/opencode`),
-  i.e. under `/opt/data` — no extra env var needed.
+  provider env var (e.g. `OPENROUTER_API_KEY`). Config lands at
+  `$OPENCODE_CONFIG` (`/opt/data/.config/opencode/opencode.json`, set
+  explicitly in `docker-compose.yml`, same rationale as `CLAUDE_CONFIG_DIR` —
+  `HOME=/opt/data` already places the default XDG path there, but pinning it
+  is defensive against any future change to opencode's resolution logic).
 - **codex**: set `OPENAI_API_KEY`, or use the Codex CLI's own OAuth login
-  flow (credentials land under `~/.codex/auth.json`, i.e. `/opt/data/.codex/`).
-  Separately, Hermes itself can use Codex OAuth via
+  flow. Credentials land under `$CODEX_HOME` (`/opt/data/.codex`, set
+  explicitly in `docker-compose.yml` ahead of the binary actually being baked
+  in — see the table above). Separately, Hermes itself can use Codex OAuth via
   `hermes auth add openai-codex` (`model.provider: openai-codex`) — that's
   Hermes-managed and independent of the standalone CLI's own auth.
 
 Because `/opt/data` is the bind-mounted, persistent volume (already used for
 Hermes's own config/sessions/skills), auth state for all three CLIs survives
-container rebuilds and restarts as long as it's written under `$HOME`
-(`/opt/data`).
+container rebuilds and restarts as long as it's written under `$CLAUDE_CONFIG_DIR`
+/ `$OPENCODE_CONFIG` / `$CODEX_HOME` (all under `/opt/data`).
 
 Example, run via `docker exec -it hermes <cmd>` or through Hermes's own
 `terminal()` tool:
@@ -77,6 +80,8 @@ docker exec hermes which tmux claude opencode
 docker exec hermes claude --version
 docker exec hermes opencode --version
 docker exec hermes sh -c 'echo $CLAUDE_CONFIG_DIR'   # -> /opt/data/.claude
+docker exec hermes sh -c 'echo $OPENCODE_CONFIG'     # -> /opt/data/.config/opencode/opencode.json
+docker exec hermes sh -c 'echo $CODEX_HOME'          # -> /opt/data/.codex
 ```
 
 These installs live in system/npm paths, not the Python venv, so they're
