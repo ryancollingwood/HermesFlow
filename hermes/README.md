@@ -123,6 +123,22 @@ package that fails to resolve is caught on push / PR.
 All of the above either weaken the security model or break the `LAZY_DEPS`
 no-op behaviour. Baking pinned packages at build time is the supported path.
 
+## Working directory: generated files belong in `/shared`
+
+By default, Hermes gateway/cron sessions write files into whatever directory
+the `gateway run` process was launched from — inside this image, that's
+`/opt/hermes`, the read-only app/venv install dir. That pollutes the app's
+own files instead of landing somewhere persistent and host-visible.
+
+The compose stack already bind-mounts `/shared` (`${SHARED_DIR:-./data/shared}`
+on the host) for exactly this purpose. `make hermes-workspace` sets Hermes'
+`terminal.cwd` config key to `/shared` via `hermes config set` (the only
+supported way to edit `config.yaml` — hand edits don't stick), so generated
+files land under `./data/shared/` on the host instead of `/opt/hermes` or
+`/opt/data`. `make bootstrap` runs this automatically; re-run
+`make hermes-workspace` ad hoc on an existing deployment to apply it (it's
+idempotent).
+
 ## Troubleshooting: stray package overlays (`hermes-heal`)
 
 A Hermes **agent session** can't edit this Dockerfile or `docker-compose.yml`

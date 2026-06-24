@@ -27,7 +27,7 @@ else
   ON_WINDOWS :=
 endif
 
-.PHONY: help check init apikey secrets wizard secure fix-permissions pull build up down restart logs ps health backup bootstrap hermes-heal lint validate ci headroom headroom-revert mlx mlx-revert mlx-status memory memory-revert hindsight-mlx hindsight-mlx-revert windmill-push windmill-pull windmill-check
+.PHONY: help check init apikey secrets wizard secure fix-permissions pull build up down restart logs ps health backup bootstrap hermes-heal hermes-workspace lint validate ci headroom headroom-revert mlx mlx-revert mlx-status memory memory-revert hindsight-mlx hindsight-mlx-revert windmill-push windmill-pull windmill-check
 
 # Fill an .env variable with a generated value when it is empty OR still set to a
 # known-weak default. Usage: $(call ensure_secret,VAR,GENERATOR,WEAK_DEFAULT)
@@ -150,6 +150,11 @@ hermes-heal: ## Remove stray agent-installed package overlay + PYTHONPATH drift 
 	  echo "→ restarting hermes to apply"; $(COMPOSE) restart hermes >/dev/null; \
 	  echo "✓ drift neutralized — venv is authoritative"; \
 	else echo "✓ no overlay drift (venv is authoritative)"; fi
+
+hermes-workspace: ## Point Hermes's gateway/cron working dir at /shared (instead of /opt/hermes)
+	@docker exec hermes hermes config set terminal.cwd /shared
+	@$(COMPOSE) restart hermes
+	@echo "✓ Hermes gateway/cron jobs now write to /shared (host: $${SHARED_DIR:-./data/shared})"
 
 up: ## Start the stack (detached)
 	@$(COMPOSE) up -d
@@ -372,6 +377,7 @@ bootstrap: ## One-shot: check → init → secrets → wizard → secure → pul
 	@$(MAKE) build
 	@$(MAKE) up
 	@$(MAKE) hermes-heal
+	@$(MAKE) hermes-workspace
 	@sleep 8
 	@$(MAKE) health
 	@echo
