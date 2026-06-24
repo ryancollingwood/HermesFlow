@@ -613,10 +613,18 @@ make baserow-mcp
 ```
 
 This logs into Baserow (using `BASEROW_EMAIL`/`BASEROW_PASSWORD` from `.env`, or
-prompts), creates an **MCP endpoint** in your workspace via the REST API, and
-registers it with Hermes — then verifies the connection. Start a **new** Hermes
-session for the tools to become active. Re-running is idempotent (it reuses the
-existing `hermes` endpoint).
+prompts) — **creating the account if it doesn't exist yet** — then creates an
+**MCP endpoint** in your workspace via the REST API, registers it with Hermes, and
+verifies the connection. Start a **new** Hermes session for the tools to become
+active. Re-running is idempotent (it reuses the existing account, workspace, and
+`hermes` endpoint).
+
+> **Which account, and who can see the data?** Baserow data is workspace-scoped:
+> the agent sees only the endpoint's workspace, and humans see it only if they're
+> members. Use your own account so you and the agent share one workspace (the
+> default), or a dedicated bot account and invite collaborators. Full rundown of
+> the options and caveats:
+> [**docs/baserow-accounts-and-sharing.md**](docs/baserow-accounts-and-sharing.md).
 
 > **Transport note.** Baserow's MCP server speaks the legacy HTTP+SSE transport,
 > which Hermes's `--url` client (Streamable-HTTP) can't drive directly. The

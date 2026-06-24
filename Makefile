@@ -249,7 +249,22 @@ baserow-mcp: ## Register Baserow with Hermes as MCP tools (creates the endpoint 
 	  TOKEN=$$(curl -fsS -X POST "$$BURL/api/user/token-auth/" -H 'Content-Type: application/json' \
 	      -d "{\"email\":\"$$EMAIL\",\"password\":\"$$PASS\"}" 2>/dev/null \
 	    | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get("access_token") or d.get("token") or "")' 2>/dev/null); \
-	  if [ -z "$$TOKEN" ]; then echo "✗ Baserow login failed — create your account at http://baserow.localhost first, or set BASEROW_EMAIL/BASEROW_PASSWORD in .env"; exit 1; fi; \
+	  if [ -z "$$TOKEN" ]; then \
+	    echo "→ no existing login for $$EMAIL — creating the account…"; \
+	    NAME=$$(printf '%s' "$$EMAIL" | cut -d@ -f1); [ "$${#NAME}" -ge 2 ] || NAME="Baserow User"; \
+	    REG=$$(curl -sS -X POST "$$BURL/api/user/" -H 'Content-Type: application/json' \
+	      -d "{\"name\":\"$$NAME\",\"email\":\"$$EMAIL\",\"password\":\"$$PASS\",\"language\":\"en\",\"authenticate\":true}" 2>/dev/null); \
+	    TOKEN=$$(printf '%s' "$$REG" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get("access_token") or d.get("token") or "")' 2>/dev/null); \
+	    if [ -n "$$TOKEN" ]; then echo "✓ created Baserow account $$EMAIL"; \
+	    else \
+	      ERR=$$(printf '%s' "$$REG" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get("error") or d.get("detail") or "unknown error")' 2>/dev/null); \
+	      echo "✗ couldn't log in or create the account ($${ERR:-unreachable})."; \
+	      echo "  • If the account already exists, the password didn't match — fix BASEROW_PASSWORD (or your input)."; \
+	      echo "  • If signups are disabled, create it in the UI: http://baserow.localhost"; \
+	      echo "  See docs/baserow-accounts-and-sharing.md for account + data-sharing options."; \
+	      exit 1; \
+	    fi; \
+	  fi; \
 	  WSID=$$(curl -fsS "$$BURL/api/workspaces/" -H "Authorization: JWT $$TOKEN" \
 	    | WSNAME="$${BASEROW_MCP_WORKSPACE}" python3 -c 'import sys,os,json; ws=json.load(sys.stdin); want=os.environ.get("WSNAME",""); m=[w for w in ws if w["name"]==want] if want else ws; print(m[0]["id"] if m else "")'); \
 	  if [ -z "$$WSID" ]; then \
