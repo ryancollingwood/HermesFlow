@@ -146,6 +146,16 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"   # reach a host-native MLX server (see mlx/)
     shm_size: 1g   # Playwright/Chromium browser tools need shared memory
+    # Hardening: block privilege escalation and cap runaway process counts
+    # from a hijacked agent. cap_drop: ALL was tried and reverted — the
+    # upstream image's s6-overlay entrypoint runs as root and needs
+    # DAC_OVERRIDE/CHOWN/SETGID/SETUID during its boot sequence (chown'ing
+    # /run/service dirs, creating gateway service dirs, then dropping to
+    # HERMES_UID/HERMES_GID); without that allowlist the container
+    # crash-loops on every boot. Revisit if a future image version
+    # documents the exact capability set its entrypoint needs.
+    security_opt:
+      - "no-new-privileges:true"
     # Health endpoint lives on the API server (API_SERVER_ENABLED=true). If this
     # returns 401/404 on your version, switch to the authenticated probe below.
     healthcheck:
@@ -161,6 +171,7 @@ services:
         limits:
           memory: ${HERMES_MEM_LIMIT:-2G}
           cpus: "${HERMES_CPU_LIMIT:-2.0}"
+          pids: 512
     networks: [edge, agent, memory, inference]
     logging: *default-logging
 
@@ -200,6 +211,10 @@ services:
       # Bind localhost-only — Caddy and internal Docker traffic use named networks.
       # Expose for direct /stats, /dashboard, /metrics access on the host.
       - "127.0.0.1:8787:8787"
+    cap_drop:
+      - ALL
+    security_opt:
+      - "no-new-privileges:true"
     networks: [agent, edge, monitoring]
     logging: *default-logging
     healthcheck:
@@ -213,6 +228,7 @@ services:
         limits:
           memory: ${HEADROOM_MEM_LIMIT:-512M}
           cpus: "${HEADROOM_CPU_LIMIT:-0.5}"
+          pids: 256
 
   # ---------------------------------------------------------------------------
   #  Hindsight database — external PostgreSQL + pgvector
