@@ -74,7 +74,8 @@ and Docker Desktop (no `make`). Flags: `--provider`, `--api-key`, `--model`,
 messaging channels (`--telegram-bot-token`/`--telegram-allowed-users`,
 `--discord-bot-token`/`--discord-allowed-users`), `--with-mlx` (Apple Silicon —
 host-native MLX server), `--with-headroom` (route through the compression proxy),
-`--bind-lan` (expose on `0.0.0.0`), `--gpu` (NVIDIA passthrough for Ollama),
+`--with-baserow` (add the [Baserow](#baserow-structured-data) structured-data
+store), `--bind-lan` (expose on `0.0.0.0`), `--gpu` (NVIDIA passthrough for Ollama),
 Hindsight overrides (`--hindsight-model` /
 `--hindsight-{retain,consolidation,reflect}-model` / `--hindsight-base-url` /
 `--hindsight-mlx` / `--hindsight-api-key`), and `--env KEY=VALUE` to set any
@@ -538,6 +539,120 @@ curl http://127.0.0.1:8787/metrics
 
 ---
 
+## Baserow (structured data)
+
+[Baserow](https://baserow.io) is an optional **no-code database** — a friendly
+spreadsheet-style UI for structured records, a full **REST API**, and an **MCP
+server** so the data is reachable by both people and agents. It's the stack's
+answer to "I need somewhere to keep structured data with a UI *and* an API"
+(an Airtable/Baserow-style alternative to a raw SQL console).
+
+It's **opt-in** and layered as a compose override
+(`docker-compose.baserow.yml`), the same pattern as the GPU override — so the
+base stack is untouched unless you enable it.
+
+### How it fits
+
+```
+                       ┌─ Caddy ──→ http://baserow.localhost  (UI + REST API + MCP)
+baserow (all-in-one) ──┤
+  backend + workers    ├─ baserow_db     (dedicated Postgres, pgvector:pg16)
+  + embedded Caddy:80  ├─ baserow_redis  (dedicated Redis — cache + realtime)
+                       └─ ollama:11434   (AI fields, local inference)
+```
+
+The all-in-one `baserow/baserow` image is pointed at a **dedicated**
+`baserow_db` + `baserow_redis` (its embedded Postgres/Redis auto-disable),
+mirroring the Hindsight pattern. Attachments live on the `BASEROW_DATA_DIR`
+volume — no object store (MinIO) required.
+
+### Enable it
+
+```sh
+./install.sh --with-baserow --api-key sk-or-...      # or add to any other flags
+# already installed? just:
+make baserow                                          # generates secrets, layers
+                                                      # the override, brings it up
+```
+
+`make baserow` adds `docker-compose.baserow.yml` to `COMPOSE_FILE` in `.env`
+(additively — it coexists with `--gpu`), so every later `docker compose` /
+`make` call includes it. First boot runs DB migrations — give it a minute, then
+open **`http://baserow.localhost`** and create the first admin account.
+
+`make baserow-revert` stops the services and removes the override from
+`COMPOSE_FILE` (your data stays in the volumes). `make backup` includes a
+`pg_dump` of `baserow_db` whenever it's running.
+
+### Generative AI fields
+
+Baserow's AI field is wired to the stack's **local Ollama** container by default
+(`BASEROW_OLLAMA_HOST=http://ollama:11434`). Pull a model and list it so it shows
+up in the field's model picker:
+
+```sh
+docker exec ollama ollama pull llama3.2
+# then set in .env:  BASEROW_OLLAMA_MODELS=llama3.2   and `make restart`
+```
+
+> **Why not the Hermes gateway?** Baserow's OpenAI provider has no base-URL
+> override, so it can't be redirected at Hermes's OpenAI-compatible endpoint.
+> Local Ollama is the supported in-stack path; for cloud models, set a real
+> `BASEROW_OPENAI_API_KEY` / `BASEROW_ANTHROPIC_API_KEY` / `BASEROW_OPENROUTER_API_KEY`
+> / `BASEROW_MISTRAL_API_KEY` (+ the matching `*_MODELS` list) in `.env`.
+
+### Hermes ⇄ Baserow over MCP
+
+Baserow ships an **MCP server**, and Hermes is an MCP client — so your Baserow
+tables become callable tools inside Hermes chat sessions (list/create/update/
+delete rows, table schema, …), the same idea as the
+[Windmill MCP](#hermes--windmill-over-mcp) wiring. One command bootstraps it:
+
+```sh
+make baserow-mcp
+```
+
+This logs into Baserow (using `BASEROW_EMAIL`/`BASEROW_PASSWORD` from `.env`, or
+prompts), creates an **MCP endpoint** in your workspace via the REST API, and
+registers it with Hermes — then verifies the connection. Start a **new** Hermes
+session for the tools to become active. Re-running is idempotent (it reuses the
+existing `hermes` endpoint).
+
+> **Transport note.** Baserow's MCP server speaks the legacy HTTP+SSE transport,
+> which Hermes's `--url` client (Streamable-HTTP) can't drive directly. The
+> derived Hermes image therefore bakes in [`mcp-remote`](https://www.npmjs.com/package/mcp-remote),
+> and `make baserow-mcp` registers Baserow as a **stdio** server through it
+> (`--command mcp-remote … --transport sse-only`). Because it's baked in (not
+> fetched via `npx` at runtime), it connects well within Hermes's stdio deadline.
+> This needs the local Hermes image — if you haven't built it yet, run
+> `make build && make up` (or `./install.sh`, which builds by default) first.
+
+Manual equivalent, if you'd rather not use the target — create the endpoint in
+Baserow's UI (workspace settings → **MCP** → *Create endpoint*), copy its key,
+then:
+
+```sh
+docker exec -i hermes hermes mcp add baserow --command mcp-remote \
+  --args http://baserow/mcp/<endpoint-key>/sse --allow-http --transport sse-only
+docker exec hermes hermes mcp test baserow     # ✓ Connected, lists the tools
+```
+
+### Baserow configuration (`.env`)
+
+| Variable | Default | Notes |
+|---|---|---|
+| `BASEROW_VERSION` | `2.2.2` | Image tag — bump to upgrade |
+| `BASEROW_PUBLIC_URL` | `http://baserow.localhost` | Must match how you reach it |
+| `BASEROW_DATA_DIR` | `${HOME}/HermesFlow/baserow` | Assets + attachments volume |
+| `BASEROW_DB_DATA_DIR` / `BASEROW_REDIS_DATA_DIR` | `…/baserow/{db,redis}` | Dedicated Postgres / Redis data |
+| `BASEROW_SECRET_KEY` | _(generated)_ | Django signing key — `make secrets` fills it |
+| `BASEROW_DB_PASSWORD` / `BASEROW_REDIS_PASSWORD` | _(generated)_ | `make secrets` fills them |
+| `BASEROW_BIND` / `BASEROW_PORT` | `127.0.0.1` / `3010` | Direct host access (primary access is via Caddy) |
+| `BASEROW_MEM_LIMIT` / `BASEROW_CPU_LIMIT` | `2G` / `2.0` | All-in-one runs backend + workers |
+| `BASEROW_OLLAMA_HOST` | `http://ollama:11434` | AI-field provider (local) |
+
+---
+
 ## Configuration (`.env`)
 
 | Variable | Default | Notes |
@@ -568,6 +683,7 @@ With the default Caddy config (plain HTTP on `.localhost` hostnames):
 | Hindsight UI | `http://hindsight.localhost` (or `http://localhost:9999`) |
 | Hindsight API | `http://localhost:8888` |
 | Headroom dashboard | `http://headroom.localhost` (or `http://localhost:8787`) |
+| Baserow (opt-in) | `http://baserow.localhost` (or `http://localhost:3010`) |
 | Alertmanager | `http://alertmanager.localhost` |
 
 `.localhost` resolves to `127.0.0.1` on most systems. From other machines on your

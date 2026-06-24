@@ -1,0 +1,155 @@
+# =============================================================================
+#  Baserow — optional structured-data store (no-code DB UI + REST API + MCP)
+#
+#  Opt-in override layered on top of the base stack via COMPOSE_FILE in .env:
+#      COMPOSE_FILE=docker-compose.yml:docker-compose.baserow.yml
+#  The installers do this with `--with-baserow`; manually, run `make baserow`.
+#  Docker Compose reads COMPOSE_FILE from .env, so every `docker compose` / `make`
+#  call then includes these services. Prefer this over editing the base file.
+#
+#  Runs the all-in-one `baserow/baserow` image but points it at a DEDICATED
+#  external Postgres + Redis (mirrors the hindsight / hindsight_db pattern), which
+#  auto-disables the image's embedded Postgres/Redis. The embedded Caddy stays,
+#  serving plain HTTP on :80 behind the stack's real Caddy (no embedded TLS).
+#
+#  AI fields are wired to the stack's local `ollama` container by default
+#  (BASEROW_OLLAMA_HOST). Baserow's OpenAI provider has no base-URL override, so
+#  the Hermes gateway can't be used as an OpenAI-compatible target; set a real
+#  OpenAI/Anthropic/OpenRouter/Mistral key in .env or the workspace UI for cloud.
+#
+#  NOTE: YAML anchors are file-scoped — the base file's &default-logging is not
+#  visible here, so it is redefined below.
+# =============================================================================
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "20m"
+    max-file: "5"
+    compress: "true"
+
+networks:
+  # baserow app <-> its dedicated Postgres + Redis (+ exporter). Internal only.
+  baserow:
+
+services:
+  # ---------------------------------------------------------------------------
+  #  Baserow all-in-one (backend + web frontend + workers + embedded Caddy).
+  #  External Postgres/Redis disable the embedded ones. UI, REST API and the
+  #  MCP server are all served on port 80.
+  # ---------------------------------------------------------------------------
+  baserow:
+    image: baserow/baserow:${BASEROW_VERSION:-2.2.2}
+    container_name: baserow
+    restart: unless-stopped
+    depends_on:
+      baserow_db:
+        condition: service_healthy
+      baserow_redis:
+        condition: service_healthy
+    environment:
+      # ── Public URL + signing key ─────────────────────────────────────────
+      - BASEROW_PUBLIC_URL=${BASEROW_PUBLIC_URL:-http://baserow.localhost}
+      - SECRET_KEY=${BASEROW_SECRET_KEY}
+      # Embedded Caddy: plain HTTP on :80 only — the stack's Caddy fronts it.
+      - BASEROW_CADDY_ADDRESSES=:80
+      # ── External Postgres (disables the embedded one) ────────────────────
+      - DATABASE_HOST=baserow_db
+      - DATABASE_PORT=5432
+      - DATABASE_NAME=${BASEROW_DB_NAME:-baserow}
+      - DATABASE_USER=${BASEROW_DB_USER:-baserow}
+      - DATABASE_PASSWORD=${BASEROW_DB_PASSWORD}
+      # ── External Redis (disables the embedded one) ───────────────────────
+      - REDIS_HOST=baserow_redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${BASEROW_REDIS_PASSWORD}
+      # ── Generative AI: local Ollama by default; cloud keys optional ───────
+      - BASEROW_OLLAMA_HOST=${BASEROW_OLLAMA_HOST:-http://ollama:11434}
+      - BASEROW_OLLAMA_MODELS=${BASEROW_OLLAMA_MODELS:-}
+      - BASEROW_OPENAI_API_KEY=${BASEROW_OPENAI_API_KEY:-}
+      - BASEROW_OPENAI_MODELS=${BASEROW_OPENAI_MODELS:-}
+      - BASEROW_ANTHROPIC_API_KEY=${BASEROW_ANTHROPIC_API_KEY:-}
+      - BASEROW_ANTHROPIC_MODELS=${BASEROW_ANTHROPIC_MODELS:-}
+      - BASEROW_OPENROUTER_API_KEY=${BASEROW_OPENROUTER_API_KEY:-}
+      - BASEROW_OPENROUTER_MODELS=${BASEROW_OPENROUTER_MODELS:-}
+      - BASEROW_MISTRAL_API_KEY=${BASEROW_MISTRAL_API_KEY:-}
+      - BASEROW_MISTRAL_MODELS=${BASEROW_MISTRAL_MODELS:-}
+    volumes:
+      - ${BASEROW_DATA_DIR:-./data/baserow}:/baserow/data
+    ports:
+      # Direct host access (optional); primary access is via Caddy.
+      - "${BASEROW_BIND:-127.0.0.1}:${BASEROW_PORT:-3010}:80"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost/api/_health/"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 90s
+    deploy:
+      resources:
+        limits:
+          memory: ${BASEROW_MEM_LIMIT:-2G}
+          cpus: "${BASEROW_CPU_LIMIT:-2.0}"
+    networks: [baserow, edge, agent, inference]
+    logging: *default-logging
+
+  # ---------------------------------------------------------------------------
+  #  Dedicated Postgres for Baserow (mirrors hindsight_db).
+  # ---------------------------------------------------------------------------
+  baserow_db:
+    image: pgvector/pgvector:pg16
+    container_name: baserow_db
+    restart: unless-stopped
+    volumes:
+      - ${BASEROW_DB_DATA_DIR:-./data/baserow/db}:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: ${BASEROW_DB_USER:-baserow}
+      POSTGRES_PASSWORD: ${BASEROW_DB_PASSWORD}
+      POSTGRES_DB: ${BASEROW_DB_NAME:-baserow}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${BASEROW_DB_USER:-baserow}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: ${BASEROW_DB_MEM_LIMIT:-512M}
+          cpus: "${BASEROW_DB_CPU_LIMIT:-0.5}"
+    networks: [baserow]
+    logging: *default-logging
+
+  # ---------------------------------------------------------------------------
+  #  Dedicated Redis for Baserow (caching + realtime collaboration).
+  # ---------------------------------------------------------------------------
+  baserow_redis:
+    image: redis:7-alpine
+    container_name: baserow_redis
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${BASEROW_REDIS_PASSWORD}", "--appendonly", "yes"]
+    volumes:
+      - ${BASEROW_REDIS_DATA_DIR:-./data/baserow/redis}:/data
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli -a \"${BASEROW_REDIS_PASSWORD}\" ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: ${BASEROW_REDIS_MEM_LIMIT:-256M}
+          cpus: "${BASEROW_REDIS_CPU_LIMIT:-0.3}"
+    networks: [baserow]
+    logging: *default-logging
+
+  # ---------------------------------------------------------------------------
+  #  Observability note (AGENTS.md §2): container-level metrics for all three
+  #  Baserow containers (CPU / memory / disk / net) are covered automatically by
+  #  cAdvisor, and the `ContainerDown` alert guards their liveness — no action
+  #  needed. A dedicated postgres-exporter (the hindsight_postgres_exporter
+  #  pattern) is deliberately NOT wired here: Prometheus's scrape config is a
+  #  static base file and the `up == 0` PrometheusTargetDown alert would fire for
+  #  everyone who runs the stack WITHOUT this optional override. To opt into full
+  #  PostgreSQL-internal metrics, add a postgres-exporter for baserow_db plus a
+  #  matching scrape job to prometheus/prometheus.yml on a Baserow-only deployment.
+  # ---------------------------------------------------------------------------
