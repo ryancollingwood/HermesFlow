@@ -27,7 +27,7 @@ else
   ON_WINDOWS :=
 endif
 
-.PHONY: help check init apikey secrets wizard secure fix-permissions pull build up down restart logs ps health backup bootstrap hermes-heal hermes-workspace lint validate ci headroom headroom-revert mlx mlx-revert mlx-status memory memory-revert hindsight-mlx hindsight-mlx-revert windmill-push windmill-pull windmill-check
+.PHONY: help check init apikey secrets wizard secure fix-permissions pull build up down restart logs ps health backup bootstrap hermes-heal hermes-workspace lint validate ci headroom headroom-revert mlx mlx-revert mlx-status memory memory-revert hindsight-mlx hindsight-mlx-revert aux-cloud aux-local aux-hindsight aux-status windmill-push windmill-pull windmill-check
 
 # Fill an .env variable with a generated value when it is empty OR still set to a
 # known-weak default. Usage: $(call ensure_secret,VAR,GENERATOR,WEAK_DEFAULT)
@@ -277,6 +277,44 @@ hindsight-mlx-revert: ## Revert Hindsight memory extraction to the bundled Ollam
 	  done
 	@$(COMPOSE) up -d hindsight
 	@echo "✓ Hindsight memory extraction reverted to the bundled Ollama"
+
+aux-cloud: ## Pin vision/compression/web_extract/triage_specifier to cloud models, independent of main model
+	@docker exec hermes hermes config set auxiliary.vision.provider openrouter
+	@docker exec hermes hermes config set auxiliary.vision.model openai/gpt-4o-mini
+	@docker exec hermes hermes config set auxiliary.compression.provider openrouter
+	@docker exec hermes hermes config set auxiliary.compression.model google/gemini-2.5-flash
+	@docker exec hermes hermes config set auxiliary.web_extract.provider openrouter
+	@docker exec hermes hermes config set auxiliary.web_extract.model google/gemini-2.5-flash
+	@docker exec hermes hermes config set auxiliary.triage_specifier.provider openrouter
+	@docker exec hermes hermes config set auxiliary.triage_specifier.model openai/gpt-4o-mini
+	@$(COMPOSE) restart hermes
+	@echo "✓ vision/compression/web_extract/triage_specifier pinned to cloud, regardless of main model (mlx/headroom)"
+
+aux-local: ## Route low-stakes auxiliary tasks (approval/title_generation/tts_audio_tags/skills_hub/mcp) to whatever main model is active
+	@docker exec hermes hermes config set auxiliary.approval.provider main
+	@docker exec hermes hermes config set auxiliary.title_generation.provider main
+	@docker exec hermes hermes config set auxiliary.tts_audio_tags.provider main
+	@docker exec hermes hermes config set auxiliary.skills_hub.provider main
+	@docker exec hermes hermes config set auxiliary.mcp.provider main
+	@$(COMPOSE) restart hermes
+	@echo "✓ approval/title_generation/tts_audio_tags/skills_hub/mcp routed to the main model (use with 'make mlx')"
+
+aux-hindsight: ## Route low-stakes auxiliary tasks to Hindsight's currently-configured LLM backend
+	@set -a; . ./$(ENV_FILE); set +a; \
+	  URL="$${HINDSIGHT_LLM_BASE_URL:-http://ollama:11434/v1}"; \
+	  KEY="$${HINDSIGHT_LLM_API_KEY:-openai}"; \
+	  MDL="$${HINDSIGHT_LLM_MODEL:-qwen2.5:14b}"; \
+	  for t in approval title_generation tts_audio_tags skills_hub mcp; do \
+	    docker exec hermes hermes config set auxiliary.$$t.provider custom; \
+	    docker exec hermes hermes config set auxiliary.$$t.base_url "$$URL"; \
+	    docker exec hermes hermes config set auxiliary.$$t.api_key "$$KEY"; \
+	    docker exec hermes hermes config set auxiliary.$$t.model "$$MDL"; \
+	  done; \
+	  echo "✓ approval/title_generation/tts_audio_tags/skills_hub/mcp → $$URL ($$MDL, same backend as Hindsight)"
+	@$(COMPOSE) restart hermes
+
+aux-status: ## Show current auxiliary model config
+	@docker exec hermes hermes config show
 
 validate: ## Validate docker-compose.yml (mirrors CI)
 	@test -f .env || cp .env.example .env

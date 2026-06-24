@@ -139,6 +139,52 @@ files land under `./data/shared/` on the host instead of `/opt/hermes` or
 `make hermes-workspace` ad hoc on an existing deployment to apply it (it's
 idempotent).
 
+## Auxiliary models: routing side-tasks (vision, compression, approval, etc.)
+
+Hermes routes specialized side-tasks — `vision`, `web_extract`, `compression`,
+`approval`, `title_generation`, `tts_audio_tags`, `skills_hub`, `mcp`,
+`triage_specifier`, and a few others — separately from the main chat model.
+By default every one of these silently falls back to whatever the **main**
+model currently is, which is risky in this deployment since `make mlx` /
+`make headroom` swap the main model between very different backends (a small
+local model vs. a cloud model via a compression proxy).
+
+Three Makefile targets manage this, applied via `hermes config set
+auxiliary.<task>.<key> <value>` (the only way the change persists — hand
+edits to `config.yaml` don't stick, same as `terminal.cwd` above):
+
+- **`make aux-cloud`** — pins `vision` / `compression` / `web_extract` /
+  `triage_specifier` to cloud models (OpenRouter), independent of whatever
+  the main model is. Run this once; it doesn't need to be re-applied when you
+  switch `mlx` ↔ `headroom`. Needed because: `vision` requires a multimodal
+  model (the local MLX model isn't one), and `compression`'s summarizer must
+  have a context window ≥ the main model's or it silently drops context.
+- **`make aux-local`** — routes the low-stakes tasks (`approval`,
+  `title_generation`, `tts_audio_tags`, `skills_hub`, `mcp`) to
+  `provider: "main"`, i.e. whatever `OPENAI_BASE_URL`/`OPENAI_API_KEY` the
+  main model is currently using. Pair with `make mlx`.
+- **`make aux-hindsight`** — routes the same low-stakes tasks directly at
+  Hindsight's currently-configured LLM backend (reads `HINDSIGHT_LLM_BASE_URL`
+  / `_API_KEY` / `_MODEL` from `.env` at run time, so it tracks whatever
+  Hindsight is using — the bundled Ollama, or the host MLX server if
+  `make hindsight-mlx` was run). Useful when you'd rather not stand up a
+  second local endpoint just for Hermes' auxiliary tasks.
+- **`make aux-status`** — `hermes config show`, for a quick sanity check
+  after switching backends.
+
+Each auxiliary task's full schema in the running config (`auxiliary.<task>`)
+is `provider` / `model` / `base_url` / `api_key` / `timeout` (+ a few
+task-specific extras) — `provider` accepts the named providers
+(`openrouter`, `nous`, `gemini`, `ollama-cloud`, `codex`, `main`, `auto`) as
+well as `"custom"` paired with an explicit `base_url`, which is how
+`aux-hindsight` points at an arbitrary OpenAI-compatible endpoint. Verify
+with `docker exec hermes cat /opt/data/config.yaml` (grep for `^auxiliary:`)
+— the bundled `/opt/hermes/cli-config.yaml.example` undersells this schema
+(it only documents `vision`/`web_extract`/`tts_audio_tags`/`session_search`
+and omits `base_url`/`api_key`), so don't rely on it as the source of truth;
+confirm against the live container instead, especially after a
+`HERMES_VERSION` bump.
+
 ## Troubleshooting: stray package overlays (`hermes-heal`)
 
 A Hermes **agent session** can't edit this Dockerfile or `docker-compose.yml`
