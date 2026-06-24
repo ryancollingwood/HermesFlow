@@ -27,7 +27,7 @@ else
   ON_WINDOWS :=
 endif
 
-.PHONY: help check init apikey secrets wizard secure fix-permissions pull build up down restart logs ps health backup bootstrap hermes-heal hermes-workspace lint validate ci headroom headroom-revert mlx mlx-revert mlx-status memory memory-revert hindsight-mlx hindsight-mlx-revert aux-cloud aux-local aux-hindsight aux-status windmill-push windmill-pull windmill-check
+.PHONY: help check init apikey secrets wizard secure fix-permissions pull build up down restart logs ps health backup bootstrap hermes-heal hermes-workspace hermes-secure lint validate ci headroom headroom-revert mlx mlx-revert mlx-status memory memory-revert hindsight-mlx hindsight-mlx-revert aux-cloud aux-local aux-hindsight aux-status windmill-push windmill-pull windmill-check
 
 # Fill an .env variable with a generated value when it is empty OR still set to a
 # known-weak default. Usage: $(call ensure_secret,VAR,GENERATOR,WEAK_DEFAULT)
@@ -155,6 +155,21 @@ hermes-workspace: ## Point Hermes's gateway/cron working dir at /shared (instead
 	@docker exec hermes hermes config set terminal.cwd /shared
 	@$(COMPOSE) restart hermes
 	@echo "✓ Hermes gateway/cron jobs now write to /shared (host: $${SHARED_DIR:-./data/shared})"
+
+hermes-secure: ## Fix Tirith PATH lookup (was failing open, unscanned) + disable allow_lazy_installs drift (idempotent)
+	@docker ps --format '{{.Names}}' | grep -qx hermes || { \
+	  echo "✗ hermes not running — 'make up' first"; exit 1; }
+	@changed=0; \
+	if ! docker exec hermes grep -qE '^\s*tirith_path:\s*/opt/data/bin/tirith\s*$$' /opt/data/config.yaml 2>/dev/null; then \
+	  echo "→ pointing tirith_path at /opt/data/bin/tirith (bare 'tirith' isn't on \$$PATH, so scans were silently skipped under tirith_fail_open)"; \
+	  docker exec hermes hermes config set security.tirith_path /opt/data/bin/tirith >/dev/null; changed=1; fi; \
+	if docker exec hermes grep -qE '^\s*allow_lazy_installs:\s*[Tt]rue\s*$$' /opt/data/config.yaml 2>/dev/null; then \
+	  echo "→ disabling security.allow_lazy_installs (README says never re-enable this; venv is read-only anyway, but the app shouldn't even attempt it)"; \
+	  docker exec hermes hermes config set security.allow_lazy_installs false >/dev/null; changed=1; fi; \
+	if [ "$$changed" = 1 ]; then \
+	  $(COMPOSE) restart hermes >/dev/null; \
+	  echo "✓ Tirith now active on \$$PATH-resolved binary; lazy installs disabled"; \
+	else echo "✓ already secure (tirith_path correct, allow_lazy_installs false)"; fi
 
 up: ## Start the stack (detached)
 	@$(COMPOSE) up -d
@@ -416,6 +431,7 @@ bootstrap: ## One-shot: check → init → secrets → wizard → secure → pul
 	@$(MAKE) up
 	@$(MAKE) hermes-heal
 	@$(MAKE) hermes-workspace
+	@$(MAKE) hermes-secure
 	@sleep 8
 	@$(MAKE) health
 	@echo

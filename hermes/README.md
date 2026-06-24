@@ -123,6 +123,34 @@ package that fails to resolve is caught on push / PR.
 All of the above either weaken the security model or break the `LAZY_DEPS`
 no-op behaviour. Baking pinned packages at build time is the supported path.
 
+If `security.allow_lazy_installs` ever drifts back to `true` (e.g. a future
+`hermes setup` wizard run resets it), `make hermes-secure` puts it back to
+`false`.
+
+## Tirith command scanning (`make hermes-secure`)
+
+Hermes ships with a Tirith binary at `/opt/data/bin/tirith` for content-level
+command scanning (homograph URL spoofing, pipe-to-interpreter patterns like
+`curl | bash`). It is **not** on `$PATH` inside the container — only
+`/opt/data/.local/bin` is. The default config (`security.tirith_path:
+tirith`) does a bare `$PATH` lookup, which fails, and because
+`tirith_fail_open: true` by default, every command then proceeds **unscanned**
+with no error surfaced.
+
+Run `make hermes-secure` (idempotent, included in `make bootstrap`) to point
+`security.tirith_path` at the absolute binary path so scanning actually runs:
+
+```
+make hermes-secure   # also re-disables allow_lazy_installs if it drifted
+```
+
+Verify scanning is active:
+
+```
+docker exec hermes hermes config show | grep -A1 allow_lazy_installs
+docker exec hermes grep tirith_path /opt/data/config.yaml   # -> /opt/data/bin/tirith
+```
+
 ## Working directory: generated files belong in `/shared`
 
 By default, Hermes gateway/cron sessions write files into whatever directory
