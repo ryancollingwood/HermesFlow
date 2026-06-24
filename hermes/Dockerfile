@@ -9,6 +9,14 @@ FROM nousresearch/hermes-agent:${HERMES_VERSION}
 
 USER root
 
+# System/npm tools the bundled claude-code and opencode skills assume exist
+# (tmux for interactive PTY orchestration via send-keys/capture-pane; the CLIs
+# themselves). These install into system paths, not the venv, so they're
+# untouched by the venv re-lock below and don't interact with hermes-heal.
+RUN apt-get update && apt-get install -y --no-install-recommends tmux && \
+    rm -rf /var/lib/apt/lists/*
+RUN npm install -g @anthropic-ai/claude-code opencode-ai@latest
+
 COPY requirements.txt /tmp/hermes-extra-requirements.txt
 
 # uv is on PATH (/usr/local/bin/uv); VIRTUAL_ENV targets the venv exactly as

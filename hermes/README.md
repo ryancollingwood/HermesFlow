@@ -6,6 +6,15 @@ packages are declared in [`requirements.txt`](requirements.txt) and baked into
 the agent's virtualenv at **build time**. This page explains why that indirection
 exists and how to add a package safely.
 
+## System & npm tools (tmux, claude-code, opencode, codex)
+
+The same Dockerfile also bakes in `tmux` (apt) and the `@anthropic-ai/claude-code`
+/ `opencode-ai` CLIs (npm) — system/npm tools, unrelated to the
+`requirements.txt` / `LAZY_DEPS` mechanism below since they don't touch
+`/opt/hermes/.venv`. See [CODING_AGENTS.md](CODING_AGENTS.md) for what's baked
+in vs. not, why tmux is required, and how to authenticate each CLI
+(claude-code, opencode, and codex).
+
 ## TL;DR
 
 1. Find the package's pinned spec in Hermes' `LAZY_DEPS` allowlist

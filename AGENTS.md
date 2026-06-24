@@ -324,6 +324,15 @@ CVE-patched core packages. Deploys neutralize it with `make hermes-heal`
 (idempotent; run automatically by `bootstrap` and both installers). If you find
 such an overlay, run `make hermes-heal` — don't sanction it.
 
+**System/npm tools (tmux, claude-code, opencode) are baseline, not optional.**
+`hermes/Dockerfile` also installs `tmux` (apt) and the `@anthropic-ai/claude-code`
+/ `opencode-ai` CLIs (npm) — the bundled `claude-code` and `opencode` skills
+assume these exist (the claude-code skill's interactive PTY mode requires tmux).
+These install into system paths, not the venv, so they don't go through
+`requirements.txt`/`LAZY_DEPS` and don't interact with `hermes-heal`. Auth is
+manual (`claude` / `opencode auth login` inside the container, or API-key env
+vars) — not baked into the image or compose file.
+
 ---
 
 ## Observability reference

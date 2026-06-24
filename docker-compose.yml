@@ -128,6 +128,10 @@ services:
       - HINDSIGHT_API_KEY=${HINDSIGHT_API_KEY:-}
       - HINDSIGHT_BASE_URL=${HINDSIGHT_BASE_URL:-http://hindsight:8888}
       - HINDSIGHT_API_URL=${HINDSIGHT_BASE_URL:-http://hindsight:8888}
+      # Claude Code config dir, explicit even though HOME=/opt/data already
+      # resolves there by default — keeps config on the bind-mounted volume
+      # so auth/session state survives container rebuilds.
+      - CLAUDE_CONFIG_DIR=/opt/data/.claude
     volumes:
       - ${DATA_DIR:-./data/hermes}:/opt/data
       - ${SHARED_DIR:-./data/shared}:/shared
