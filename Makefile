@@ -39,6 +39,7 @@ define ensure_secret
 	    if grep -qE '^$(1)=' $(ENV_FILE); then \
 	      sed -i.bak "s|^$(1)=.*|$(1)=$$VAL|" $(ENV_FILE) && rm -f $(ENV_FILE).bak; \
 	    else \
+	      { [ -s $(ENV_FILE) ] && [ -n "$$(tail -c1 $(ENV_FILE))" ] && printf '\n' >> $(ENV_FILE); }; \
 	      echo "$(1)=$$VAL" >> $(ENV_FILE); \
 	    fi; \
 	    echo "✓ generated $(1)"; \
@@ -242,10 +243,11 @@ baserow-mcp: ## Register Baserow with Hermes as MCP tools (creates the endpoint 
 	@docker ps --format '{{.Names}}' | grep -qx baserow || { echo "✗ Baserow isn't running — run 'make baserow' first"; exit 1; }
 	@docker exec hermes sh -c 'command -v mcp-remote >/dev/null' 2>/dev/null || { echo "✗ the running Hermes image lacks mcp-remote — rebuild it: make build && make up"; exit 1; }
 	@set -a; . ./$(ENV_FILE); set +a; \
-	  BURL="http://localhost:$${BASEROW_PORT:-3010}"; \
-	  EMAIL="$${BASEROW_EMAIL}"; PASS="$${BASEROW_PASSWORD}"; \
-	  if [ -z "$$EMAIL" ]; then read -p "Baserow email: " EMAIL; fi; \
-	  if [ -z "$$PASS" ]; then read -rsp "Baserow password: " PASS; echo; fi; \
+	  BURL="http://localhost:$${BASEROW_PORT:-3010}"; ENVF="$(ENV_FILE)"; \
+	  envput() { if grep -qE "^$$1=" "$$ENVF"; then sed -i.bak "s|^$$1=.*|$$1=$$2|" "$$ENVF" && rm -f "$$ENVF.bak"; else { [ -s "$$ENVF" ] && [ -n "$$(tail -c1 "$$ENVF")" ] && printf '\n' >> "$$ENVF"; }; printf '%s=%s\n' "$$1" "$$2" >> "$$ENVF"; fi; }; \
+	  EMAIL="$${BASEROW_EMAIL}"; PASS="$${BASEROW_PASSWORD}"; GEN=0; \
+	  [ -n "$$EMAIL" ] || { EMAIL="hermes@baserow.local"; GEN=1; }; \
+	  [ -n "$$PASS" ] || { PASS="$$(openssl rand -hex 16)"; GEN=1; }; \
 	  TOKEN=$$(curl -fsS -X POST "$$BURL/api/user/token-auth/" -H 'Content-Type: application/json' \
 	      -d "{\"email\":\"$$EMAIL\",\"password\":\"$$PASS\"}" 2>/dev/null \
 	    | python3 -c 'import sys,json; d=json.load(sys.stdin); print(d.get("access_token") or d.get("token") or "")' 2>/dev/null); \
@@ -265,14 +267,18 @@ baserow-mcp: ## Register Baserow with Hermes as MCP tools (creates the endpoint 
 	      exit 1; \
 	    fi; \
 	  fi; \
-	  WSID=$$(curl -fsS "$$BURL/api/workspaces/" -H "Authorization: JWT $$TOKEN" \
-	    | WSNAME="$${BASEROW_MCP_WORKSPACE}" python3 -c 'import sys,os,json; ws=json.load(sys.stdin); want=os.environ.get("WSNAME",""); m=[w for w in ws if w["name"]==want] if want else ws; print(m[0]["id"] if m else "")'); \
-	  if [ -z "$$WSID" ]; then \
-	    WSID=$$(curl -fsS -X POST "$$BURL/api/workspaces/" -H "Authorization: JWT $$TOKEN" -H 'Content-Type: application/json' -d '{"name":"Hermes"}' | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])'); \
-	    echo "→ created workspace 'Hermes' (id $$WSID)"; \
+	  if [ "$$GEN" = "1" ]; then envput BASEROW_EMAIL "$$EMAIL"; envput BASEROW_PASSWORD "$$PASS"; echo "→ saved BASEROW_EMAIL / BASEROW_PASSWORD to $$ENVF"; fi; \
+	  WSID="$${BASEROW_WORKSPACE_ID}"; \
+	  PRESENT=$$(curl -fsS "$$BURL/api/workspaces/" -H "Authorization: JWT $$TOKEN" \
+	    | WSWANT="$$WSID" python3 -c 'import sys,os,json; w=os.environ.get("WSWANT",""); print(w if w and any(str(x["id"])==w for x in json.load(sys.stdin)) else "")'); \
+	  if [ -n "$$PRESENT" ]; then echo "→ using existing workspace id $$WSID"; \
+	  else \
+	    WSID=$$(curl -fsS -X POST "$$BURL/api/workspaces/" -H "Authorization: JWT $$TOKEN" -H 'Content-Type: application/json' -d "{\"name\":\"$${BASEROW_MCP_WORKSPACE:-Hermes}\"}" | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])'); \
+	    envput BASEROW_WORKSPACE_ID "$$WSID"; \
+	    echo "→ created workspace (id $$WSID) — saved BASEROW_WORKSPACE_ID to $$ENVF"; \
 	  fi; \
 	  KEY=$$(curl -fsS "$$BURL/api/mcp/endpoints/" -H "Authorization: JWT $$TOKEN" \
-	    | python3 -c 'import sys,json; e=[x for x in json.load(sys.stdin) if x["name"]=="hermes"]; print(e[0]["key"] if e else "")'); \
+	    | WSID="$$WSID" python3 -c 'import sys,os,json; w=os.environ["WSID"]; e=[x for x in json.load(sys.stdin) if x["name"]=="hermes" and str(x.get("workspace_id"))==w]; print(e[0]["key"] if e else "")'); \
 	  if [ -z "$$KEY" ]; then \
 	    KEY=$$(curl -fsS -X POST "$$BURL/api/mcp/endpoints/" -H "Authorization: JWT $$TOKEN" -H 'Content-Type: application/json' -d "{\"name\":\"hermes\",\"workspace_id\":$$WSID}" | python3 -c 'import sys,json;print(json.load(sys.stdin)["key"])'); \
 	    echo "→ created MCP endpoint 'hermes'"; \

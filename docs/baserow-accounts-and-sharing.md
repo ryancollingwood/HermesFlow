@@ -25,16 +25,21 @@ workspace and registers it with Hermes via the baked-in `mcp-remote` bridge.
 
 ## What `make baserow-mcp` does with credentials
 
-It reads `BASEROW_EMAIL` / `BASEROW_PASSWORD` from `.env` (or prompts), then:
+It uses `BASEROW_EMAIL` / `BASEROW_PASSWORD` from `.env`, then:
 
-1. **Tries to log in** with those credentials.
-2. **If login fails, it creates the account** with that email/password (requires
+1. **If either is blank, it generates them** (email defaults to
+   `hermes@baserow.local`, password is random) and **saves them back to `.env`**
+   so you can log into the UI and so later runs reuse the same account.
+2. **Tries to log in** with those credentials.
+3. **If login fails, it creates the account** with that email/password (requires
    self-service signups to be enabled — the default; see *Caveats*).
-3. Ensures a workspace exists (uses `BASEROW_MCP_WORKSPACE` by name if set,
-   otherwise your first workspace, otherwise creates one called `Hermes`).
-4. Creates/reuses the `hermes` MCP endpoint in that workspace and wires Hermes.
+4. Picks the workspace from **`BASEROW_WORKSPACE_ID`** (a numeric id): if it's set
+   and that workspace still exists, it's reused; otherwise a new workspace is
+   created (named by `BASEROW_MCP_WORKSPACE`, default `Hermes`) and its id is
+   **saved back to `.env`** as `BASEROW_WORKSPACE_ID`.
+5. Creates/reuses the `hermes` MCP endpoint in that workspace and wires Hermes.
 
-The whole thing is idempotent — re-running reuses the existing account, workspace,
+The whole thing is idempotent — re-running reuses the saved account, workspace,
 and endpoint.
 
 ## Account options
@@ -95,8 +100,9 @@ are a paid Baserow feature — but plain viewing via membership works on OSS.
 ## Caveats
 
 - **The agent only sees the endpoint's workspace.** Data you create in a
-  *different* workspace is invisible to Hermes (and vice-versa). Pin the workspace
-  with `BASEROW_MCP_WORKSPACE=<name>` if you have more than one.
+  *different* workspace is invisible to Hermes (and vice-versa). The workspace is
+  pinned by `BASEROW_WORKSPACE_ID` (a numeric id, saved automatically); point it
+  at a different workspace's id to switch which one the agent uses.
 - **Auto-create needs signups enabled.** If `allow_new_signups` is off (Baserow
   admin → Settings), `make baserow-mcp` can't create the account — make it in the
   UI first. If the email already exists but the password is wrong, creation fails
@@ -104,8 +110,9 @@ are a paid Baserow feature — but plain viewing via membership works on OSS.
 - **The first account on a fresh instance becomes an instance admin** (`is_staff`)
   — it can manage global settings. Keep that in mind when auto-creating the very
   first account.
-- **`BASEROW_PASSWORD` lives in `.env`** (git-ignored). It's your Baserow login —
-  if you'd rather not store it, leave it blank and you'll be prompted.
+- **`BASEROW_EMAIL` / `BASEROW_PASSWORD` live in `.env`** (git-ignored). They're
+  your Baserow login. Leave them blank and the target generates and saves them
+  there on first run — read them from `.env` to sign into the UI.
 - **The MCP endpoint key is a credential.** Anyone with the
   `…/mcp/<key>/sse` URL has full tool access to that workspace. Revoke it by
   deleting the `hermes` endpoint in Baserow (workspace settings → **MCP**) or via
