@@ -27,7 +27,7 @@ else
   ON_WINDOWS :=
 endif
 
-.PHONY: help check init apikey secrets wizard secure fix-permissions pull build up down restart logs ps health backup bootstrap hermes-heal hermes-workspace hermes-secure lint validate ci headroom headroom-revert mlx mlx-revert mlx-status memory memory-revert hindsight-mlx hindsight-mlx-revert aux-cloud aux-local aux-hindsight aux-status windmill-push windmill-pull windmill-check baserow baserow-revert baserow-mcp
+.PHONY: help check init apikey secrets wizard secure fix-permissions pull build up down restart logs ps health backup bootstrap hermes-heal hermes-workspace hermes-secure lint validate ci headroom headroom-revert mlx mlx-revert mlx-status memory memory-revert hindsight-mlx hindsight-mlx-revert aux-cloud aux-local aux-hindsight aux-status windmill-push windmill-pull windmill-check baserow baserow-revert baserow-mcp directus directus-revert
 
 # Fill an .env variable with a generated value when it is empty OR still set to a
 # known-weak default. Usage: $(call ensure_secret,VAR,GENERATOR,WEAK_DEFAULT)
@@ -90,8 +90,14 @@ secrets: ## Generate every required secret in .env that's blank or still a weak 
 	$(call ensure_secret,WM_DB_PASSWORD,openssl rand -hex 32,windmill)
 	$(call ensure_secret,HINDSIGHT_DB_PASSWORD,openssl rand -hex 16,hindsight)
 	$(call ensure_secret,GRAFANA_ADMIN_PASSWORD,openssl rand -hex 16,changeme)
+	$(call ensure_secret,COLLECTION_DB_ADMIN_PASSWORD,openssl rand -hex 16,collection)
 	$(call ensure_secret,BASEROW_SECRET_KEY,openssl rand -hex 32,)
 	$(call ensure_secret,BASEROW_DB_PASSWORD,openssl rand -hex 16,)
+	$(call ensure_secret,DIRECTUS_DB_PASSWORD,openssl rand -hex 16,)
+	$(call ensure_secret,WINDMILL_COLLECTION_DB_PASSWORD,openssl rand -hex 16,)
+	$(call ensure_secret,DIRECTUS_KEY,openssl rand -hex 16,)
+	$(call ensure_secret,DIRECTUS_SECRET,openssl rand -hex 32,)
+	$(call ensure_secret,DIRECTUS_ADMIN_PASSWORD,openssl rand -hex 16,)
 	$(call ensure_secret,BASEROW_REDIS_PASSWORD,openssl rand -hex 16,)
 
 wizard: ## Run the Hermes first-run setup wizard (interactive; writes ~/.hermes/.env + config)
@@ -225,12 +231,12 @@ baserow: ## Start Baserow (structured-data UI + REST API); adds the override to 
 	    echo "COMPOSE_FILE=$$NEW" >> $(ENV_FILE); \
 	  fi; \
 	  echo "✓ COMPOSE_FILE=$$NEW"
-	@$(COMPOSE) up -d baserow_db baserow_redis baserow
+	@$(COMPOSE) up -d collection_db baserow_redis baserow
 	@echo "✓ Baserow is starting (first boot runs DB migrations — give it a minute)"
 	@echo "  UI / API: http://baserow.localhost   (direct: http://localhost:$${BASEROW_PORT:-3010})"
 
 baserow-revert: ## Stop Baserow + drop its override from COMPOSE_FILE (volumes/data preserved)
-	@$(COMPOSE) rm -sf baserow baserow_redis baserow_db 2>/dev/null || true
+	@$(COMPOSE) rm -sf baserow baserow_redis 2>/dev/null || true
 	@CUR=$$(grep -E '^COMPOSE_FILE=' $(ENV_FILE) 2>/dev/null | head -1 | cut -d= -f2- | xargs); \
 	  NEW=$$(echo "$$CUR" | sed -E 's|:?docker-compose\.baserow\.yml||'); \
 	  if [ -z "$$NEW" ] || [ "$$NEW" = "docker-compose.yml" ]; then NEW=""; fi; \
@@ -291,6 +297,38 @@ baserow-mcp: ## Register Baserow with Hermes as MCP tools (creates the endpoint 
 	  docker exec hermes hermes mcp test baserow 2>&1 | grep -iE "Connected|Tools discovered" \
 	    || { echo "⚠ couldn't confirm — check: docker exec hermes hermes mcp test baserow"; exit 0; }; \
 	  echo "✓ Baserow MCP tools are available to Hermes (start a new session to use them)"
+
+directus: ## Start Directus (triage UI + REST/GraphQL API + MCP); adds the override to COMPOSE_FILE
+	@$(MAKE) --no-print-directory secrets
+	@CUR=$$(grep -E '^COMPOSE_FILE=' $(ENV_FILE) 2>/dev/null | head -1 | cut -d= -f2- | xargs); \
+	  case ":$$CUR:" in \
+	    *:docker-compose.directus.yml:*) NEW="$$CUR" ;; \
+	    *) if [ -z "$$CUR" ]; then NEW="docker-compose.yml:docker-compose.directus.yml"; \
+	       else NEW="$$CUR:docker-compose.directus.yml"; fi ;; \
+	  esac; \
+	  if grep -qE '^COMPOSE_FILE=' $(ENV_FILE); then \
+	    sed -i.bak "s|^COMPOSE_FILE=.*|COMPOSE_FILE=$$NEW|" $(ENV_FILE) && rm -f $(ENV_FILE).bak; \
+	  else \
+	    echo "COMPOSE_FILE=$$NEW" >> $(ENV_FILE); \
+	  fi; \
+	  echo "✓ COMPOSE_FILE=$$NEW"
+	@$(COMPOSE) up -d collection_db directus
+	@echo "✓ Directus is starting (first boot runs DB migrations — give it a minute)"
+	@echo "  UI / API: http://directus.localhost   (direct: http://localhost:$${DIRECTUS_PORT:-8055})"
+	@echo "  Log in with DIRECTUS_ADMIN_EMAIL / DIRECTUS_ADMIN_PASSWORD from .env"
+	@echo "  → To give Hermes MCP access: open the UI, Settings → AI, enable MCP, generate"
+	@echo "    an access token for a dedicated MCP user, then register that endpoint with"
+	@echo "    Hermes (MCP is a Studio-only setting in Directus — not scriptable here, unlike"
+	@echo "    'make baserow-mcp')."
+
+directus-revert: ## Stop Directus + drop its override from COMPOSE_FILE (volumes/data preserved)
+	@$(COMPOSE) rm -sf directus 2>/dev/null || true
+	@CUR=$$(grep -E '^COMPOSE_FILE=' $(ENV_FILE) 2>/dev/null | head -1 | cut -d= -f2- | xargs); \
+	  NEW=$$(echo "$$CUR" | sed -E 's|:?docker-compose\.directus\.yml||'); \
+	  if [ -z "$$NEW" ] || [ "$$NEW" = "docker-compose.yml" ]; then NEW=""; fi; \
+	  sed -i.bak "s|^COMPOSE_FILE=.*|COMPOSE_FILE=$$NEW|" $(ENV_FILE) && rm -f $(ENV_FILE).bak; \
+	  echo "✓ COMPOSE_FILE=$${NEW:-(cleared)}"
+	@echo "✓ Directus stopped (data preserved; collection_db keeps running for Baserow/Windmill)"
 
 mlx: ## Route Hermes to a host-native MLX server (Apple Silicon — see mlx/README.md)
 	@set -a; . ./$(ENV_FILE); set +a; \
@@ -458,6 +496,22 @@ windmill-push: ## Push windmill/ assets (resource type, resource, scripts) to th
 	         -X POST "$$base/api/w/main/variables/update/$$vp" -d "{\"value\":\"$$API_SERVER_KEY\"}" >/dev/null 2>&1; then \
 	      echo "✓ updated secret variable $$vp"; \
 	    else echo "⚠ couldn't set $$vp — set it in the UI (Variables → $$vp)"; fi; \
+	  fi; \
+	  if [ -n "$$token" ] && [ -n "$${WINDMILL_COLLECTION_DB_PASSWORD:-}" ]; then \
+	    vp="f/collection/db_password"; \
+	    if curl -fsS -H "Host: $$hh" -H "Authorization: Bearer $$token" -H 'Content-Type: application/json' \
+	         -X POST "$$base/api/w/main/variables/create" \
+	         -d "{\"path\":\"$$vp\",\"value\":\"$$WINDMILL_COLLECTION_DB_PASSWORD\",\"is_secret\":true}" >/dev/null 2>&1; then \
+	      echo "✓ created secret variable $$vp"; \
+	    elif curl -fsS -H "Host: $$hh" -H "Authorization: Bearer $$token" -H 'Content-Type: application/json' \
+	         -X POST "$$base/api/w/main/variables/update/$$vp" -d "{\"value\":\"$$WINDMILL_COLLECTION_DB_PASSWORD\"}" >/dev/null 2>&1; then \
+	      echo "✓ updated secret variable $$vp"; \
+	    else echo "⚠ couldn't set $$vp — set it in the UI (Variables → $$vp)"; fi; \
+	    echo "✓ collection_db Postgres resource available to scripts/flows as f/collection/collection_db"; \
+	    echo "  → Baserow webhook receiver deployed at f/collection/baserow_webhook. To wire a Baserow"; \
+	    echo "    table to it: Baserow table → Webhooks → URL ="; \
+	    echo "    http://windmill_server:8000/api/w/main/jobs/run/p/f/collection/baserow_webhook?token=$$token"; \
+	    echo "    (use a dedicated Windmill token, not the admin login token above, for anything long-lived)"; \
 	  fi
 
 windmill-pull: ## Pull windmill/ assets FROM the server into the repo for version control — needs the wmill CLI
@@ -491,7 +545,7 @@ windmill-check: ## Report whether the live Windmill server has drifted from wind
 	  fi; \
 	  git checkout -- windmill/; exit $$rc
 
-backup: ## Snapshot Postgres (Windmill + Hindsight) + the Hermes data dir into ./backups/
+backup: ## Snapshot Postgres (Windmill + Hindsight + Collection) + the Hermes data dir into ./backups/
 	@mkdir -p backups
 	@set -a; . ./$(ENV_FILE); set +a; \
 	  STAMP=$$(date +%F-%H%M); \
@@ -499,10 +553,8 @@ backup: ## Snapshot Postgres (Windmill + Hindsight) + the Hermes data dir into .
 	  $(COMPOSE) exec -T db pg_dump -U postgres windmill | gzip > "backups/windmill-$$STAMP.sql.gz"; \
 	  echo "→ dumping Hindsight Postgres…"; \
 	  $(COMPOSE) exec -T hindsight_db pg_dump -U "$${HINDSIGHT_DB_USER:-hindsight}" "$${HINDSIGHT_DB_NAME:-hindsight}" | gzip > "backups/hindsight-$$STAMP.sql.gz"; \
-	  if docker ps --format '{{.Names}}' | grep -qx baserow_db; then \
-	    echo "→ dumping Baserow Postgres…"; \
-	    $(COMPOSE) exec -T baserow_db pg_dump -U "$${BASEROW_DB_USER:-baserow}" "$${BASEROW_DB_NAME:-baserow}" | gzip > "backups/baserow-$$STAMP.sql.gz"; \
-	  fi; \
+	  echo "→ dumping Collection Postgres (Baserow + Directus + shared collection schemas)…"; \
+	  $(COMPOSE) exec -T collection_db pg_dump -U "$${COLLECTION_DB_ADMIN_USER:-collection_admin}" "$${COLLECTION_DB_NAME:-collection}" | gzip > "backups/collection-$$STAMP.sql.gz"; \
 	  echo "→ archiving Hermes /data…"; \
 	  tar czf "backups/hermes-$$STAMP.tar.gz" -C "$${DATA_DIR:-$$HOME/.hermes/data}" . ; \
 	  echo "✓ backups written to ./backups/ (stamp $$STAMP)"

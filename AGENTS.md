@@ -92,31 +92,54 @@ start / flags) and `INSTALL.md` (flag table + step description).
 
 `wmill sync` is a **mirror** (`push` makes the server match the repo and
 **deletes/archives** anything in scope that isn't tracked). Scope is set by
-`includes` in `windmill/wmill.yaml` and is deliberately narrow:
-`f/hermes/**` + the `hermes_endpoint` resource-type. Full breakdown in
-[`windmill/SYNC.md`](windmill/SYNC.md). When you author or generate a Windmill
-script, follow these rules so a push can never wipe data:
+`includes` in `windmill/wmill.yaml` and is deliberately narrow — currently
+`f/hermes/**` + `f/collection/**` + the `hermes_endpoint` resource-type. Full
+breakdown in [`windmill/SYNC.md`](windmill/SYNC.md). When you author or
+generate a Windmill script, follow these rules so a push can never wipe data:
 
-- **Code/config that must be versioned → `f/hermes/`.** This is the only synced
-  folder. Commit it; it round-trips via `make windmill-push` / `make windmill-pull`.
-- **Non-secret runtime state → `f/hermes_state/`, never `f/hermes/`.** Any
-  variable a script *writes at runtime* — last-run timestamps, cursors, sync
-  markers, paging state — goes under `f/hermes_state/` (e.g.
-  `f/hermes_state/<thing>_last_run`). That folder is **outside sync scope**, so it
-  is never versioned and a mirror push never deletes it. The installers
-  create-or-no-op `f/hermes_state`. Putting state in `f/hermes/` is a bug: the
-  next push deletes it (this is exactly how `f/hermes/karakeep_last_run` was lost).
+- **Code/config that must be versioned → one of the synced folders** (currently
+  `f/hermes/` and `f/collection/`). Commit it; it round-trips via
+  `make windmill-push` / `make windmill-pull`.
+- **Non-secret runtime state → a sibling `<folder>_state/` folder, never inside
+  the synced folder itself.** Any variable a script *writes at runtime* — last-run
+  timestamps, cursors, sync markers, paging state — goes under `f/hermes_state/`
+  (e.g. `f/hermes_state/<thing>_last_run`) for Hermes-owned scripts, or the
+  equivalent `<folder>_state/` sibling for any other synced folder. That sibling
+  is **outside sync scope**, so it is never versioned and a mirror push never
+  deletes it. Putting state inside a synced folder is a bug: the next push
+  deletes it (this is exactly how `f/hermes/karakeep_last_run` was lost). If a
+  new synced folder needs runtime state, create its `<folder>_state/` sibling and
+  have the installer/Makefile target create-or-no-op it, mirroring
+  `f/hermes_state`.
 - **Secrets → a secret variable, value set server-side.** Never write a real key
   into a tracked file; `skipSecrets: true` keeps secret variables out of sync
   entirely (see the secrets section above). The placeholder
-  `f/hermes/api_key.variable.yaml` is the pattern.
-- **Everything else (`u/*`, other `f/*` folders) is out of scope by design.** If a
-  script provisions, say, a `u/hermes` service user, that is a runtime/admin
-  action — do **not** add it to `includes` or expect sync to manage it.
-- **Don't widen `includes` casually.** Narrow scope is the safety mechanism; a
-  push's blast radius is whatever `includes` covers. Track folder permissions by
-  committing each in-scope folder's `folder.meta.yaml` (generate with
-  `wmill folder add-missing`) so pushes don't strip them.
+  `f/hermes/api_key.variable.yaml` (and `f/collection/db_password.variable.yaml`)
+  is the pattern — commit the placeholder, patch the real value via a
+  `variables/create`-or-`variables/update` API call in the relevant
+  `make <feature>-push`-style target (see `windmill-push` for both examples).
+- **Prefer a built-in resource type over a custom one.** `f/collection/collection_db`
+  uses Windmill's inherited `postgresql` type — no `*.resource-type.yaml` needed.
+  Only add a custom resource-type file (like `hermes_endpoint`) when no built-in
+  type fits; custom resource-types must also be added to `includes` explicitly.
+- **Everything else (`u/*`, other untracked `f/*` folders) is out of scope by
+  design.** If a script provisions, say, a `u/hermes` service user, that is a
+  runtime/admin action — do **not** add it to `includes` or expect sync to manage it.
+- **Adding a new tracked Windmill folder (e.g. for a new integration) is a
+  three-file change, not just dropping files in `windmill/f/<name>/`:**
+  1. Add `"f/<name>/**"` explicitly to `includes` in `windmill/wmill.yaml` (never
+     widen to a blanket `f/**` — narrow, explicit scope is the safety mechanism).
+  2. Add a row for it to the scope table and the three scenario tables in
+     `windmill/SYNC.md`.
+  3. Commit the folder's `folder.meta.yaml` (generate with
+     `wmill folder add-missing`) so pushes don't strip folder permissions.
+  Forgetting step 1 is a silent no-op, not an error: `wmill sync push` will
+  simply never push the new folder's resources/scripts/variables, and
+  `windmill-push`'s own secret-patching curl calls can succeed even though the
+  resource/script they're patching alongside was never actually deployed.
+- **Don't widen `includes` casually** beyond what step 1 above requires. Narrow
+  scope is the safety mechanism; a push's blast radius is whatever `includes`
+  covers.
 
 ---
 

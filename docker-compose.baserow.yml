@@ -7,10 +7,13 @@
 #  Docker Compose reads COMPOSE_FILE from .env, so every `docker compose` / `make`
 #  call then includes these services. Prefer this over editing the base file.
 #
-#  Runs the all-in-one `baserow/baserow` image but points it at a DEDICATED
-#  external Postgres + Redis (mirrors the hindsight / hindsight_db pattern), which
-#  auto-disables the image's embedded Postgres/Redis. The embedded Caddy stays,
-#  serving plain HTTP on :80 behind the stack's real Caddy (no embedded TLS).
+#  Runs the all-in-one `baserow/baserow` image but points it at the base
+#  stack's shared `collection_db` Postgres (its own private `baserow` schema —
+#  see collection_db/initdb/01-init.sh; no other service is granted access
+#  into that schema) plus a DEDICATED external Redis (mirrors the hindsight
+#  pattern), which auto-disables the image's embedded Postgres/Redis. The
+#  embedded Caddy stays, serving plain HTTP on :80 behind the stack's real
+#  Caddy (no embedded TLS).
 #
 #  AI fields are wired to the stack's local `ollama` container by default
 #  (BASEROW_OLLAMA_HOST). Baserow's OpenAI provider has no base-URL override, so
@@ -29,7 +32,8 @@ x-logging: &default-logging
     compress: "true"
 
 networks:
-  # baserow app <-> its dedicated Postgres + Redis (+ exporter). Internal only.
+  # baserow app <-> its dedicated Redis. Internal only. (DB access is via the
+  # base stack's `collection` network instead of a private network here.)
   baserow:
 
 services:
@@ -43,7 +47,7 @@ services:
     container_name: baserow
     restart: unless-stopped
     depends_on:
-      baserow_db:
+      collection_db:
         condition: service_healthy
       baserow_redis:
         condition: service_healthy
@@ -53,10 +57,12 @@ services:
       - SECRET_KEY=${BASEROW_SECRET_KEY}
       # Embedded Caddy: plain HTTP on :80 only — the stack's Caddy fronts it.
       - BASEROW_CADDY_ADDRESSES=:80
-      # ── External Postgres (disables the embedded one) ────────────────────
-      - DATABASE_HOST=baserow_db
+      # ── External Postgres: the base stack's shared collection_db, using
+      # Baserow's own private `baserow` schema (role's default search_path is
+      # set in collection_db/initdb/01-init.sh) — disables the embedded one.
+      - DATABASE_HOST=collection_db
       - DATABASE_PORT=5432
-      - DATABASE_NAME=${BASEROW_DB_NAME:-baserow}
+      - DATABASE_NAME=${COLLECTION_DB_NAME:-collection}
       - DATABASE_USER=${BASEROW_DB_USER:-baserow}
       - DATABASE_PASSWORD=${BASEROW_DB_PASSWORD}
       # ── External Redis (disables the embedded one) ───────────────────────
@@ -90,33 +96,7 @@ services:
         limits:
           memory: ${BASEROW_MEM_LIMIT:-2G}
           cpus: "${BASEROW_CPU_LIMIT:-2.0}"
-    networks: [baserow, edge, agent, inference]
-    logging: *default-logging
-
-  # ---------------------------------------------------------------------------
-  #  Dedicated Postgres for Baserow (mirrors hindsight_db).
-  # ---------------------------------------------------------------------------
-  baserow_db:
-    image: pgvector/pgvector:pg16
-    container_name: baserow_db
-    restart: unless-stopped
-    volumes:
-      - ${BASEROW_DB_DATA_DIR:-./data/baserow/db}:/var/lib/postgresql/data
-    environment:
-      POSTGRES_USER: ${BASEROW_DB_USER:-baserow}
-      POSTGRES_PASSWORD: ${BASEROW_DB_PASSWORD}
-      POSTGRES_DB: ${BASEROW_DB_NAME:-baserow}
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${BASEROW_DB_USER:-baserow}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    deploy:
-      resources:
-        limits:
-          memory: ${BASEROW_DB_MEM_LIMIT:-512M}
-          cpus: "${BASEROW_DB_CPU_LIMIT:-0.5}"
-    networks: [baserow]
+    networks: [baserow, collection, edge, agent, inference]
     logging: *default-logging
 
   # ---------------------------------------------------------------------------
@@ -143,13 +123,11 @@ services:
     logging: *default-logging
 
   # ---------------------------------------------------------------------------
-  #  Observability note (AGENTS.md §2): container-level metrics for all three
-  #  Baserow containers (CPU / memory / disk / net) are covered automatically by
-  #  cAdvisor, and the `ContainerDown` alert guards their liveness — no action
-  #  needed. A dedicated postgres-exporter (the hindsight_postgres_exporter
-  #  pattern) is deliberately NOT wired here: Prometheus's scrape config is a
-  #  static base file and the `up == 0` PrometheusTargetDown alert would fire for
-  #  everyone who runs the stack WITHOUT this optional override. To opt into full
-  #  PostgreSQL-internal metrics, add a postgres-exporter for baserow_db plus a
-  #  matching scrape job to prometheus/prometheus.yml on a Baserow-only deployment.
+  #  Observability note (AGENTS.md §2): container-level metrics for the
+  #  Baserow + Redis containers (CPU / memory / disk / net) are covered
+  #  automatically by cAdvisor, and the `ContainerDown` alert guards their
+  #  liveness. PostgreSQL-internal metrics are already covered for Baserow
+  #  too, since it shares `collection_db` with Directus/Windmill and that
+  #  DB's `collection_postgres_exporter` lives in the always-present base
+  #  `docker-compose.yml` (not gated behind this optional override).
   # ---------------------------------------------------------------------------

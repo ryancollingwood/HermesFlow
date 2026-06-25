@@ -32,6 +32,10 @@ networks:
   inference:
   # prometheus + exporters + grafana (scraping stays off the application networks)
   monitoring:
+  # collection_db <-> directus/baserow/windmill. Deliberately NOT joined by
+  # hermes — agent access to this data goes through the Directus/Baserow MCP
+  # servers only, never raw SQL.
+  collection:
 
 services:
   # ---------------------------------------------------------------------------
@@ -417,6 +421,53 @@ services:
     logging: *default-logging
 
   # ---------------------------------------------------------------------------
+  #  Collection database — shared store for captured/derived data (page
+  #  scrapes, LLM generations, triage records) that Windmill writes and
+  #  Directus governs as its application data (DB_SCHEMA=directus for
+  #  Directus's own system tables, separate `collection` schema for the
+  #  shared business data — see initdb/01-init.sh). Also hosts Baserow's own
+  #  private schema on this same physical instance (ops convenience: one DB
+  #  to back up/monitor) but with NO cross-grants into `collection` — Baserow
+  #  manages its tables via internal DDL that direct external writes would
+  #  risk corrupting, so any Baserow <-> collection sync goes through
+  #  Baserow's webhooks, not SQL.
+  #  Reachable directly from the host (COLLECTION_DB_BIND) for ad-hoc
+  #  inspection with psql/DBeaver/etc. Hermes is deliberately NOT on the
+  #  `collection` network — agent access goes through the Directus/Baserow
+  #  MCP servers only.
+  # ---------------------------------------------------------------------------
+  collection_db:
+    image: pgvector/pgvector:pg16
+    container_name: collection_db
+    restart: unless-stopped
+    volumes:
+      - ${COLLECTION_DB_DATA_DIR:-./data/collection/db}:/var/lib/postgresql/data
+      - ./collection_db/initdb:/docker-entrypoint-initdb.d:ro
+    environment:
+      POSTGRES_USER: ${COLLECTION_DB_ADMIN_USER:-collection_admin}
+      POSTGRES_PASSWORD: ${COLLECTION_DB_ADMIN_PASSWORD:-collection}
+      POSTGRES_DB: ${COLLECTION_DB_NAME:-collection}
+      # Consumed by initdb/01-init.sh to create the per-app roles below —
+      # only read on first init (empty data dir), same as POSTGRES_PASSWORD.
+      BASEROW_DB_PASSWORD: ${BASEROW_DB_PASSWORD:-baserow}
+      DIRECTUS_DB_PASSWORD: ${DIRECTUS_DB_PASSWORD:-directus}
+      WINDMILL_COLLECTION_DB_PASSWORD: ${WINDMILL_COLLECTION_DB_PASSWORD:-windmill}
+    ports:
+      - "${COLLECTION_DB_BIND:-127.0.0.1}:${COLLECTION_DB_PORT:-5433}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${COLLECTION_DB_ADMIN_USER:-collection_admin}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          memory: ${COLLECTION_DB_MEM_LIMIT:-1G}
+          cpus: "${COLLECTION_DB_CPU_LIMIT:-1.0}"
+    networks: [collection]
+    logging: *default-logging
+
+  # ---------------------------------------------------------------------------
   #  Windmill database
   # ---------------------------------------------------------------------------
   db:
@@ -551,7 +602,7 @@ services:
       - ${WM_DATA_DIR:-./data/windmill}/cache:/tmp/windmill/cache
       - ${WM_DATA_DIR:-./data/windmill}/logs:/tmp/windmill/logs
       - ${SHARED_DIR:-./data/shared}:/shared
-    networks: [backend, agent, inference]
+    networks: [backend, agent, inference, collection]
     logging: *default-logging
 
   # ---------------------------------------------------------------------------
@@ -582,7 +633,7 @@ services:
     volumes:
       - ${WM_DATA_DIR:-./data/windmill}/logs:/tmp/windmill/logs
       - ${SHARED_DIR:-./data/shared}:/shared
-    networks: [backend, agent, inference]
+    networks: [backend, agent, inference, collection]
     logging: *default-logging
 
   # ---------------------------------------------------------------------------
@@ -702,6 +753,23 @@ services:
           cpus: "0.1"
           memory: 64M
     networks: [backend, monitoring]
+    logging: *default-logging
+
+  collection_postgres_exporter:
+    image: prometheuscommunity/postgres-exporter:${PG_EXPORTER_VERSION:-latest}
+    container_name: collection_postgres_exporter
+    restart: unless-stopped
+    environment:
+      - DATA_SOURCE_NAME=postgresql://${COLLECTION_DB_ADMIN_USER:-collection_admin}:${COLLECTION_DB_ADMIN_PASSWORD:-collection}@collection_db:5432/${COLLECTION_DB_NAME:-collection}?sslmode=disable
+    depends_on:
+      collection_db:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.1"
+          memory: 64M
+    networks: [collection, monitoring]
     logging: *default-logging
 
   hindsight_postgres_exporter:
