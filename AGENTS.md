@@ -122,20 +122,95 @@ script, follow these rules so a push can never wipe data:
 
 ## Optional features = compose overrides, not edits to the base file
 
-Optional capabilities are layered with an override file toggled via `COMPOSE_FILE`
-in `.env`, leaving the default behaviour untouched:
+Optional capabilities are layered with a `docker-compose.<feature>.yml` override
+toggled via `COMPOSE_FILE` in `.env`, leaving the default stack untouched. Docker
+Compose reads `COMPOSE_FILE` from `.env`, so every `docker compose` / `make` call
+picks the override up. Prefer this over uncommenting blocks in the base file.
 
-- `docker-compose.gpu.yml` adds the NVIDIA device reservation to `ollama`
-  (`--gpu` sets `COMPOSE_FILE=docker-compose.yml:docker-compose.gpu.yml`). Docker
-  Compose reads `COMPOSE_FILE` from `.env`, so every `docker compose` / `make`
-  call picks it up. Prefer this pattern over uncommenting blocks in the base file.
+Two reference points, minimal → full:
 
-Inference notes worth knowing: Docker Desktop on **macOS cannot pass the GPU**
-into containers, so the bundled `ollama` is CPU-only there (use host-native
-`mlx/` or remote inference). On a **Linux/NVIDIA** host, `--gpu` makes the
-in-container `ollama` GPU-accelerated. The Hindsight memory provider reads
-`HINDSIGHT_API_URL` (the `hindsight-client` package ships in the hermes image —
-no `pip install` needed; just set `memory.provider`).
+- **`docker-compose.gpu.yml`** — one-service tweak: adds the NVIDIA device
+  reservation to `ollama` (`--gpu`).
+- **`docker-compose.baserow.yml`** — a full subsystem: an extra app + dedicated
+  Postgres/Redis, its own network, a Caddy route, secrets, an installer flag,
+  Makefile lifecycle targets, and an agent (MCP) bootstrap.
+
+### `COMPOSE_FILE` is additive
+
+Overrides must compose, so `--gpu` and `--with-baserow` can both be on at once.
+Build `COMPOSE_FILE` from `docker-compose.yml` + each enabled override,
+**idempotently — never overwrite it**. Both installers share a `compose_add`
+helper for this; the Makefile `make <feature>` / `<feature>-revert` targets
+add/remove their own override from the list.
+
+### Wiring checklist (per optional extension)
+
+Use only the layers the feature needs — `gpu` uses just the first two, `baserow`
+uses all of them. Keep `install.sh` and `install.py` at parity throughout.
+
+1. **Override file** `docker-compose.<feature>.yml` — its services still follow
+   the [Adding a new container](#adding-a-new-container) checklist.
+2. **Installer flag** `--with-<feature>` (default off) → `compose_add` the
+   override; reflect it in the usage text and the `--dry-run` summary.
+3. **Makefile lifecycle** — `make <feature>` (generate secrets → add the override
+   to `COMPOSE_FILE` → `up -d` the services) and `make <feature>-revert`
+   (stop/`rm` the services → drop the override; volumes preserved). Add both to
+   `.PHONY` with `## ` help comments.
+4. **Secrets** — `ensure_secret` calls in `make secrets` **and** the matching
+   `install.py`; leave them blank with `# <REQUIRED>` in `.env.example` (never a
+   weak default in the override). See [Secrets & credential handling](#secrets--credential-handling).
+5. **Backup** — a *guarded* dump in `make backup` (only when the service is
+   running, since the feature is usually off).
+6. **CI** — add the merged config to the compose job:
+   `docker compose -f docker-compose.yml -f docker-compose.<feature>.yml config -q`
+   (the base CI run doesn't include overrides).
+7. **Docs** — a README section + an INSTALL flag-table row; add a focused
+   `docs/<feature>*.md` for deeper caveats when warranted.
+
+### Override-file gotchas
+
+- **YAML anchors are file-scoped.** The base `&default-logging` anchor is not
+  visible in an override — redefine `x-logging: &default-logging` at the top of
+  any override that uses it.
+- **New networks** go in the override's own `networks:`; base networks (`edge`,
+  `agent`, …) merge across files and can just be referenced.
+- **Never reference an optional service from the base file** (e.g. in `caddy`'s
+  `depends_on`) — it breaks `docker compose config` when the override is absent. A
+  Caddy route in the always-present `Caddyfile` is fine: it just 502s until the
+  service is up.
+- **Optional exporters vs. Prometheus.** This *qualifies* the observability step
+  of the new-container checklist: cAdvisor covers every container automatically,
+  but a *static* scrape target for an optional service trips the `up == 0`
+  PrometheusTargetDown alert for everyone running without the override. Don't add
+  static scrape jobs for optional exporters — rely on cAdvisor and note the gap
+  (see the comment in `docker-compose.baserow.yml`).
+- **`.env` writers must be newline-safe.** Appending `KEY=VALUE` to a file whose
+  last line has no trailing newline concatenates onto it (it once mangled a
+  password). `ensure_secret` and the `baserow-mcp` `envput` add a newline first —
+  copy that guard for any new writer.
+
+### Runtime / agent (MCP) bootstrap
+
+Wiring that depends on a *running* service, an account, or credentials belongs in
+a dedicated, idempotent `make <feature>-...` target, **not** install-time.
+`make baserow-mcp` is the template: it provisions via the service's REST API,
+persists generated values back to `.env` (newline-safe), reuses what already
+exists on re-run, and verifies the result.
+
+Exposing a service to Hermes over **MCP** has a transport catch: Hermes drives
+Streamable-HTTP for `--url` servers. If the service only speaks the legacy
+HTTP+SSE transport (e.g. Baserow), bake the bridge into the **hermes image**
+(`mcp-remote`, see `hermes/Dockerfile`) and register it as a stdio server —
+baking keeps startup within Hermes's connect deadline (runtime `npx` is too slow).
+
+> **GPU notes.** Docker Desktop on **macOS cannot pass the GPU** into containers,
+> so the bundled `ollama` is CPU-only there (use host-native `mlx/` or remote
+> inference). On a **Linux/NVIDIA** host, `--gpu` makes the in-container `ollama`
+> GPU-accelerated.
+>
+> **Hindsight note.** The memory provider reads `HINDSIGHT_API_URL`; the
+> `hindsight-client` package ships in the hermes image (no `pip install` needed —
+> just set `memory.provider`).
 
 ---
 
