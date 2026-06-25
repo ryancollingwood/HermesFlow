@@ -612,12 +612,14 @@ delete rows, table schema, …), the same idea as the
 make baserow-mcp
 ```
 
-This logs into Baserow (using `BASEROW_EMAIL`/`BASEROW_PASSWORD` from `.env`, or
-prompts) — **creating the account if it doesn't exist yet** — then creates an
-**MCP endpoint** in your workspace via the REST API, registers it with Hermes, and
-verifies the connection. Start a **new** Hermes session for the tools to become
-active. Re-running is idempotent (it reuses the existing account, workspace, and
-`hermes` endpoint).
+This logs into Baserow with `BASEROW_EMAIL`/`BASEROW_PASSWORD` from `.env` —
+**creating the account if it doesn't exist yet** — then creates an **MCP
+endpoint** in your workspace via the REST API, registers it with Hermes, and
+verifies the connection. If the credentials are blank it **generates them and
+saves them back to `.env`** (use those to log into the Baserow UI); the
+workspace it uses is recorded as `BASEROW_WORKSPACE_ID`. Start a **new** Hermes
+session for the tools to become active. Re-running is idempotent (it reuses the
+saved account, workspace, and `hermes` endpoint).
 
 > **Which account, and who can see the data?** Baserow data is workspace-scoped:
 > the agent sees only the endpoint's workspace, and humans see it only if they're
