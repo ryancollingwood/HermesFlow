@@ -161,7 +161,7 @@ packages from `hermes/requirements.txt` into the image, then `docker compose up 
 It then runs `make hermes-heal` — idempotent cleanup that removes any stray
 agent-installed package overlay + `PYTHONPATH` drift so the baked venv stays
 authoritative — and waits for the `hermes` container to pass its healthcheck. See
-[hermes/README.md](hermes/README.md) for what the build does and why.
+[docs/hermes-docker-build.md](docs/hermes-docker-build.md) for what the build does and why.
 
 ### 9. Set the default model and probe
 Sets `model.default` (the image seeds an invalid default on OpenRouter), then
@@ -206,7 +206,7 @@ acceleration. This step:
 It does **not** re-route anything automatically. To use MLX afterwards, either
 route Hermes through it (`make mlx`) or point Hindsight at it (set
 `HINDSIGHT_LLM_BASE_URL=${MLX_BASE_URL}` and restart `hindsight`). See
-[`mlx/README.md`](mlx/README.md) for model sizing and details.
+[`docs/mlx.md`](docs/mlx.md) for model sizing and details.
 
 ### 13. Headroom routing (opt-in with `--with-headroom`)
 Only runs when `--with-headroom` is passed, and only for the `openrouter`

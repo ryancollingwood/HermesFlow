@@ -81,7 +81,7 @@ services:
   # ---------------------------------------------------------------------------
   hermes:
     # Thin derived image: bakes extra Python packages (hermes/requirements.txt)
-    # into the upstream image's read-only venv at build time. See hermes/README.md.
+    # into the upstream image's read-only venv at build time. See docs/hermes-docker-build.md.
     # Deploy package changes with: docker compose build hermes && docker compose up -d hermes
     build:
       context: ./hermes
@@ -138,7 +138,7 @@ services:
       - CLAUDE_CONFIG_DIR=/opt/data/.claude
       # Codex CLI home dir (auth.json, sessions) — same rationale as
       # CLAUDE_CONFIG_DIR above. Not baked into the image yet (see
-      # hermes/CODING_AGENTS.md) but harmless to set ahead of time.
+      # docs/hermes-coding-agents.md) but harmless to set ahead of time.
       - CODEX_HOME=/opt/data/.codex
       # OpenCode's explicit config file path, same rationale as
       # CLAUDE_CONFIG_DIR — keeps it on the bind-mounted volume even though

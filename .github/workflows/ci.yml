@@ -18,7 +18,8 @@ jobs:
         run: |
           docker compose -f docker-compose.yml -f docker-compose.gpu.yml config -q
           docker compose -f docker-compose.yml -f docker-compose.baserow.yml config -q
-          echo "✓ gpu + baserow overrides merge cleanly"
+          docker compose -f docker-compose.yml -f docker-compose.directus.yml config -q
+          echo "✓ gpu + baserow + directus overrides merge cleanly"
       - name: Validate Caddyfile
         run: |
           docker run --rm -v "$PWD/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2 \

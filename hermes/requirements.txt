@@ -13,7 +13,7 @@
 #  - One spec per line. No URLs / git+https / local paths / --index-url overrides.
 #  - After changing this file, redeploy with:
 #        docker compose build hermes && docker compose up -d hermes
-#  - See hermes/README.md for the full process and rationale.
+#  - See docs/hermes-docker-build.md for the full process and rationale.
 
 # search.firecrawl  (config.yaml: web.backend: firecrawl)
 firecrawl-py==4.17.0
