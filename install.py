@@ -60,6 +60,7 @@ Other optional channels / toggles:
     --with-headroom                       route Hermes through the Headroom proxy
     --with-baserow                        add Baserow (structured-data UI + REST API)
     --with-directus                       add Directus (triage UI + REST/GraphQL API + MCP)
+    --with-observability                  add Prometheus/Grafana/exporters/Loki+Promtail
     --bind-lan                            expose Hermes/Hindsight/Ollama on 0.0.0.0
     --gpu                                 NVIDIA GPU passthrough for Ollama (Linux)
     --env KEY=VALUE                       set any other .env var (repeatable)
@@ -579,6 +580,8 @@ def main() -> None:
                     help="add Baserow (structured-data UI + REST API) via its compose override")
     ap.add_argument("--with-directus", action="store_true",
                     help="add Directus (triage UI + REST/GraphQL API + MCP) via its compose override")
+    ap.add_argument("--with-observability", action="store_true",
+                    help="add Prometheus/Grafana/exporters/Loki+Promtail via its compose override")
     ap.add_argument("--bind-lan", action="store_true",
                     help="expose Hermes/Hindsight/Ollama on 0.0.0.0 instead of loopback")
     ap.add_argument("--gpu", action="store_true",
@@ -670,6 +673,8 @@ def main() -> None:
             + (" (docker-compose.baserow.yml)" if args.with_baserow else ""))
         say(f"  Directus:        {yn(args.with_directus)}"
             + (" (docker-compose.directus.yml)" if args.with_directus else ""))
+        say(f"  Observability:   {yn(args.with_observability)}"
+            + (" (docker-compose.observability.yml)" if args.with_observability else ""))
         say(f"  Telegram:        {'configured' if tg_token else 'none'}    "
             f"Discord: {'configured' if dc_token else 'none'}")
         if args.env:
@@ -763,6 +768,11 @@ def main() -> None:
     if args.with_directus:
         compose_add("docker-compose.directus.yml")
         say(f"{OK} enabled Directus — UI / API at http://directus.localhost (first boot runs migrations)")
+
+    if args.with_observability:
+        compose_add("docker-compose.observability.yml")
+        say(f"{OK} enabled observability — Grafana at http://grafana.localhost, "
+            f"Prometheus at http://prometheus.localhost")
 
     # Expose services on the LAN (0.0.0.0) instead of loopback only.
     if args.bind_lan:

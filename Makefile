@@ -27,7 +27,7 @@ else
   ON_WINDOWS :=
 endif
 
-.PHONY: help check init apikey secrets wizard secure fix-permissions pull build up down restart logs ps health backup bootstrap hermes-heal hermes-workspace hermes-secure lint validate ci headroom headroom-revert mlx mlx-revert mlx-status memory memory-revert hindsight-mlx hindsight-mlx-revert aux-cloud aux-local aux-hindsight aux-status windmill-push windmill-pull windmill-check baserow baserow-revert baserow-mcp directus directus-revert
+.PHONY: help check init apikey secrets wizard secure fix-permissions pull build up down restart logs ps health backup bootstrap hermes-heal hermes-workspace hermes-secure lint validate ci headroom headroom-revert mlx mlx-revert mlx-status memory memory-revert hindsight-mlx hindsight-mlx-revert aux-cloud aux-local aux-hindsight aux-status windmill-push windmill-pull windmill-check baserow baserow-revert baserow-mcp directus directus-revert observability observability-revert
 
 # Fill an .env variable with a generated value when it is empty OR still set to a
 # known-weak default. Usage: $(call ensure_secret,VAR,GENERATOR,WEAK_DEFAULT)
@@ -329,6 +329,37 @@ directus-revert: ## Stop Directus + drop its override from COMPOSE_FILE (volumes
 	  sed -i.bak "s|^COMPOSE_FILE=.*|COMPOSE_FILE=$$NEW|" $(ENV_FILE) && rm -f $(ENV_FILE).bak; \
 	  echo "✓ COMPOSE_FILE=$${NEW:-(cleared)}"
 	@echo "✓ Directus stopped (data preserved; collection_db keeps running for Baserow/Windmill)"
+
+observability: ## Start observability (Prometheus, Grafana, exporters, Loki/Promtail); adds the override to COMPOSE_FILE
+	@$(MAKE) --no-print-directory secrets
+	@CUR=$$(grep -E '^COMPOSE_FILE=' $(ENV_FILE) 2>/dev/null | head -1 | cut -d= -f2- | xargs); \
+	  case ":$$CUR:" in \
+	    *:docker-compose.observability.yml:*) NEW="$$CUR" ;; \
+	    *) if [ -z "$$CUR" ]; then NEW="docker-compose.yml:docker-compose.observability.yml"; \
+	       else NEW="$$CUR:docker-compose.observability.yml"; fi ;; \
+	  esac; \
+	  if grep -qE '^COMPOSE_FILE=' $(ENV_FILE); then \
+	    sed -i.bak "s|^COMPOSE_FILE=.*|COMPOSE_FILE=$$NEW|" $(ENV_FILE) && rm -f $(ENV_FILE).bak; \
+	  else \
+	    echo "COMPOSE_FILE=$$NEW" >> $(ENV_FILE); \
+	  fi; \
+	  echo "✓ COMPOSE_FILE=$$NEW"
+	@$(COMPOSE) up -d prometheus grafana cadvisor node_exporter postgres_exporter collection_postgres_exporter hindsight_postgres_exporter alertmanager loki promtail
+	@$(COMPOSE) up -d caddy
+	@echo "✓ Observability is starting"
+	@echo "  Grafana:      http://grafana.localhost   (admin / see GRAFANA_ADMIN_PASSWORD)"
+	@echo "  Prometheus:   http://prometheus.localhost"
+	@echo "  Alertmanager: http://alertmanager.localhost"
+
+observability-revert: ## Stop observability + drop its override from COMPOSE_FILE (volumes/data preserved)
+	@$(COMPOSE) rm -sf prometheus grafana cadvisor node_exporter postgres_exporter collection_postgres_exporter hindsight_postgres_exporter alertmanager loki promtail 2>/dev/null || true
+	@CUR=$$(grep -E '^COMPOSE_FILE=' $(ENV_FILE) 2>/dev/null | head -1 | cut -d= -f2- | xargs); \
+	  NEW=$$(echo "$$CUR" | sed -E 's|:?docker-compose\.observability\.yml||'); \
+	  if [ -z "$$NEW" ] || [ "$$NEW" = "docker-compose.yml" ]; then NEW=""; fi; \
+	  sed -i.bak "s|^COMPOSE_FILE=.*|COMPOSE_FILE=$$NEW|" $(ENV_FILE) && rm -f $(ENV_FILE).bak; \
+	  echo "✓ COMPOSE_FILE=$${NEW:-(cleared)}"
+	@$(COMPOSE) up -d caddy 2>/dev/null || true
+	@echo "✓ Observability stopped (data preserved in volumes)"
 
 mlx: ## Route Hermes to a host-native MLX server (Apple Silicon — see docs/mlx.md)
 	@set -a; . ./$(ENV_FILE); set +a; \

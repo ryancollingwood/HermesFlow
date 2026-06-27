@@ -16,7 +16,7 @@ before touching any file.
 | Inference | `ollama` |
 | Workflow | `windmill_server`, `windmill_lsp`, `windmill_worker` (×2), `windmill_worker_native` |
 | Data | `db` (PostgreSQL 16) |
-| Observability | `prometheus`, `alertmanager`, `grafana`, `cadvisor`, `node_exporter`, `postgres_exporter`, `hindsight_postgres_exporter`, `loki`, `promtail` |
+| Observability (optional, `docker-compose.observability.yml`) | `prometheus`, `alertmanager`, `grafana`, `cadvisor`, `node_exporter`, `postgres_exporter`, `collection_postgres_exporter`, `hindsight_postgres_exporter`, `loki`, `promtail` |
 
 Networks: `backend`, `edge`, `agent`, `memory`, `inference`, `monitoring`.
 

@@ -85,6 +85,8 @@ preview exactly what an install would do:
 | `--discord-allowed-users <id,id,…>` | — | Comma-separated Discord user IDs allowed to use the bot. **Requires** `--discord-bot-token`. |
 | `--with-headroom` | off | Route Hermes through the Headroom context-compression proxy (OpenRouter only). |
 | `--with-baserow` | off | Add Baserow (structured-data UI + REST API + MCP) by layering [`docker-compose.baserow.yml`](docker-compose.baserow.yml) on via `COMPOSE_FILE`. AI fields default to local Ollama. |
+| `--with-directus` | off | Add Directus (triage UI + REST/GraphQL API + MCP) by layering [`docker-compose.directus.yml`](docker-compose.directus.yml) on via `COMPOSE_FILE`. |
+| `--with-observability` | off | Add Prometheus, Grafana, exporters, and Loki/Promtail by layering [`docker-compose.observability.yml`](docker-compose.observability.yml) on via `COMPOSE_FILE`. |
 | `--bind-lan` | off | Expose Hermes/Hindsight/Ollama on `0.0.0.0` instead of loopback. |
 | `--gpu` | off | NVIDIA GPU passthrough for the Ollama container (Linux/WSL2 + nvidia-container-toolkit). No-op on macOS. |
 | `--env KEY=VALUE` | — | Set any other `.env` variable. Repeatable. |
@@ -121,7 +123,8 @@ Generates every required secret that's blank or still a known-weak default:
 `GRAFANA_ADMIN_PASSWORD` (otherwise Grafana boots as `admin`/`changeme`).
 Existing custom values are left alone.
 
-This step also applies the `--gpu`, `--with-baserow`, `--bind-lan`,
+This step also applies the `--gpu`, `--with-baserow`, `--with-directus`,
+`--with-observability`, `--bind-lan`,
 `--hindsight-api-key`, and `--env` overrides to `.env` first, so they're in place
 before the stack starts. `--gpu` layers
 [`docker-compose.gpu.yml`](docker-compose.gpu.yml) on via `COMPOSE_FILE` (adding
@@ -223,6 +226,25 @@ with the stack — UI/REST API at `http://baserow.localhost`. AI fields default 
 the local Ollama container. The same thing `make baserow` does; revert (and drop
 the override) with `make baserow-revert`. See
 [README → Baserow](README.md#baserow-structured-data).
+
+### 15. Directus (opt-in with `--with-directus`)
+Only runs when `--with-directus` is passed. Adds
+[`docker-compose.directus.yml`](docker-compose.directus.yml) to `COMPOSE_FILE` so
+Directus comes up against the shared `collection_db` — UI/REST/GraphQL API at
+`http://directus.localhost`, logging in with `DIRECTUS_ADMIN_EMAIL` /
+`DIRECTUS_ADMIN_PASSWORD`. The same thing `make directus` does; revert (and
+drop the override) with `make directus-revert`. MCP access is enabled in the
+Directus UI itself (Settings → AI), not scriptable here. See
+[README → Directus](README.md#directus-triage-ui).
+
+### 16. Observability (opt-in with `--with-observability`)
+Only runs when `--with-observability` is passed. Adds
+[`docker-compose.observability.yml`](docker-compose.observability.yml) to
+`COMPOSE_FILE` so Prometheus, Grafana, cAdvisor, the exporters, Alertmanager,
+and Loki/Promtail come up — dashboards at `http://grafana.localhost` (`admin` /
+`GRAFANA_ADMIN_PASSWORD`). The same thing `make observability` does; revert
+(and drop the override) with `make observability-revert`. See
+[README → Observability](README.md#observability-optional).
 
 ## Re-running / repair
 
