@@ -61,6 +61,7 @@
 #    --discord-allowed-users <id,id,...>   Discord user IDs allowed to use the bot
 #    --with-headroom                       route Hermes through the Headroom proxy
 #    --with-baserow                        add Baserow (structured-data UI + REST API)
+#    --with-directus                       add Directus (triage UI + REST/GraphQL API + MCP)
 #    --bind-lan                            expose Hermes/Hindsight/Ollama on 0.0.0.0
 #    --gpu                                 NVIDIA GPU passthrough for Ollama (Linux)
 #    --env KEY=VALUE                       set any other .env var (repeatable)
@@ -92,6 +93,7 @@ DISCORD_TOKEN=""
 DISCORD_USERS=""
 WITH_HEADROOM=0
 WITH_BASEROW=0
+WITH_DIRECTUS=0
 BIND_LAN=0
 GPU=0
 PROFILE=""
@@ -434,6 +436,7 @@ while [ $# -gt 0 ]; do
     --discord-allowed-users) DISCORD_USERS="$2"; shift 2 ;;
     --with-headroom) WITH_HEADROOM=1; shift ;;
     --with-baserow) WITH_BASEROW=1; shift ;;
+    --with-directus) WITH_DIRECTUS=1; shift ;;
     --bind-lan) BIND_LAN=1; shift ;;
     --gpu) GPU=1; shift ;;
     --profile) shift 2 ;;
@@ -511,12 +514,13 @@ if [ "$DRY_RUN" -eq 1 ]; then
   echo "  Provider:        $PROVIDER (api key: $([ -n "$API_KEY" ] && echo present || echo ABSENT))"
   echo "  Default model:   $MODEL"
   echo "  Profile:         ${PROFILE:-none}"
-  echo "  Secrets:         generate any blank/weak of API_SERVER_KEY, WM_DB_PASSWORD, HINDSIGHT_DB_PASSWORD, GRAFANA_ADMIN_PASSWORD, BASEROW_*"
+  echo "  Secrets:         generate any blank/weak of API_SERVER_KEY, WM_DB_PASSWORD, HINDSIGHT_DB_PASSWORD, GRAFANA_ADMIN_PASSWORD, COLLECTION_DB_ADMIN_PASSWORD, BASEROW_*, DIRECTUS_*, WINDMILL_COLLECTION_DB_PASSWORD"
   echo "  Memory:          $(yn $WITH_MEMORY)$([ "$HS_REMOTE" -eq 1 ] && echo " (remote via $PROVIDER)")"
   [ -n "$HS_MODEL$HS_BASE_URL" ] && echo "  Hindsight LLM:   model=${HS_MODEL:-<.env>} base=${HS_BASE_URL:-<.env>}"
   echo "  Windmill:        $(yn $WITH_WINDMILL)"
   echo "  MLX server:      $(yn $WITH_MLX)    Headroom: $(yn $WITH_HEADROOM)    GPU passthrough: $(yn $GPU)    LAN bind: $(yn $BIND_LAN)"
   echo "  Baserow:         $(yn $WITH_BASEROW)$([ "$WITH_BASEROW" -eq 1 ] && echo " (docker-compose.baserow.yml)")"
+  echo "  Directus:        $(yn $WITH_DIRECTUS)$([ "$WITH_DIRECTUS" -eq 1 ] && echo " (docker-compose.directus.yml)")"
   echo "  Telegram:        $([ -n "$TG_TOKEN" ] && echo configured || echo none)    Discord: $([ -n "$DISCORD_TOKEN" ] && echo configured || echo none)"
   [ "${#EXTRA_ENV[@]}" -gt 0 ] && echo "  Extra .env:      ${EXTRA_ENV[*]}"
   echo "  Steps:           $([ "$DO_PULL" -eq 1 ] && echo 'pull → ')$([ "$DO_BUILD" -eq 1 ] && echo 'build → ')up → heal → set-model → probe$([ "$WITH_MEMORY" -eq 1 ] && echo ' → memory')$([ "$WITH_WINDMILL" -eq 1 ] && echo ' → windmill')$([ "$WITH_MLX" -eq 1 ] && echo ' → mlx')$([ "$WITH_HEADROOM" -eq 1 ] && echo ' → headroom')"
@@ -591,6 +595,15 @@ fi
 if [ "$WITH_BASEROW" -eq 1 ]; then
   compose_add docker-compose.baserow.yml
   echo "✓ enabled Baserow — UI / REST API at http://baserow.localhost (first boot runs migrations)"
+fi
+
+# Directus (triage UI + REST/GraphQL API + MCP) — layer its optional compose
+# override. Uses the base stack's shared collection_db (own `directus` schema
+# + the shared `collection` schema). MCP is enabled via Settings -> AI in the
+# Studio UI after first login, not here.
+if [ "$WITH_DIRECTUS" -eq 1 ]; then
+  compose_add docker-compose.directus.yml
+  echo "✓ enabled Directus — UI / API at http://directus.localhost (first boot runs migrations)"
 fi
 
 # Expose services on the LAN (0.0.0.0) instead of loopback only.

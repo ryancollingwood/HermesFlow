@@ -1,0 +1,101 @@
+# =============================================================================
+#  Directus — human triage UI, AI-assisted field generation, agent (MCP) and
+#  programmatic API access over the shared `collection` schema.
+#
+#  Opt-in override layered on top of the base stack via COMPOSE_FILE in .env:
+#      COMPOSE_FILE=docker-compose.yml:docker-compose.directus.yml
+#  The installers do this with `--with-directus`; manually, run `make directus`.
+#
+#  Uses the base stack's `collection_db` Postgres: DB_SCHEMA=directus isolates
+#  Directus's own system tables (directus_users, directus_permissions, etc.),
+#  while Directus is also granted full rights on the shared `collection`
+#  schema as its application data (page scrapes, LLM generations, triage
+#  records) — see collection_db/initdb/01-init.sh for the grants, and the
+#  functional-requirements gap analysis for why Baserow's own `baserow`
+#  schema is deliberately NOT reachable from here (Baserow's tables are
+#  managed by its own internal DDL; cross-app sync goes through Baserow's
+#  webhooks, not SQL).
+#
+#  AI field generation: Directus has no native "AI field" type or AI Flow
+#  operation. Build a Flow (Webhook/Request URL -> Run Script -> Update Data)
+#  calling Ollama's /v1 endpoint directly over the `inference` network, or use
+#  the built-in AI Assistant chat panel pointed at the same local endpoint via
+#  Settings -> AI (supports OpenAI-compatible custom endpoints, including
+#  Ollama, natively).
+#
+#  MCP: native since Directus v11.12+. Enabled via Settings -> AI in the
+#  Studio UI (not a compose-level/env setting) — generate a static access
+#  token for a dedicated MCP user there, then register it with Hermes. All
+#  MCP operations run through that user's normal Directus permissions (no
+#  privileged bypass) and are audit-logged.
+#
+#  NOTE: YAML anchors are file-scoped — the base file's &default-logging is
+#  not visible here, so it is redefined below.
+# =============================================================================
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "20m"
+    max-file: "5"
+    compress: "true"
+
+services:
+  # ---------------------------------------------------------------------------
+  #  Directus app (Studio UI + REST/GraphQL API + MCP server, once enabled).
+  # ---------------------------------------------------------------------------
+  directus:
+    image: directus/directus:${DIRECTUS_VERSION:-latest}
+    container_name: directus
+    restart: unless-stopped
+    depends_on:
+      collection_db:
+        condition: service_healthy
+    environment:
+      # ── Project key/secret + admin bootstrap ──────────────────────────────
+      - KEY=${DIRECTUS_KEY}
+      - SECRET=${DIRECTUS_SECRET}
+      - ADMIN_EMAIL=${DIRECTUS_ADMIN_EMAIL:-admin@directus.local}
+      - ADMIN_PASSWORD=${DIRECTUS_ADMIN_PASSWORD}
+      # Public URL Directus generates links against — must match how you
+      # reach it. Default assumes access via the stack's Caddy.
+      - PUBLIC_URL=${DIRECTUS_PUBLIC_URL:-http://directus.localhost}
+      # ── Database: the base stack's shared collection_db, Directus's own
+      # `directus` schema for system tables (role's default search_path also
+      # includes `collection` for its application data — see
+      # collection_db/initdb/01-init.sh) ────────────────────────────────────
+      - DB_CLIENT=pg
+      - DB_HOST=collection_db
+      - DB_PORT=5432
+      - DB_DATABASE=${COLLECTION_DB_NAME:-collection}
+      - DB_USER=${DIRECTUS_DB_USER:-directus}
+      - DB_PASSWORD=${DIRECTUS_DB_PASSWORD}
+      - DB_SCHEMA=directus
+    volumes:
+      - ${DIRECTUS_UPLOADS_DIR:-./data/directus/uploads}:/directus/uploads
+      - ${DIRECTUS_EXTENSIONS_DIR:-./data/directus/extensions}:/directus/extensions
+    ports:
+      # Direct host access (optional); primary access is via Caddy.
+      - "${DIRECTUS_BIND:-127.0.0.1}:${DIRECTUS_PORT:-8055}:8055"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8055/server/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          memory: ${DIRECTUS_MEM_LIMIT:-1G}
+          cpus: "${DIRECTUS_CPU_LIMIT:-1.0}"
+    networks: [collection, edge, agent, inference]
+    logging: *default-logging
+
+  # ---------------------------------------------------------------------------
+  #  Observability note (AGENTS.md §2): container-level metrics are covered
+  #  automatically by cAdvisor. /server/health is wired above as the
+  #  container healthcheck. PostgreSQL-internal metrics for Directus's DB are
+  #  already covered by `collection_postgres_exporter` in the always-present
+  #  base docker-compose.yml (not gated behind this optional override).
+  #  Directus has no separate /metrics endpoint to scrape.
+  # ---------------------------------------------------------------------------

@@ -59,6 +59,7 @@ Other optional channels / toggles:
     --discord-allowed-users <id,id,...>   Discord user IDs allowed to use the bot
     --with-headroom                       route Hermes through the Headroom proxy
     --with-baserow                        add Baserow (structured-data UI + REST API)
+    --with-directus                       add Directus (triage UI + REST/GraphQL API + MCP)
     --bind-lan                            expose Hermes/Hindsight/Ollama on 0.0.0.0
     --gpu                                 NVIDIA GPU passthrough for Ollama (Linux)
     --env KEY=VALUE                       set any other .env var (repeatable)
@@ -576,6 +577,8 @@ def main() -> None:
                     help="route Hermes through the Headroom context-compression proxy")
     ap.add_argument("--with-baserow", action="store_true",
                     help="add Baserow (structured-data UI + REST API) via its compose override")
+    ap.add_argument("--with-directus", action="store_true",
+                    help="add Directus (triage UI + REST/GraphQL API + MCP) via its compose override")
     ap.add_argument("--bind-lan", action="store_true",
                     help="expose Hermes/Hindsight/Ollama on 0.0.0.0 instead of loopback")
     ap.add_argument("--gpu", action="store_true",
@@ -665,6 +668,8 @@ def main() -> None:
             f"GPU passthrough: {yn(args.gpu)}    LAN bind: {yn(args.bind_lan)}")
         say(f"  Baserow:         {yn(args.with_baserow)}"
             + (" (docker-compose.baserow.yml)" if args.with_baserow else ""))
+        say(f"  Directus:        {yn(args.with_directus)}"
+            + (" (docker-compose.directus.yml)" if args.with_directus else ""))
         say(f"  Telegram:        {'configured' if tg_token else 'none'}    "
             f"Discord: {'configured' if dc_token else 'none'}")
         if args.env:
@@ -751,6 +756,14 @@ def main() -> None:
         compose_add("docker-compose.baserow.yml")
         say(f"{OK} enabled Baserow — UI / REST API at http://baserow.localhost (first boot runs migrations)")
 
+    # Directus (triage UI + REST/GraphQL API + MCP) — layer its optional
+    # compose override. Uses the base stack's shared collection_db (own
+    # `directus` schema + the shared `collection` schema). MCP is enabled via
+    # Settings -> AI in the Studio UI after first login, not here.
+    if args.with_directus:
+        compose_add("docker-compose.directus.yml")
+        say(f"{OK} enabled Directus — UI / API at http://directus.localhost (first boot runs migrations)")
+
     # Expose services on the LAN (0.0.0.0) instead of loopback only.
     if args.bind_lan:
         for k in ("HERMES_BIND", "HINDSIGHT_BIND", "OLLAMA_BIND"):
@@ -779,9 +792,15 @@ def main() -> None:
     ensure_secret("WM_DB_PASSWORD", 32, weak="windmill")
     ensure_secret("HINDSIGHT_DB_PASSWORD", 16, weak="hindsight")
     ensure_secret("GRAFANA_ADMIN_PASSWORD", 16, weak="changeme")
+    ensure_secret("COLLECTION_DB_ADMIN_PASSWORD", 16, weak="collection")
     ensure_secret("BASEROW_SECRET_KEY", 32)
     ensure_secret("BASEROW_DB_PASSWORD", 16)
     ensure_secret("BASEROW_REDIS_PASSWORD", 16)
+    ensure_secret("DIRECTUS_DB_PASSWORD", 16)
+    ensure_secret("WINDMILL_COLLECTION_DB_PASSWORD", 16)
+    ensure_secret("DIRECTUS_KEY", 16)
+    ensure_secret("DIRECTUS_SECRET", 32)
+    ensure_secret("DIRECTUS_ADMIN_PASSWORD", 16)
 
     # 6. data dirs + ownership
     make_dirs_and_fix_perms()
