@@ -227,6 +227,25 @@ the local Ollama container. The same thing `make baserow` does; revert (and drop
 the override) with `make baserow-revert`. See
 [README → Baserow](README.md#baserow-structured-data).
 
+### 15. Directus (opt-in with `--with-directus`)
+Only runs when `--with-directus` is passed. Adds
+[`docker-compose.directus.yml`](docker-compose.directus.yml) to `COMPOSE_FILE` so
+Directus comes up against the shared `collection_db` — UI/REST/GraphQL API at
+`http://directus.localhost`, logging in with `DIRECTUS_ADMIN_EMAIL` /
+`DIRECTUS_ADMIN_PASSWORD`. The same thing `make directus` does; revert (and
+drop the override) with `make directus-revert`. MCP access is enabled in the
+Directus UI itself (Settings → AI), not scriptable here. See
+[README → Directus](README.md#directus-triage-ui).
+
+### 16. Observability (opt-in with `--with-observability`)
+Only runs when `--with-observability` is passed. Adds
+[`docker-compose.observability.yml`](docker-compose.observability.yml) to
+`COMPOSE_FILE` so Prometheus, Grafana, cAdvisor, the exporters, Alertmanager,
+and Loki/Promtail come up — dashboards at `http://grafana.localhost` (`admin` /
+`GRAFANA_ADMIN_PASSWORD`). The same thing `make observability` does; revert
+(and drop the override) with `make observability-revert`. See
+[README → Observability](README.md#observability-optional).
+
 ## Re-running / repair
 
 Because every step is idempotent you can re-run the installer to:
