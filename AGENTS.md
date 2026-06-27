@@ -150,13 +150,41 @@ toggled via `COMPOSE_FILE` in `.env`, leaving the default stack untouched. Docke
 Compose reads `COMPOSE_FILE` from `.env`, so every `docker compose` / `make` call
 picks the override up. Prefer this over uncommenting blocks in the base file.
 
-Two reference points, minimal → full:
+Three reference points, minimal → full:
 
 - **`docker-compose.gpu.yml`** — one-service tweak: adds the NVIDIA device
   reservation to `ollama` (`--gpu`).
-- **`docker-compose.baserow.yml`** — a full subsystem: an extra app + dedicated
-  Postgres/Redis, its own network, a Caddy route, secrets, an installer flag,
-  Makefile lifecycle targets, and an agent (MCP) bootstrap.
+- **`docker-compose.baserow.yml`** — a full subsystem with its own dedicated
+  Postgres/Redis: an extra app, its own network, a Caddy route, secrets, an
+  installer flag, Makefile lifecycle targets, and an agent (MCP) bootstrap.
+- **`docker-compose.directus.yml`** — a full subsystem that instead **shares**
+  the base stack's `collection_db` Postgres (see
+  [Shared `collection_db` schema isolation](#shared-collection_db-schema-isolation)
+  below): an extra app, secrets, an installer flag (`--with-directus`), and
+  Makefile lifecycle targets (`make directus` / `directus-revert`) — but no
+  MCP bootstrap target, since its MCP server is enabled natively in the
+  Directus Studio UI rather than bridged through Hermes.
+
+### Shared `collection_db` schema isolation
+
+Unlike Baserow (its own dedicated Postgres container), Directus reuses the
+base stack's `collection_db` Postgres instance, alongside Windmill's
+"collection" role. `collection_db/initdb/01-init.sh` creates three isolated
+schemas in one physical database, each with its own role:
+
+- `baserow` — Baserow's own private schema. No other role gets access; its
+  table/field DDL is internally managed and direct external writes risk
+  corrupting it. Any Baserow ↔ collection sync goes through Baserow's
+  webhooks, not SQL.
+- `directus` — Directus's own system tables (`directus_users`,
+  `directus_permissions`, etc).
+- `collection` — shared business data (page scrapes, LLM generations, triage
+  records), writable by both `directus` and `windmill_collection` roles, but
+  **not** by `baserow`.
+
+If you add another subsystem that needs to share this database, follow the
+same pattern: a dedicated role + schema in `01-init.sh`, scoped grants on
+`collection` only if it genuinely needs to read/write shared data.
 
 ### `COMPOSE_FILE` is additive
 
@@ -186,7 +214,8 @@ uses all of them. Keep `install.sh` and `install.py` at parity throughout.
    running, since the feature is usually off).
 6. **CI** — add the merged config to the compose job:
    `docker compose -f docker-compose.yml -f docker-compose.<feature>.yml config -q`
-   (the base CI run doesn't include overrides).
+   (the base CI run doesn't include overrides). `docker-compose.directus.yml`
+   is **not yet in this CI check** — validate it locally until that's fixed.
 7. **Docs** — a README section + an INSTALL flag-table row; add a focused
    `docs/<feature>*.md` for deeper caveats when warranted.
 
@@ -226,6 +255,13 @@ HTTP+SSE transport (e.g. Baserow), bake the bridge into the **hermes image**
 (`mcp-remote`, see `hermes/Dockerfile`) and register it as a stdio server —
 baking keeps startup within Hermes's connect deadline (runtime `npx` is too slow).
 
+Not every integration needs this dance — if the service ships a native MCP
+server already (Directus, v11.12+), there's no bridge to bake: enable it via
+the app's own UI (Settings → AI in Directus's case) and register the
+resulting endpoint/token with Hermes directly. Don't add a
+`make directus-mcp`-style target for this; it's a one-time manual step, not
+a repeatable provisioning flow like `baserow-mcp`.
+
 > **GPU notes.** Docker Desktop on **macOS cannot pass the GPU** into containers,
 > so the bundled `ollama` is CPU-only there (use host-native `mlx/` or remote
 > inference). On a **Linux/NVIDIA** host, `--gpu` makes the in-container `ollama`
@@ -234,6 +270,12 @@ baking keeps startup within Hermes's connect deadline (runtime `npx` is too slow
 > **Hindsight note.** The memory provider reads `HINDSIGHT_API_URL`; the
 > `hindsight-client` package ships in the hermes image (no `pip install` needed —
 > just set `memory.provider`).
+>
+> **Directus note.** No native "AI field" type or AI Flow operation exists.
+> AI-assisted field generation needs a Directus Flow (Webhook/Request URL →
+> Run Script → Update Data) calling Ollama's `/v1` endpoint over the
+> `inference` network, or the built-in AI Assistant chat panel pointed at the
+> same endpoint via Settings → AI.
 
 ---
 
