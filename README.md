@@ -17,7 +17,7 @@ with the Windmill side pre-wired to call Hermes as an OpenAI-compatible endpoint
 | `Makefile` | `bootstrap`, lifecycle, health, backups, key generation |
 | `windmill/` | wmill-syncable resource type, resource, secret, and example scripts |
 | `mlx/` | Host-native MLX inference server for Apple Silicon (setup + launch script) |
-| `hermes/` | Thin derived Hermes image — bakes extra Python packages into the venv ([how & why](hermes/README.md)) |
+| `hermes/` | Thin derived Hermes image — bakes extra Python packages into the venv ([how & why](docs/hermes-docker-build.md)) |
 
 ## Architecture
 
@@ -415,7 +415,7 @@ doesn't pass the GPU through to containers. It runs as a native host process ins
 reachable from the stack via `host.docker.internal` (same pattern as the LM Studio
 backend below).
 
-See [`mlx/README.md`](mlx/README.md) for setup, model sizing for 8/16/32 GB Macs, and
+See [`docs/mlx.md`](docs/mlx.md) for setup, model sizing for 8/16/32 GB Macs, and
 how to point Hindsight and/or Hermes at it. Quick version:
 
 ```sh
@@ -716,7 +716,6 @@ instead of hardcoding the URL/key each time.
 ```
 windmill/
 ├── wmill.yaml                          # sync config (scope: f/hermes/** only)
-├── SYNC.md                             # what push/pull do to your content — read before forcing a push
 ├── hermes_endpoint.resource-type.yaml  # resource type: { base_url, api_key }
 └── f/hermes/                           # VERSIONED Hermes code/config (this is the only synced folder)
     ├── folder.meta.yaml                # folder permissions/owners (tracked so a push won't strip them)
@@ -732,7 +731,7 @@ windmill/
 > installer creates but which is **deliberately outside sync scope**, so a mirror
 > push never deletes it and it never lands in git. Everything else (`u/*`, other
 > `f/*`, inherited resource-types, secret variables) is ignored by sync too.
-> [**windmill/SYNC.md**](windmill/SYNC.md) has the full per-scenario breakdown.
+> [**docs/windmill-sync.md**](docs/windmill-sync.md) has the full per-scenario breakdown.
 
 ### Push it
 

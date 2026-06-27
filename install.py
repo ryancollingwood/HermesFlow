@@ -463,7 +463,7 @@ def setup_windmill() -> None:
     # Ensure the runtime-state folder exists (create-or-no-op). Scripts store
     # NON-secret Hermes state here (e.g. last-run timestamps). It is deliberately
     # OUTSIDE wmill.yaml's sync scope, so a mirror push never deletes it and it
-    # is never versioned in the repo. See windmill/SYNC.md.
+    # is never versioned in the repo. See docs/windmill-sync.md.
     fst, _ = wm_http("GET", "/api/w/main/folders/get/hermes_state", bearer=token)
     if fst == 200:
         say(f"{OK} Windmill folder f/hermes_state already exists")

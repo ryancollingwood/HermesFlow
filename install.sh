@@ -312,7 +312,7 @@ setup_windmill() {
   # Ensure the runtime-state folder exists (create-or-no-op). Scripts store
   # NON-secret Hermes state here (e.g. last-run timestamps). It is deliberately
   # OUTSIDE wmill.yaml's sync scope, so a mirror push never deletes it and it is
-  # never versioned in the repo. See windmill/SYNC.md.
+  # never versioned in the repo. See docs/windmill-sync.md.
   if curl -fsS -o /dev/null -H "Host: $hh" -H "Authorization: Bearer $token" \
        "$base/api/w/main/folders/get/hermes_state" 2>/dev/null; then
     echo "✓ Windmill folder f/hermes_state already exists"

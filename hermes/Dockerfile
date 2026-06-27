@@ -3,7 +3,7 @@
 # then the venv is re-locked so the RUNTIME posture is identical to upstream:
 # read-only, root-owned venv; the agent (uid 501 hermes) gains no write access.
 #
-# See hermes/README.md for the why, and hermes/requirements.txt for the packages.
+# See docs/hermes-docker-build.md for the why, and hermes/requirements.txt for the packages.
 ARG HERMES_VERSION=latest
 FROM nousresearch/hermes-agent:${HERMES_VERSION}
 

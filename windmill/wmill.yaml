@@ -6,7 +6,7 @@ defaultTs: bun
 # everything else (the f/hermes_state runtime-state folder, any other f/
 # folder, all u/ namespaces, and the ~250 inherited resource-types) is
 # intentionally OUT of scope so a mirror push can never delete it. See
-# windmill/SYNC.md for the full scenario breakdown.
+# docs/windmill-sync.md for the full scenario breakdown.
 includes:
   - "f/hermes/**"
   - "f/collection/**"

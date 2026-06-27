@@ -330,14 +330,14 @@ directus-revert: ## Stop Directus + drop its override from COMPOSE_FILE (volumes
 	  echo "✓ COMPOSE_FILE=$${NEW:-(cleared)}"
 	@echo "✓ Directus stopped (data preserved; collection_db keeps running for Baserow/Windmill)"
 
-mlx: ## Route Hermes to a host-native MLX server (Apple Silicon — see mlx/README.md)
+mlx: ## Route Hermes to a host-native MLX server (Apple Silicon — see docs/mlx.md)
 	@set -a; . ./$(ENV_FILE); set +a; \
 	  docker exec hermes hermes config set model.provider custom; \
 	  docker exec hermes hermes config set model.base_url "$${MLX_BASE_URL:-http://host.docker.internal:8080/v1}"; \
 	  docker exec hermes hermes config set model.api_key mlx
 	@$(COMPOSE) restart hermes
 	@echo "✓ Hermes is routing to the host MLX server"
-	@echo "  Make sure mlx_lm.server is running on the host first — see mlx/README.md"
+	@echo "  Make sure mlx_lm.server is running on the host first — see docs/mlx.md"
 
 mlx-revert: headroom-revert ## Revert Hermes to direct provider routing (alias of headroom-revert)
 

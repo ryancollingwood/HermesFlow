@@ -94,7 +94,7 @@ start / flags) and `INSTALL.md` (flag table + step description).
 **deletes/archives** anything in scope that isn't tracked). Scope is set by
 `includes` in `windmill/wmill.yaml` and is deliberately narrow — currently
 `f/hermes/**` + `f/collection/**` + the `hermes_endpoint` resource-type. Full
-breakdown in [`windmill/SYNC.md`](windmill/SYNC.md). When you author or
+breakdown in [`docs/windmill-sync.md`](docs/windmill-sync.md). When you author or
 generate a Windmill script, follow these rules so a push can never wipe data:
 
 - **Code/config that must be versioned → one of the synced folders** (currently
@@ -130,7 +130,7 @@ generate a Windmill script, follow these rules so a push can never wipe data:
   1. Add `"f/<name>/**"` explicitly to `includes` in `windmill/wmill.yaml` (never
      widen to a blanket `f/**` — narrow, explicit scope is the safety mechanism).
   2. Add a row for it to the scope table and the three scenario tables in
-     `windmill/SYNC.md`.
+     `docs/windmill-sync.md`.
   3. Commit the folder's `folder.meta.yaml` (generate with
      `wmill folder add-missing`) so pushes don't strip folder permissions.
   Forgetting step 1 is a silent no-op, not an error: `wmill sync push` will
@@ -215,7 +215,7 @@ uses all of them. Keep `install.sh` and `install.py` at parity throughout.
 6. **CI** — add the merged config to the compose job:
    `docker compose -f docker-compose.yml -f docker-compose.<feature>.yml config -q`
    (the base CI run doesn't include overrides). `gpu`, `baserow`, and
-   `directus` are all covered.
+   `directus` are all covered
 7. **Docs** — a README section + an INSTALL flag-table row; add a focused
    `docs/<feature>*.md` for deeper caveats when warranted.
 
@@ -454,7 +454,7 @@ satisfied and never reaches the disabled install path. **Never** unset the
 disable flag, chown/chmod the venv writable, or add a writable `PYTHONPATH`
 dir — all weaken the security model. CI (`.github/workflows/hermes-image.yml`,
 path-filtered to `hermes/**`) builds the image to validate every pin resolves.
-Full rationale: `hermes/README.md`.
+Full rationale: `docs/hermes-docker-build.md`.
 
 **Invariant — the baked venv is the single source of truth.** A `PYTHONPATH`
 overlay under `/opt/data` (e.g. `/opt/data/.hermes-extras`, plus a `PYTHONPATH=`
