@@ -498,12 +498,15 @@ services:
       - DATABASE_URL=postgres://postgres:${WM_DB_PASSWORD:-windmill}@db/windmill?sslmode=disable
       - MODE=server
       - BASE_URL=${WM_BASE_URL:-http://localhost:8000}
+      - ALLOW_PRIVATE_AI_BASE_URLS=${WM_ALLOW_PRIVATE_AI_BASE_URLS:-false}
     depends_on:
       db:
         condition: service_healthy
     volumes:
       - ${WM_DATA_DIR:-./data/windmill}/logs:/tmp/windmill/logs
       - ${SHARED_DIR:-./data/shared}:/shared
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://localhost:8000/api/version || wget -qO- http://localhost:8000/api/version || exit 1"]
       interval: 30s
@@ -579,7 +582,7 @@ services:
     privileged: true
     init: true
     deploy:
-      replicas: 2
+      replicas: ${WM_WORKER_REPLICAS:-2}
       resources:
         limits:
           cpus: "1.0"
