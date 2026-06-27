@@ -85,6 +85,8 @@ preview exactly what an install would do:
 | `--discord-allowed-users <id,id,…>` | — | Comma-separated Discord user IDs allowed to use the bot. **Requires** `--discord-bot-token`. |
 | `--with-headroom` | off | Route Hermes through the Headroom context-compression proxy (OpenRouter only). |
 | `--with-baserow` | off | Add Baserow (structured-data UI + REST API + MCP) by layering [`docker-compose.baserow.yml`](docker-compose.baserow.yml) on via `COMPOSE_FILE`. AI fields default to local Ollama. |
+| `--with-directus` | off | Add Directus (triage UI + REST/GraphQL API + MCP) by layering [`docker-compose.directus.yml`](docker-compose.directus.yml) on via `COMPOSE_FILE`. |
+| `--with-observability` | off | Add Prometheus, Grafana, exporters, and Loki/Promtail by layering [`docker-compose.observability.yml`](docker-compose.observability.yml) on via `COMPOSE_FILE`. |
 | `--bind-lan` | off | Expose Hermes/Hindsight/Ollama on `0.0.0.0` instead of loopback. |
 | `--gpu` | off | NVIDIA GPU passthrough for the Ollama container (Linux/WSL2 + nvidia-container-toolkit). No-op on macOS. |
 | `--env KEY=VALUE` | — | Set any other `.env` variable. Repeatable. |
@@ -121,7 +123,8 @@ Generates every required secret that's blank or still a known-weak default:
 `GRAFANA_ADMIN_PASSWORD` (otherwise Grafana boots as `admin`/`changeme`).
 Existing custom values are left alone.
 
-This step also applies the `--gpu`, `--with-baserow`, `--bind-lan`,
+This step also applies the `--gpu`, `--with-baserow`, `--with-directus`,
+`--with-observability`, `--bind-lan`,
 `--hindsight-api-key`, and `--env` overrides to `.env` first, so they're in place
 before the stack starts. `--gpu` layers
 [`docker-compose.gpu.yml`](docker-compose.gpu.yml) on via `COMPOSE_FILE` (adding
