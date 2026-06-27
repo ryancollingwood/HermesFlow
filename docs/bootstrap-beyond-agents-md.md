@@ -23,8 +23,8 @@ features" section there for its compose-override pattern, shared
   script↔metadata↔lockfile consistency check — all static, no running
   server) and `.github/workflows/hermes-image.yml` (path-filtered to
   `hermes/**`, builds the derived Hermes image to confirm `requirements.txt`
-  pins resolve against `LAZY_DEPS`). Note: `docker-compose.directus.yml` is
-  still not in the CI compose-merge check — see AGENTS.md's wiring checklist.
+  pins resolve against `LAZY_DEPS`). `docker-compose.directus.yml` is now
+  included in the CI compose-merge check alongside `gpu` and `baserow`.
 - Full Makefile target list (for quick lookup, not reproduced in AGENTS.md):
   `bootstrap`, `wizard`, `secure`, `secrets`, `apikey`, `init`, `check`,
   `fix-permissions`, `pull`, `build`, `up`/`down`/`restart`, `logs`, `ps`,

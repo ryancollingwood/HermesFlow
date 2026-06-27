@@ -214,8 +214,8 @@ uses all of them. Keep `install.sh` and `install.py` at parity throughout.
    running, since the feature is usually off).
 6. **CI** — add the merged config to the compose job:
    `docker compose -f docker-compose.yml -f docker-compose.<feature>.yml config -q`
-   (the base CI run doesn't include overrides). `docker-compose.directus.yml`
-   is **not yet in this CI check** — validate it locally until that's fixed.
+   (the base CI run doesn't include overrides). `gpu`, `baserow`, and
+   `directus` are all covered.
 7. **Docs** — a README section + an INSTALL flag-table row; add a focused
    `docs/<feature>*.md` for deeper caveats when warranted.
 
