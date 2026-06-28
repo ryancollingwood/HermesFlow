@@ -1,0 +1,31 @@
+version: 2
+
+models:
+  - name: mart_hn_stories
+    description: >-
+      Business-ready Hacker News story facts, written into collection_db's
+      `data_platform` schema. This is the agent-facing data contract for
+      Hermes — every column must have an exhaustive description, since
+      Hermes reads this YAML via MCP to understand context and write SQL.
+    columns:
+      - name: story_id
+        description: Unique Hacker News item id for the story. Primary key of this mart.
+        tests:
+          - unique
+          - not_null
+      - name: title
+        description: Story title as displayed on Hacker News.
+      - name: url
+        description: External URL the story links to. Null for self/text posts (e.g. Ask HN).
+      - name: score
+        description: Story score (points) recorded at the time of extraction — not live/real-time.
+      - name: author
+        description: Hacker News username of the story submitter.
+      - name: posted_at
+        description: Timestamp the story was originally posted to Hacker News (converted from epoch).
+      - name: comment_count
+        description: Number of descendant comments recorded at the time of extraction.
+      - name: extraction_batch_id
+        description: Id shared by every row from the same extraction run — use to filter to a single run or exclude a failed one.
+      - name: extracted_at
+        description: Timestamp this row's data was pulled from the Hacker News API.

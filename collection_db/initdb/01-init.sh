@@ -3,15 +3,20 @@
 # postgres-image /docker-entrypoint-initdb.d behaviour — re-running the
 # container against an existing volume does NOT re-run this).
 #
-# Creates three isolated surfaces in one physical database:
-#   - baserow    schema: Baserow's own private app schema. No other role gets
-#                access — Baserow's table/field DDL is internally managed and
-#                direct external writes risk corrupting it. Any Baserow <->
-#                collection sync goes through Baserow webhooks, not SQL.
-#   - directus   schema: Directus's own system tables (directus_users, etc).
-#   - collection schema: shared business data (page scrapes, LLM generations,
-#                triage records) — writable by directus and the windmill
-#                collection role, NOT by baserow.
+# Creates four isolated surfaces in one physical database:
+#   - baserow       schema: Baserow's own private app schema. No other role
+#                   gets access — Baserow's table/field DDL is internally
+#                   managed and direct external writes risk corrupting it.
+#                   Any Baserow <-> collection sync goes through Baserow
+#                   webhooks, not SQL.
+#   - directus      schema: Directus's own system tables (directus_users,
+#                   etc).
+#   - collection    schema: shared business data (page scrapes, LLM
+#                   generations, triage records) — writable by directus and
+#                   the windmill collection role, NOT by baserow.
+#   - data_platform schema: dbt mart models for the dlt/dbt/Windmill data
+#                   platform pipeline — owned by its own role, isolated from
+#                   the others. See docs/data-platform-plan.md.
 set -e
 
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-EOSQL
@@ -30,4 +35,8 @@ psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" <<-E
   GRANT USAGE, CREATE ON SCHEMA collection TO directus, windmill_collection;
   ALTER DEFAULT PRIVILEGES IN SCHEMA collection GRANT ALL ON TABLES TO directus, windmill_collection;
   ALTER DEFAULT PRIVILEGES IN SCHEMA collection GRANT ALL ON SEQUENCES TO directus, windmill_collection;
+
+  CREATE ROLE data_platform LOGIN PASSWORD '${DATA_PLATFORM_DB_PASSWORD}';
+  CREATE SCHEMA IF NOT EXISTS data_platform AUTHORIZATION data_platform;
+  ALTER ROLE data_platform SET search_path TO data_platform, public;
 EOSQL

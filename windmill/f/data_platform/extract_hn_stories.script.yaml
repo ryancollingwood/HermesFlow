@@ -1,0 +1,13 @@
+summary: Extract Hacker News top stories via dlt into the datalake
+description: ''
+lock: '!inline f/data_platform/extract_hn_stories.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    limit:
+      type: integer
+      description: Number of top stories to fetch
+      default: 20
+  required: []
