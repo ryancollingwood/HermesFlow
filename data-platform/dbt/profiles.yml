@@ -1,0 +1,24 @@
+# dbt-duckdb profile. DuckDB itself is in-memory and ephemeral — one
+# instance per Windmill job, never a shared file (sidesteps DuckDB's
+# single-writer lock entirely). Mart models are materialized through the
+# attached Postgres database (`pg`), so the durable target is collection_db,
+# not the ephemeral DuckDB instance. See docs/plans/datalake.md.
+data_platform:
+  target: dev
+  outputs:
+    dev:
+      type: duckdb
+      path: ":memory:"
+      # Explicit default schema keeps dbt's startup schema-bootstrap step in
+      # the local (ephemeral) DuckDB catalog instead of an implicit
+      # main_<project_name> name that otherwise resolves against the
+      # attached Postgres `pg` alias, where the data_platform role only has
+      # rights on its own schema, not database-level CREATE.
+      schema: stg
+      extensions:
+        - httpfs
+        - postgres
+      attach:
+        - path: "dbname={{ env_var('COLLECTION_DB_NAME', 'collection') }} host={{ env_var('COLLECTION_DB_HOST', 'collection_db') }} port={{ env_var('COLLECTION_DB_PORT_INTERNAL', '5432') }} user={{ env_var('DATA_PLATFORM_DB_USER', 'data_platform') }} password={{ env_var('DATA_PLATFORM_DB_PASSWORD') }}"
+          type: postgres
+          alias: pg

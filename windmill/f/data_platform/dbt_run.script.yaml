@@ -1,0 +1,32 @@
+summary: Run the data_platform dbt project (staging in DuckDB, marts attached to
+  collection_db)
+description: ''
+lock: '!inline f/data_platform/dbt_run.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    command:
+      type: string
+      description: >-
+        dbt subcommand to run. Use `build` (default) for staging+mart in one
+        process — staging lives in an ephemeral in-memory DuckDB scoped to
+        this job, so a standalone `test` run afterwards has nothing to check.
+      default: build
+      enum:
+        - build
+        - run
+        - test
+      originalType: string
+    db:
+      type: object
+      description: ''
+      default: null
+      format: resource-postgresql
+    full_refresh:
+      type: boolean
+      description: Pass --full-refresh (only applies to `run`)
+      default: false
+  required:
+    - db

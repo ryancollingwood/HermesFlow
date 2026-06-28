@@ -1,0 +1,10 @@
+version: 2
+
+sources:
+  - name: datalake
+    description: Immutable raw Parquet layer written by dlt, read directly from disk.
+    tables:
+      - name: hn_stories
+        description: Hacker News top story snapshots, one row per story per extraction run.
+        meta:
+          external_location: "read_parquet('/shared/datalake/hn_stories/**/stories/*.parquet')"

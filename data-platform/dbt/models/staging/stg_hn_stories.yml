@@ -1,0 +1,32 @@
+version: 2
+
+models:
+  - name: stg_hn_stories
+    description: Cleaned, typed Hacker News story snapshots — one row per story per extraction run.
+    columns:
+      - name: story_id
+        description: Hacker News item id.
+        tests:
+          - not_null
+      - name: title
+        description: Story title.
+      - name: url
+        description: External URL the story links to (null for text/Ask HN posts).
+      - name: score
+        description: Story score (points) at extraction time.
+      - name: author
+        description: Hacker News username of the story submitter.
+      - name: posted_at_epoch
+        description: Unix epoch timestamp the story was originally posted.
+      - name: comment_count
+        description: Number of descendant comments at extraction time.
+      - name: _extracted_at
+        description: Timestamp this row was pulled by the dlt pipeline.
+      - name: _job_id
+        description: Windmill job id that produced this row.
+      - name: _pipeline
+        description: Name of the dlt pipeline that produced this row (hn_stories).
+      - name: _batch_id
+        description: Id shared by every row from one extraction run.
+      - name: _source_url
+        description: The specific Hacker News API endpoint hit to fetch this row.

@@ -450,6 +450,7 @@ services:
       BASEROW_DB_PASSWORD: ${BASEROW_DB_PASSWORD:-baserow}
       DIRECTUS_DB_PASSWORD: ${DIRECTUS_DB_PASSWORD:-directus}
       WINDMILL_COLLECTION_DB_PASSWORD: ${WINDMILL_COLLECTION_DB_PASSWORD:-windmill}
+      DATA_PLATFORM_DB_PASSWORD: ${DATA_PLATFORM_DB_PASSWORD:-data_platform}
     ports:
       - "${COLLECTION_DB_BIND:-127.0.0.1}:${COLLECTION_DB_PORT:-5433}:5432"
     healthcheck:
@@ -603,6 +604,10 @@ services:
       - ${WM_DATA_DIR:-./data/windmill}/cache:/tmp/windmill/cache
       - ${WM_DATA_DIR:-./data/windmill}/logs:/tmp/windmill/logs
       - ${SHARED_DIR:-./data/shared}:/shared
+      # Read-only bind mount of the data-platform/ dbt project + dlt pipeline
+      # code (git-versioned on the host) — gives ephemeral workers instant
+      # access without a custom worker image. See docs/plans/datalake.md.
+      - ${DATA_PLATFORM_DIR:-./data-platform}:/data_platform:ro
     networks: [backend, agent, inference, collection]
     logging: *default-logging
 

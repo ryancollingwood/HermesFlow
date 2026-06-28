@@ -521,7 +521,7 @@ windmill-push: ## Push windmill/ assets (resource type, resource, scripts) to th
 	    vp="f/hermes/api_key"; \
 	    if curl -fsS -H "Host: $$hh" -H "Authorization: Bearer $$token" -H 'Content-Type: application/json' \
 	         -X POST "$$base/api/w/main/variables/create" \
-	         -d "{\"path\":\"$$vp\",\"value\":\"$$API_SERVER_KEY\",\"is_secret\":true}" >/dev/null 2>&1; then \
+	         -d "{\"path\":\"$$vp\",\"value\":\"$$API_SERVER_KEY\",\"is_secret\":true,\"description\":\"Hermes API key, used by Windmill scripts calling Hermes\"}" >/dev/null 2>&1; then \
 	      echo "✓ created secret variable $$vp"; \
 	    elif curl -fsS -H "Host: $$hh" -H "Authorization: Bearer $$token" -H 'Content-Type: application/json' \
 	         -X POST "$$base/api/w/main/variables/update/$$vp" -d "{\"value\":\"$$API_SERVER_KEY\"}" >/dev/null 2>&1; then \
@@ -532,7 +532,7 @@ windmill-push: ## Push windmill/ assets (resource type, resource, scripts) to th
 	    vp="f/collection/db_password"; \
 	    if curl -fsS -H "Host: $$hh" -H "Authorization: Bearer $$token" -H 'Content-Type: application/json' \
 	         -X POST "$$base/api/w/main/variables/create" \
-	         -d "{\"path\":\"$$vp\",\"value\":\"$$WINDMILL_COLLECTION_DB_PASSWORD\",\"is_secret\":true}" >/dev/null 2>&1; then \
+	         -d "{\"path\":\"$$vp\",\"value\":\"$$WINDMILL_COLLECTION_DB_PASSWORD\",\"is_secret\":true,\"description\":\"windmill_collection role password into collection_db's collection schema\"}" >/dev/null 2>&1; then \
 	      echo "✓ created secret variable $$vp"; \
 	    elif curl -fsS -H "Host: $$hh" -H "Authorization: Bearer $$token" -H 'Content-Type: application/json' \
 	         -X POST "$$base/api/w/main/variables/update/$$vp" -d "{\"value\":\"$$WINDMILL_COLLECTION_DB_PASSWORD\"}" >/dev/null 2>&1; then \
@@ -543,6 +543,19 @@ windmill-push: ## Push windmill/ assets (resource type, resource, scripts) to th
 	    echo "    table to it: Baserow table → Webhooks → URL ="; \
 	    echo "    http://windmill_server:8000/api/w/main/jobs/run/p/f/collection/baserow_webhook?token=$$token"; \
 	    echo "    (use a dedicated Windmill token, not the admin login token above, for anything long-lived)"; \
+	  fi; \
+	  if [ -n "$$token" ] && [ -n "$${DATA_PLATFORM_DB_PASSWORD:-}" ]; then \
+	    vp="f/data_platform/db_password"; \
+	    if curl -fsS -H "Host: $$hh" -H "Authorization: Bearer $$token" -H 'Content-Type: application/json' \
+	         -X POST "$$base/api/w/main/variables/create" \
+	         -d "{\"path\":\"$$vp\",\"value\":\"$$DATA_PLATFORM_DB_PASSWORD\",\"is_secret\":true,\"description\":\"data_platform role password into collection_db's data_platform schema\"}" >/dev/null 2>&1; then \
+	      echo "✓ created secret variable $$vp"; \
+	    elif curl -fsS -H "Host: $$hh" -H "Authorization: Bearer $$token" -H 'Content-Type: application/json' \
+	         -X POST "$$base/api/w/main/variables/update/$$vp" -d "{\"value\":\"$$DATA_PLATFORM_DB_PASSWORD\"}" >/dev/null 2>&1; then \
+	      echo "✓ updated secret variable $$vp"; \
+	    else echo "⚠ couldn't set $$vp — set it in the UI (Variables → $$vp)"; fi; \
+	    echo "✓ data_platform Postgres resource available to scripts/flows as f/data_platform/data_platform_db"; \
+	    echo "  → Example pipeline: run f/data_platform/extract_hn_stories then f/data_platform/dbt_run"; \
 	  fi
 
 windmill-pull: ## Pull windmill/ assets FROM the server into the repo for version control — needs the wmill CLI

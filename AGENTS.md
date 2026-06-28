@@ -186,6 +186,19 @@ If you add another subsystem that needs to share this database, follow the
 same pattern: a dedicated role + schema in `01-init.sh`, scoped grants on
 `collection` only if it genuinely needs to read/write shared data.
 
+`data_platform` is the existing example: a dlt/dbt pipeline stack that
+extracts to immutable Parquet under `${SHARED_DIR}/datalake/`, stages in an
+ephemeral per-job DuckDB instance, and writes mart models into its own
+`data_platform` schema in `collection_db` via dbt-duckdb's Postgres attach
+feature — no extra Postgres container. Architecture and rationale:
+[docs/plans/datalake.md](docs/plans/datalake.md). **Adding a new pipeline
+to it is a documented checklist, not a from-scratch design exercise:**
+[docs/data-platform-add-pipeline.md](docs/data-platform-add-pipeline.md) —
+follow it in order; it exists because most of the steps in it were
+failure modes hit once already (wrong dbt-duckdb external-source syntax,
+schema-naming gotchas, missing raw-layer dedupe, lock files that look
+right but break at runtime).
+
 ### `COMPOSE_FILE` is additive
 
 Overrides must compose, so `--gpu` and `--with-baserow` can both be on at once.
