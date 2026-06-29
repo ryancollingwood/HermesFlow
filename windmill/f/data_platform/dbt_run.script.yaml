@@ -9,9 +9,8 @@ schema:
   properties:
     command:
       type: string
-      description: >-
-        dbt subcommand to run. Use `build` (default) for staging+mart in one
-        process — staging lives in an ephemeral in-memory DuckDB scoped to
+      description: dbt subcommand to run. Use `build` (default) for staging+mart in
+        one process — staging lives in an ephemeral in-memory DuckDB scoped to
         this job, so a standalone `test` run afterwards has nothing to check.
       default: build
       enum:

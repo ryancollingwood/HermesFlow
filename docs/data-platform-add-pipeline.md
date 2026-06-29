@@ -170,15 +170,21 @@ includes) and creates/updates the `f/data_platform/db_password` secret
 from `.env`. If you only changed lock files (not resources/folders), a
 plain `wmill sync push --yes` from `windmill/` is enough and faster.
 
-**Known gotcha:** `make windmill-push` runs `wmill generate-metadata`
-across the *entire* `windmill/` tree first, not just your new folder. If
-any existing script (in `f/hermes/` or `f/collection/`) has an import
-inside a function body rather than at module level, generate-metadata can
-silently empty its lock file too — this happened to
-`f/collection/baserow_webhook` while building this pipeline. After
-pushing, diff `windmill/f/collection/*.lock` and `windmill/f/hermes/*.lock`
-against git to make sure nothing else got wiped, and `git checkout --` any
-that did before committing.
+**Known gotcha:** `make windmill-push` (and `install.sh`/`install.py`) runs
+`wmill generate-metadata` across the *entire* `windmill/` tree first, not
+just your new folder. If any existing script (in `f/hermes/` or
+`f/collection/`) has an import inside a function body rather than at module
+level, generate-metadata can silently empty its lock file too — this
+happened to `f/collection/baserow_webhook` and `f/data_platform/dbt_run`
+while building this pipeline, and again when `generate-metadata` was
+re-run by hand during unrelated troubleshooting. `windmill-push` now
+snapshots every `*.script.lock` before calling `generate-metadata` and
+restores any that come back with fewer pinned dependencies, logging a
+warning when it does — so a normal `make windmill-push` self-heals this.
+The risk is only if you call `wmill generate-metadata` directly (e.g. while
+debugging) without going through `make windmill-push`/the installer: diff
+the affected lock files against git afterward and `git checkout --` any
+that got wiped before committing or pushing.
 
 ## 7. Validate end-to-end
 

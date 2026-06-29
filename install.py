@@ -387,12 +387,26 @@ def push_windmill_assets(token: str) -> None:
                    cwd=wd, capture_output=True, text=True)
     # Regenerate .script.yaml + lockfiles so new/edited scripts lock cleanly
     # (needs the server, which is up here). Best-effort: don't block the push.
+    # generate-metadata's static import analysis misses imports made inside
+    # function bodies and can silently empty an otherwise-correct lock file
+    # (hit this with f/collection/baserow_webhook and f/data_platform/dbt_run —
+    # see docs/data-platform-add-pipeline.md), so snapshot lock files first and
+    # restore any that shrank.
+    lock_files = list(wd.rglob("*.script.lock"))
+    locks_before = {f: f.read_text() for f in lock_files}
     subprocess.run(["wmill", "generate-metadata"], cwd=wd, capture_output=True, text=True)
+    for f, before in locks_before.items():
+        after = f.read_text() if f.exists() else ""
+        before_n = sum(1 for ln in before.splitlines() if ln.strip() and not ln.startswith("#"))
+        after_n = sum(1 for ln in after.splitlines() if ln.strip() and not ln.startswith("#"))
+        if before_n > 0 and after_n < before_n:
+            say(f"{WARN} generate-metadata emptied {f}'s pinned deps ({before_n} -> {after_n}) — restoring (see docs/data-platform-add-pipeline.md)")
+            f.write_text(before)
     # Safety: `wmill sync push` mirrors local→remote and DELETES/ARCHIVES any
     # remote item absent locally. Dry-run first and refuse if anything would be
     # removed, so re-running the installer can't wipe assets built in the UI.
     # Override deliberately with WMILL_FORCE_PUSH=1.
-    dry = subprocess.run(["wmill", "sync", "push", "--dry-run", "--yes"],
+    dry = subprocess.run(["wmill", "sync", "push", "--dry-run", "--yes", "--skip-branch-validation"],
                          cwd=wd, capture_output=True, text=True)
     plain = re.sub(r"\x1b\[[0-9;]*m", "", (dry.stdout or "") + (dry.stderr or ""))
     dels = [ln for ln in plain.splitlines() if re.match(
@@ -404,7 +418,7 @@ def push_windmill_assets(token: str) -> None:
         say("  Bring them into the repo first:  make windmill-pull")
         say("  Or mirror anyway (destructive):  WMILL_FORCE_PUSH=1 python install.py …")
         return
-    push = subprocess.run(["wmill", "sync", "push", "--yes"],
+    push = subprocess.run(["wmill", "sync", "push", "--yes", "--skip-branch-validation"],
                           cwd=wd, capture_output=True, text=True)
     if push.returncode == 0:
         say(f"{OK} pushed windmill/ assets (resource type, f/hermes/local, client.py, chat.py)")

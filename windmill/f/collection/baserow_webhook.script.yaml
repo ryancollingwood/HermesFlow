@@ -1,4 +1,4 @@
-summary: 'Receive a Baserow webhook and persist it into collection.baserow_sync'
+summary: Receive a Baserow webhook and persist it into collection.baserow_sync
 description: ''
 lock: '!inline f/collection/baserow_webhook.script.lock'
 kind: script
@@ -6,16 +6,17 @@ schema:
   $schema: https://json-schema.org/draft/2020-12/schema
   type: object
   properties:
-    payload:
-      type: object
-      description: Raw Baserow webhook payload
-      default: null
-      originalType: object
     db:
       type: object
       description: ''
       default: null
       format: resource-postgresql
+    payload:
+      type: object
+      description: Raw Baserow webhook payload
+      default: null
+      originalType: object
+      properties: {}
   required:
     - payload
     - db

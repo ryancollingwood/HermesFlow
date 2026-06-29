@@ -1,13 +1,14 @@
+description: collection_db `data_platform` schema — dbt mart models for the
+  dlt/dbt data platform pipeline. Isolated from baserow, directus, and
+  collection — see collection_db/initdb/01-init.sh and docs/plans/datalake.md.
 value:
-  host: collection_db
-  port: 5432
-  user: data_platform
   dbname: collection
-  sslmode: disable
-  # $var: pulls the value from the secret variable at push/run time.
+  host: collection_db
   password: $var:f/data_platform/db_password
+  port: 5432
+  region: ''
+  root_certificate_pem: ''
+  sslmode: disable
+  use_iam_auth: false
+  user: data_platform
 resource_type: postgresql
-description: >-
-  collection_db `data_platform` schema — dbt mart models for the dlt/dbt
-  data platform pipeline. Isolated from baserow, directus, and collection —
-  see collection_db/initdb/01-init.sh and docs/plans/datalake.md.

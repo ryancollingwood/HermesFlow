@@ -236,14 +236,34 @@ push_windmill_assets() {
   ( cd windmill && wmill workspace add main main "$remote" --token "$token" >/dev/null 2>&1 ) || true
   # Regenerate .script.yaml + lockfiles so new/edited scripts lock cleanly
   # (needs the server, which is up here). Best-effort: don't block the push.
+  # generate-metadata's static import analysis misses imports made inside
+  # function bodies and can silently empty an otherwise-correct lock file
+  # (hit this with f/collection/baserow_webhook and f/data_platform/dbt_run —
+  # see docs/data-platform-add-pipeline.md), so snapshot lock files first and
+  # restore any that shrank.
+  local lock_backup
+  lock_backup=$(mktemp -d)
+  ( cd windmill && find . -name '*.script.lock' ) | while read -r f; do
+    mkdir -p "$lock_backup/$(dirname "$f")"; cp "windmill/$f" "$lock_backup/$f"
+  done
   ( cd windmill && wmill generate-metadata >/dev/null 2>&1 ) || true
+  ( cd windmill && find . -name '*.script.lock' ) | while read -r f; do
+    [ -f "$lock_backup/$f" ] || continue
+    old_n=$(grep -vc '^#' "$lock_backup/$f" 2>/dev/null || echo 0)
+    new_n=$(grep -vc '^#' "windmill/$f" 2>/dev/null || echo 0)
+    if [ "$old_n" -gt 0 ] && [ "$new_n" -lt "$old_n" ]; then
+      echo "⚠ generate-metadata emptied windmill/$f's pinned deps ($old_n → $new_n) — restoring (see docs/data-platform-add-pipeline.md)"
+      cp "$lock_backup/$f" "windmill/$f"
+    fi
+  done
+  rm -rf "$lock_backup"
   # Safety: `wmill sync push` mirrors local→remote and DELETES/ARCHIVES any
   # remote item absent locally. Dry-run first and refuse if anything would be
   # removed, so re-running the installer can't wipe assets built in the UI.
   # Override deliberately with WMILL_FORCE_PUSH=1.
   local esc dels
   esc=$(printf '\033')
-  dels="$( ( cd windmill && wmill sync push --dry-run --yes 2>&1 ) \
+  dels="$( ( cd windmill && wmill sync push --dry-run --yes --skip-branch-validation 2>&1 ) \
     | sed "s/${esc}\[[0-9;]*m//g" \
     | grep -E '^- (folder|variable|resource|resource-type|script|flow|app|schedule|trigger|user|group|settings)( |$)' || true)"
   if [ -n "$dels" ] && [ "${WMILL_FORCE_PUSH:-0}" != "1" ]; then
@@ -253,7 +273,7 @@ push_windmill_assets() {
     echo "  Or mirror anyway (destructive):  WMILL_FORCE_PUSH=1 ./install.sh …"
     return 0
   fi
-  if ( cd windmill && wmill sync push --yes >/dev/null 2>&1 ); then
+  if ( cd windmill && wmill sync push --yes --skip-branch-validation >/dev/null 2>&1 ); then
     echo "✓ pushed windmill/ assets (resource type, f/hermes/local, client.py, chat.py)"
   else
     echo "⚠ 'wmill sync push' failed — run it by hand from windmill/ (see README 'Push it')."
