@@ -797,6 +797,9 @@ if [ "$WITH_HEADROOM" -eq 1 ]; then
   fi
 fi
 
+# ── 14. Hermes skills (data-platform pipeline-authoring skill, additive) ─────
+make --no-print-directory hermes-skills-push
+
 echo
 echo "Done. Services:"
 echo "  Windmill:        http://windmill.localhost"

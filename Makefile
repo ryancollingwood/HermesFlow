@@ -27,7 +27,7 @@ else
   ON_WINDOWS :=
 endif
 
-.PHONY: help check init apikey secrets wizard secure fix-permissions pull build up down restart logs ps health backup backup-schedule backup-schedule-revert bootstrap hermes-heal hermes-workspace hermes-secure lint validate ci headroom headroom-revert mlx mlx-revert mlx-status memory memory-revert hindsight-mlx hindsight-mlx-revert aux-cloud aux-local aux-hindsight aux-status windmill-push windmill-pull windmill-check baserow baserow-revert baserow-mcp directus directus-revert observability observability-revert
+.PHONY: help check init apikey secrets wizard secure fix-permissions pull build up down restart logs ps health backup backup-schedule backup-schedule-revert bootstrap hermes-heal hermes-workspace hermes-secure hermes-skills-push hermes-skills-pull lint validate ci headroom headroom-revert mlx mlx-revert mlx-status memory memory-revert hindsight-mlx hindsight-mlx-revert aux-cloud aux-local aux-hindsight aux-status windmill-push windmill-pull windmill-check baserow baserow-revert baserow-mcp directus directus-revert observability observability-revert
 
 # Fill an .env variable with a generated value when it is empty OR still set to a
 # known-weak default. Usage: $(call ensure_secret,VAR,GENERATOR,WEAK_DEFAULT)
@@ -180,6 +180,31 @@ hermes-secure: ## Fix Tirith PATH lookup (was failing open, unscanned) + disable
 	  $(COMPOSE) restart hermes >/dev/null; \
 	  echo "✓ Tirith now active on \$$PATH-resolved binary; lazy installs disabled"; \
 	else echo "✓ already secure (tirith_path correct, allow_lazy_installs false)"; fi
+
+hermes-skills-push: ## Copy hermes/skills/ into the Hermes-bound DATA_DIR/skills/ (additive — never deletes skills not tracked here)
+	@set -a; . ./$(ENV_FILE) 2>/dev/null; set +a; \
+	  dest="$${DATA_DIR:-$$HOME/.hermes/data}/skills"; \
+	  if [ ! -d hermes/skills ]; then echo "→ no hermes/skills/ in this repo — nothing to push"; exit 0; fi; \
+	  mkdir -p "$$dest"; \
+	  cp -R hermes/skills/. "$$dest/"; \
+	  echo "✓ copied hermes/skills/ → $$dest"; \
+	  echo "  (additive: any skill already under $$dest but not in this repo is left untouched)"
+
+hermes-skills-pull: ## Pull tracked skills FROM the Hermes-bound DATA_DIR/skills/ back into hermes/skills/ for review — scoped to skills already tracked here, never imports Hermes's bundled/curated skills
+	@set -a; . ./$(ENV_FILE) 2>/dev/null; set +a; \
+	  src="$${DATA_DIR:-$$HOME/.hermes/data}/skills"; \
+	  if [ ! -d hermes/skills ]; then echo "→ no hermes/skills/ in this repo yet — nothing to scope the pull to"; exit 0; fi; \
+	  if [ ! -d "$$src" ]; then echo "✗ $$src not found"; exit 1; fi; \
+	  found=0; \
+	  for d in $$(find hermes/skills -mindepth 2 -maxdepth 2 -type d); do \
+	    rel="$${d#hermes/skills/}"; \
+	    if [ -d "$$src/$$rel" ]; then \
+	      cp -R "$$src/$$rel/." "$$d/"; \
+	      echo "→ pulled $$rel"; found=1; \
+	    fi; \
+	  done; \
+	  if [ "$$found" = 1 ]; then echo "✓ pulled tracked skills from $$src — review 'git diff' before committing"; \
+	  else echo "→ none of the tracked skills under hermes/skills/ exist in $$src"; fi
 
 up: ## Start the stack (detached)
 	@$(COMPOSE) up -d

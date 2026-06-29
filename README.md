@@ -20,7 +20,7 @@ with the Windmill side pre-wired to call Hermes as an OpenAI-compatible endpoint
 | `Makefile` | `bootstrap`, lifecycle, health, backups, key generation |
 | `windmill/` | wmill-syncable resource type, resource, secret, and example scripts |
 | `mlx/` | Host-native MLX inference server for Apple Silicon (setup + launch script) |
-| `hermes/` | Thin derived Hermes image — bakes extra Python packages into the venv ([how & why](docs/hermes-docker-build.md)) |
+| `hermes/` | Thin derived Hermes image — bakes extra Python packages into the venv ([how & why](docs/hermes-docker-build.md)) — plus `hermes/skills/`, version-controlled custom Hermes skills pushed to `DATA_DIR/skills/` via `make hermes-skills-push` |
 
 ## Architecture
 
@@ -976,6 +976,8 @@ Gotchas (all enforced by Windmill):
 | `make baserow-mcp` | Register Baserow with Hermes as MCP tools |
 | `make directus` / `directus-revert` | Add/remove the optional Directus override |
 | `make headroom` / `headroom-revert` | Route Hermes through / off the Headroom context-compression proxy |
+| `make hermes-skills-push` | Copy `hermes/skills/` into the Hermes-bound `DATA_DIR/skills/` (additive — never deletes a skill there that isn't tracked in this repo). Run by both installers automatically. |
+| `make hermes-skills-pull` | Pull tracked skills back from `DATA_DIR/skills/` into `hermes/skills/` for review — scoped only to skills already tracked here. See [docs/hermes-skills.md](docs/hermes-skills.md). |
 
 ## Security notes
 

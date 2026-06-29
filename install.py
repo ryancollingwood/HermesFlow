@@ -515,6 +515,26 @@ def setup_windmill() -> None:
         say(f"{WARN} couldn't register the Windmill MCP server in Hermes — wire it up manually (see README).")
 
 
+def push_hermes_skills(data_dir: str) -> None:
+    """Copy hermes/skills/ into the Hermes-bound DATA_DIR/skills/.
+
+    Additive only — never deletes a skill under DATA_DIR/skills/ that isn't
+    tracked in this repo (mirrors `make hermes-skills-push`).
+    """
+    src = Path("hermes/skills")
+    if not src.is_dir():
+        return
+    dest = Path(data_dir) / "skills"
+    dest.mkdir(parents=True, exist_ok=True)
+    for item in src.iterdir():
+        target = dest / item.name
+        if item.is_dir():
+            shutil.copytree(item, target, dirs_exist_ok=True)
+        else:
+            shutil.copy2(item, target)
+    say(f"{OK} copied hermes/skills/ → {dest} (additive — untracked skills there are left untouched)")
+
+
 def setup_mlx() -> None:
     """Install the host-native MLX inference server (Apple Silicon macOS only).
 
@@ -944,6 +964,9 @@ def main() -> None:
             say(f"{OK} Hermes is routing through Headroom (stats: http://headroom.localhost/stats)")
         else:
             say(f"{WARN} --with-headroom needs the openrouter provider + an API key — skipping.")
+
+    # 14. Hermes skills (data-platform pipeline-authoring skill, additive)
+    push_hermes_skills(data_dir)
 
     print()
     say("Done. Services:")

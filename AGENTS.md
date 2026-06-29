@@ -512,6 +512,20 @@ vars) — not baked into the image or compose file.
 
 ---
 
+## Hermes custom skills
+
+Custom skills (the Markdown playbooks Hermes's `skills_hub` routes to) live
+in this repo at `hermes/skills/<category>/<skill-name>/` and deploy to the
+Hermes-bound `DATA_DIR/skills/` via `make hermes-skills-push` — additive
+only, same as Windmill sync, so it never touches Hermes's own bundled/curated
+skills living alongside them. Pull live edits back for review with
+`make hermes-skills-pull` (scoped only to skills already tracked here) before
+trusting that a skill Hermes itself edited still matches what's committed.
+Full guide, skill anatomy, and the audit-before-commit workflow:
+[docs/hermes-skills.md](docs/hermes-skills.md).
+
+---
+
 ## Observability reference
 
 | What | Where |
