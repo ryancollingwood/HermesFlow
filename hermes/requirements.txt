@@ -17,3 +17,10 @@
 
 # search.firecrawl  (config.yaml: web.backend: firecrawl)
 firecrawl-py==4.17.0
+
+# OCR/document parsing — not a LAZY_DEPS feature, so no pin-matching constraint
+# applies here; this just puts the `lit` CLI on $PATH (venv/bin is on $PATH for
+# the hermes user — see docs/hermes-docker-build.md) for shell-tool use, e.g.
+# `lit parse document.pdf`. Needs tesseract-ocr (apt) for the OCR path — see
+# hermes/Dockerfile.
+liteparse==2.4.0
