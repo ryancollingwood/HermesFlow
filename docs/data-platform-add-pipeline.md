@@ -149,6 +149,28 @@ lock format (strip comments, keep `# py: 3.12` as line 1):
 { echo "# py: 3.12"; grep -E '^[a-zA-Z0-9_.\-]+(\[[a-z,]+\])?==' /tmp/lock.txt; } > windmill/f/data_platform/extract_<name>.script.lock
 ```
 
+**Resource handling: prefer `wmill.get_resource()` over an injected
+parameter for fixed, dedicated resources.** `dbt_run` originally took
+`db: postgresql` as an injected/bound parameter (the standard Windmill
+pattern, and still the right call for a script meant to run against a
+*caller-chosen* resource). But `f/data_platform/data_platform_db` is the
+*only* resource this pipeline ever attaches to — there's nothing for a
+caller to legitimately choose. Fetch it directly instead:
+
+```python
+from wmill import get_resource
+
+db = get_resource("f/data_platform/data_platform_db")
+```
+
+This closes off an entire failure mode: a run can no longer reach the
+function body with a missing/null/empty `db` (e.g. from a flow step or
+schedule that didn't bind the parameter correctly) — `get_resource()` fails
+fast with its own clear error instead of an opaque `KeyError`/`TypeError`
+three lines into `main()`. Drop the `db: postgresql` parameter and its
+`TypedDict` entirely when you do this; don't leave a vestigial unused
+parameter in the schema.
+
 ## 5. Decide: new dbt_run, or reuse the existing one
 
 If your pipeline's staging/mart models live in the same
@@ -170,15 +192,21 @@ includes) and creates/updates the `f/data_platform/db_password` secret
 from `.env`. If you only changed lock files (not resources/folders), a
 plain `wmill sync push --yes` from `windmill/` is enough and faster.
 
-**Known gotcha:** `make windmill-push` runs `wmill generate-metadata`
-across the *entire* `windmill/` tree first, not just your new folder. If
-any existing script (in `f/hermes/` or `f/collection/`) has an import
-inside a function body rather than at module level, generate-metadata can
-silently empty its lock file too — this happened to
-`f/collection/baserow_webhook` while building this pipeline. After
-pushing, diff `windmill/f/collection/*.lock` and `windmill/f/hermes/*.lock`
-against git to make sure nothing else got wiped, and `git checkout --` any
-that did before committing.
+**Known gotcha:** `make windmill-push` (and `install.sh`/`install.py`) runs
+`wmill generate-metadata` across the *entire* `windmill/` tree first, not
+just your new folder. If any existing script (in `f/hermes/` or
+`f/collection/`) has an import inside a function body rather than at module
+level, generate-metadata can silently empty its lock file too — this
+happened to `f/collection/baserow_webhook` and `f/data_platform/dbt_run`
+while building this pipeline, and again when `generate-metadata` was
+re-run by hand during unrelated troubleshooting. `windmill-push` now
+snapshots every `*.script.lock` before calling `generate-metadata` and
+restores any that come back with fewer pinned dependencies, logging a
+warning when it does — so a normal `make windmill-push` self-heals this.
+The risk is only if you call `wmill generate-metadata` directly (e.g. while
+debugging) without going through `make windmill-push`/the installer: diff
+the affected lock files against git afterward and `git checkout --` any
+that got wiped before committing or pushing.
 
 ## 7. Validate end-to-end
 
@@ -189,10 +217,10 @@ Don't stop at "it deployed" — run it and check the data:
 curl -fsS -H "Host: windmill.localhost" -H "Authorization: Bearer $TOKEN" \
   -X POST "http://127.0.0.1/api/w/main/jobs/run/p/f/data_platform/extract_<name>" -d '{}'
 
-# trigger dbt build (db param is the Windmill resource reference, not a literal)
+# trigger dbt build — dbt_run resolves its own db resource via
+# wmill.get_resource(), so no db arg here (only command/full_refresh, both optional)
 curl -fsS -H "Host: windmill.localhost" -H "Authorization: Bearer $TOKEN" \
-  -X POST "http://127.0.0.1/api/w/main/jobs/run/p/f/data_platform/dbt_run" \
-  -d '{"db":"$res:f/data_platform/data_platform_db"}'
+  -X POST "http://127.0.0.1/api/w/main/jobs/run/p/f/data_platform/dbt_run" -d '{}'
 
 # poll http://127.0.0.1/api/w/main/jobs_u/get/<job_id> until type=CompletedJob
 
@@ -204,6 +232,53 @@ docker compose exec collection_db psql -U collection_admin -d collection \
 Then **run extraction a second time** and re-check the mart row count
 against `count(distinct <natural_key>)` — if they diverge, the staging
 dedupe in step 2 is missing or wrong.
+
+## 8. If a script gets edited live instead of in the repo, audit before committing
+
+This covers a script edited directly in the Windmill UI, or by an agent
+driving the Windmill API/editor, instead of in this repo — not a
+hypothetical: asking Hermes (or another agent) to "fix the pipeline" can
+result in it editing the script directly in Windmill. `make windmill-pull`
+brings that back, but don't commit a pull without diffing it first — two
+things can silently regress, and Windmill's own tooling won't flag either
+for you:
+
+- **Comments and docstrings explaining *why*, not just *what*, get
+  stripped.** A live edit (especially an LLM-driven one) tends to rewrite
+  a docstring into something generically correct but stripped of the
+  project-specific rationale (why DuckDB is ephemeral, why the project is
+  mounted read-only, why `dbt build` not `dbt run`+`test`). Read the diff
+  like a PR review, not a rubber stamp — re-add the rationale if it's
+  gone; it's there so the *next* edit (human or agent) doesn't have to
+  rediscover it.
+- **The pulled `.script.yaml` can carry `schema: null`,** silently
+  removing every parameter field from the script's UI "Run" form (the
+  Python function's defaults still work, but nothing is overridable
+  without hand-editing JSON args). This happens when a script gets
+  deployed via a direct API/editor edit that skips Windmill's normal
+  "infer schema from the function signature" step — it's not visible from
+  the diff alone (`schema: null` doesn't look obviously wrong) and it
+  silently persists through `wmill generate-metadata`: the staleness check
+  is purely content-hash-based, and `make windmill-pull` already updated
+  `wmill-lock.yaml`'s hash to match the *just-pulled* content, so
+  generate-metadata sees "no change" and skips it even with
+  `--schema-only`. To force a real regen:
+
+  ```sh
+  cd windmill
+  # remove (or hand-edit) the affected path's line from wmill-lock.yaml first,
+  # e.g. delete the "f/data_platform/dbt_run: <hash>" line
+  wmill generate-metadata f/data_platform --schema-only --yes
+  wmill generate-metadata rehash f/data_platform   # resync wmill-lock.yaml's hash after manual schema edits
+  ```
+
+  Then re-add any enum/description detail the auto-inference can't
+  produce from a bare type+default (it only sees `command: str = "build"`,
+  not that `build`/`run`/`test` are the only valid values) before pushing.
+- **Re-run the dry-run push** (`wmill sync push --dry-run --yes
+  --skip-branch-validation --show-diffs` from `windmill/`) after fixing
+  either of the above, and confirm it shows only the files you actually
+  touched before doing a real push.
 
 ## Things that will bite you if skipped
 

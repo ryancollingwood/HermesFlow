@@ -1,14 +1,15 @@
+description: Shared collection_db `collection` schema — captured/derived data
+  (page scrapes, LLM generations, triage records) governed by Directus. Scripts/
+  flows write here instead of Windmill's own orchestration database. Baserow has
+  no access to this schema — see collection_db/initdb/01-init.sh.
 value:
-  host: collection_db
-  port: 5432
-  user: windmill_collection
   dbname: collection
-  sslmode: disable
-  # $var: pulls the value from the secret variable at push/run time.
+  host: collection_db
   password: $var:f/collection/db_password
+  port: 5432
+  region: ''
+  root_certificate_pem: ''
+  sslmode: disable
+  use_iam_auth: false
+  user: windmill_collection
 resource_type: postgresql
-description: >-
-  Shared collection_db `collection` schema — captured/derived data (page
-  scrapes, LLM generations, triage records) governed by Directus. Scripts/
-  flows write here instead of Windmill's own orchestration database. Baserow
-  has no access to this schema — see collection_db/initdb/01-init.sh.

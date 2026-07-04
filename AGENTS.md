@@ -93,13 +93,33 @@ start / flags) and `INSTALL.md` (flag table + step description).
 `wmill sync` is a **mirror** (`push` makes the server match the repo and
 **deletes/archives** anything in scope that isn't tracked). Scope is set by
 `includes` in `windmill/wmill.yaml` and is deliberately narrow — currently
-`f/hermes/**` + `f/collection/**` + the `hermes_endpoint` resource-type. Full
+`f/hermes/**` + `f/collection/**` + an explicit, item-by-item list of
+`f/data_platform/` files + the `hermes_endpoint` resource-type. Full
 breakdown in [`docs/windmill-sync.md`](docs/windmill-sync.md). When you author or
 generate a Windmill script, follow these rules so a push can never wipe data:
 
+- **Never hand someone (or run yourself) a bare `wmill sync push`/`pull`
+  command without `cd windmill &&` baked into the same command line.**
+  Without `windmill/wmill.yaml` loaded, the CLI has zero scope restriction
+  and mirrors the *entire* remote workspace against whatever's in the
+  current directory — see the `[!WARNING]` block at the top of
+  [`docs/windmill-sync.md`](docs/windmill-sync.md) for the incident this
+  caused (every secret/resource/folder in the workspace hard-deleted,
+  several scripts never tracked in this repo archived). Always prefer
+  `make windmill-push`/`-pull`/`-check`, which `cd windmill` for you and
+  (push) dry-run-and-abort on any deletion.
+
 - **Code/config that must be versioned → one of the synced folders** (currently
-  `f/hermes/` and `f/collection/`). Commit it; it round-trips via
-  `make windmill-push` / `make windmill-pull`.
+  `f/hermes/`, `f/collection/`, and `f/data_platform/`). Commit it; it
+  round-trips via `make windmill-push` / `make windmill-pull`.
+- **`f/data_platform/` is scoped item-by-item, not `f/data_platform/**`.**
+  Unlike `f/hermes/` and `f/collection/`, that folder's `includes` entries
+  name each file/pattern explicitly (e.g. `f/data_platform/dbt_run.*`). This
+  is deliberate: a blanket wildcard would sweep up any script/flow/app
+  someone adds to that folder later — on the server or locally — into the
+  mirror's blast radius. When you add a new pipeline's assets under
+  `f/data_platform/`, add their specific filenames/patterns to `includes`
+  rather than relying on the folder already being in scope.
 - **Non-secret runtime state → a sibling `<folder>_state/` folder, never inside
   the synced folder itself.** Any variable a script *writes at runtime* — last-run
   timestamps, cursors, sync markers, paging state — goes under `f/hermes_state/`
@@ -129,6 +149,10 @@ generate a Windmill script, follow these rules so a push can never wipe data:
   three-file change, not just dropping files in `windmill/f/<name>/`:**
   1. Add `"f/<name>/**"` explicitly to `includes` in `windmill/wmill.yaml` (never
      widen to a blanket `f/**` — narrow, explicit scope is the safety mechanism).
+     If the folder is one where extra items might show up unexpectedly (e.g. a
+     pipeline folder others will add scripts to over time, on the server or
+     locally), enumerate the specific files/patterns instead of the folder
+     wildcard — see the `f/data_platform/` entries above for the pattern.
   2. Add a row for it to the scope table and the three scenario tables in
      `docs/windmill-sync.md`.
   3. Commit the folder's `folder.meta.yaml` (generate with
@@ -485,6 +509,20 @@ These install into system paths, not the venv, so they don't go through
 `requirements.txt`/`LAZY_DEPS` and don't interact with `hermes-heal`. Auth is
 manual (`claude` / `opencode auth login` inside the container, or API-key env
 vars) — not baked into the image or compose file.
+
+---
+
+## Hermes custom skills
+
+Custom skills (the Markdown playbooks Hermes's `skills_hub` routes to) live
+in this repo at `hermes/skills/<category>/<skill-name>/` and deploy to the
+Hermes-bound `DATA_DIR/skills/` via `make hermes-skills-push` — additive
+only, same as Windmill sync, so it never touches Hermes's own bundled/curated
+skills living alongside them. Pull live edits back for review with
+`make hermes-skills-pull` (scoped only to skills already tracked here) before
+trusting that a skill Hermes itself edited still matches what's committed.
+Full guide, skill anatomy, and the audit-before-commit workflow:
+[docs/hermes-skills.md](docs/hermes-skills.md).
 
 ---
 

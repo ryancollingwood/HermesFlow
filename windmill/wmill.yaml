@@ -2,16 +2,22 @@
 # wmill CLI sync config. Run `wmill` commands from this `windmill/` directory.
 defaultTs: bun
 # Sync scope is deliberately narrow — only the versioned Hermes + collection
-# + data_platform code lives here. `f/hermes/**`, `f/collection/**`, and
-# `f/data_platform/**` are tracked code/config; everything else (the
-# f/hermes_state runtime-state folder, any other f/ folder, all u/
-# namespaces, and the ~250 inherited resource-types) is intentionally OUT of
-# scope so a mirror push can never delete it. See docs/windmill-sync.md for
-# the full scenario breakdown.
+# + data_platform code lives here. `f/hermes/**` and `f/collection/**` are
+# tracked code/config wholesale; `f/data_platform/**` is instead enumerated
+# item-by-item below so that any extra script/flow/app someone adds in that
+# folder (locally or on the server) is never swept into a push/pull —
+# everything else (the f/hermes_state runtime-state folder, any other f/
+# folder, all u/ namespaces, and the ~250 inherited resource-types) is
+# intentionally OUT of scope so a mirror push can never delete it. See
+# docs/windmill-sync.md for the full scenario breakdown.
 includes:
   - "f/hermes/**"
   - "f/collection/**"
-  - "f/data_platform/**"
+  - "f/data_platform/folder.meta.yaml"
+  - "f/data_platform/data_platform_db.resource.yaml"
+  - "f/data_platform/db_password.variable.yaml"
+  - "f/data_platform/dbt_run.*"
+  - "f/data_platform/extract_hn_stories.*"
   - "hermes_endpoint.resource-type.yaml"
 excludes: []
 # Keep secret values OUT of the synced YAML by default. When false, pulling a

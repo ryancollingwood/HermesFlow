@@ -20,7 +20,7 @@ with the Windmill side pre-wired to call Hermes as an OpenAI-compatible endpoint
 | `Makefile` | `bootstrap`, lifecycle, health, backups, key generation |
 | `windmill/` | wmill-syncable resource type, resource, secret, and example scripts |
 | `mlx/` | Host-native MLX inference server for Apple Silicon (setup + launch script) |
-| `hermes/` | Thin derived Hermes image — bakes extra Python packages into the venv ([how & why](docs/hermes-docker-build.md)) |
+| `hermes/` | Thin derived Hermes image — bakes extra Python packages into the venv ([how & why](docs/hermes-docker-build.md)) — plus `hermes/skills/`, version-controlled custom Hermes skills pushed to `DATA_DIR/skills/` via `make hermes-skills-push` |
 
 ## Architecture
 
@@ -795,9 +795,9 @@ instead of hardcoding the URL/key each time.
 
 ```
 windmill/
-├── wmill.yaml                          # sync config (scope: f/hermes/** only)
+├── wmill.yaml                          # sync config (scope: f/hermes/**, f/collection/**, and an explicit f/data_platform/ item list)
 ├── hermes_endpoint.resource-type.yaml  # resource type: { base_url, api_key }
-└── f/hermes/                           # VERSIONED Hermes code/config (this is the only synced folder)
+└── f/hermes/                           # VERSIONED Hermes code/config
     ├── folder.meta.yaml                # folder permissions/owners (tracked so a push won't strip them)
     ├── api_key.variable.yaml           # secret variable (placeholder)
     ├── local.resource.yaml             # a hermes_endpoint resource → $var:f/hermes/api_key
@@ -805,12 +805,17 @@ windmill/
     └── chat.py                         # example consumer: from f.hermes.client import chat
 ```
 
-> **Two folders, two purposes.** `f/hermes/` is **versioned code/config** and is
-> the *only* folder sync touches. Non-secret **runtime state** (last-run
-> timestamps, cursors, …) belongs in **`f/hermes_state/`** — a folder the
-> installer creates but which is **deliberately outside sync scope**, so a mirror
-> push never deletes it and it never lands in git. Everything else (`u/*`, other
-> `f/*`, inherited resource-types, secret variables) is ignored by sync too.
+> **Two folders, two purposes.** `f/hermes/`, `f/collection/`, and the tracked
+> items under `f/data_platform/` are **versioned code/config** and are the
+> *only* things sync touches. Non-secret **runtime state** (last-run
+> timestamps, cursors, …) belongs in a sibling `<folder>_state/` folder (e.g.
+> `f/hermes_state/`) — created by the installer but **deliberately outside
+> sync scope**, so a mirror push never deletes it and it never lands in git.
+> `f/data_platform/` is scoped item-by-item in `includes` (each file/pattern
+> named explicitly) rather than a blanket `f/data_platform/**`, so any extra
+> script/flow/app dropped into that folder — on the server or locally — is
+> never swept into a push/pull. Everything else (`u/*`, other `f/*`, inherited
+> resource-types, secret variables) is ignored by sync too.
 > [**docs/windmill-sync.md**](docs/windmill-sync.md) has the full per-scenario breakdown.
 
 ### Push it
@@ -963,13 +968,16 @@ Gotchas (all enforced by Windmill):
 | `make health` | Probe Hermes `/health` and Windmill `/api/version` |
 | `make apikey` | Generate `API_SERVER_KEY` into `.env` if empty |
 | `make secrets` | Generate every required secret (`API_SERVER_KEY`, `WM_DB_PASSWORD`, `HINDSIGHT_DB_PASSWORD`, `GRAFANA_ADMIN_PASSWORD`) that's blank or a weak default |
-| `make backup` | `pg_dump` of Windmill + Hindsight Postgres, tar of Hermes `/opt/data` → `./backups/` |
+| `make backup` | `pg_dump` of Windmill + Hindsight + Collection Postgres, tar of Hermes `/opt/data` → `./backups/` (auto-prunes anything older than `BACKUP_RETENTION_DAYS`, default 14) |
+| `make backup-schedule` / `backup-schedule-revert` | Install/remove a daily 03:00 cron job that runs `make backup` automatically |
 | `make pull` | Pull latest images |
 | `make observability` / `observability-revert` | Add/remove the optional Prometheus/Grafana/exporters/Loki override |
 | `make baserow` / `baserow-revert` | Add/remove the optional Baserow override |
 | `make baserow-mcp` | Register Baserow with Hermes as MCP tools |
 | `make directus` / `directus-revert` | Add/remove the optional Directus override |
 | `make headroom` / `headroom-revert` | Route Hermes through / off the Headroom context-compression proxy |
+| `make hermes-skills-push` | Copy `hermes/skills/` into the Hermes-bound `DATA_DIR/skills/` (additive — never deletes a skill there that isn't tracked in this repo). Run by both installers automatically. |
+| `make hermes-skills-pull` | Pull tracked skills back from `DATA_DIR/skills/` into `hermes/skills/` for review — scoped only to skills already tracked here. See [docs/hermes-skills.md](docs/hermes-skills.md). |
 
 ## Security notes
 
@@ -1007,6 +1015,19 @@ Gotchas (all enforced by Windmill):
   A cached deployment error sticks to the script even after the interpreter is
   fixed — delete and re-push it (or save a new version) to force a clean
   re-lock once the interpreter is in place.
+- **`make windmill-push` / `windmill-pull` hangs with no output** — `wmill`'s
+  git-branch validation prompt isn't covered by `--yes`, so it silently waits
+  on stdin for a y/n you never see scroll by. `windmill-push`/`-pull`/`-check`
+  pass `--skip-branch-validation` to the underlying `wmill sync` calls to avoid
+  this; if you run `wmill sync push`/`pull` by hand, pass it too.
+- **Never run `wmill sync push`/`pull` by hand from outside `windmill/`** —
+  without `wmill.yaml` loaded the CLI has no scope restriction and mirrors
+  your *entire* remote workspace against whatever's in the wrong directory,
+  which can hard-delete every secret/resource/folder in the workspace. Always
+  use `make windmill-push`/`-pull`/`-check`, or `cd windmill` first by hand.
+  See the `[!WARNING]` at the top of
+  [docs/windmill-sync.md](docs/windmill-sync.md) for what this looks like
+  when it goes wrong and how to recover.
 - **Windmill `wmill sync push` fails / workspace not found** — a fresh Windmill
   CE has no `main` workspace and `wmill workspace add` doesn't create one
   server-side. Create it in the UI (or let `install.sh` do it). See

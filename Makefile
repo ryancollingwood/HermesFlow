@@ -27,7 +27,7 @@ else
   ON_WINDOWS :=
 endif
 
-.PHONY: help check init apikey secrets wizard secure fix-permissions pull build up down restart logs ps health backup bootstrap hermes-heal hermes-workspace hermes-secure lint validate ci headroom headroom-revert mlx mlx-revert mlx-status memory memory-revert hindsight-mlx hindsight-mlx-revert aux-cloud aux-local aux-hindsight aux-status windmill-push windmill-pull windmill-check baserow baserow-revert baserow-mcp directus directus-revert observability observability-revert
+.PHONY: help check init apikey secrets wizard secure fix-permissions pull build up down restart logs ps health backup backup-schedule backup-schedule-revert bootstrap hermes-heal hermes-workspace hermes-secure hermes-skills-push hermes-skills-pull lint validate ci headroom headroom-revert mlx mlx-revert mlx-status memory memory-revert hindsight-mlx hindsight-mlx-revert aux-cloud aux-local aux-hindsight aux-status windmill-push windmill-pull windmill-check baserow baserow-revert baserow-mcp directus directus-revert observability observability-revert
 
 # Fill an .env variable with a generated value when it is empty OR still set to a
 # known-weak default. Usage: $(call ensure_secret,VAR,GENERATOR,WEAK_DEFAULT)
@@ -180,6 +180,31 @@ hermes-secure: ## Fix Tirith PATH lookup (was failing open, unscanned) + disable
 	  $(COMPOSE) restart hermes >/dev/null; \
 	  echo "✓ Tirith now active on \$$PATH-resolved binary; lazy installs disabled"; \
 	else echo "✓ already secure (tirith_path correct, allow_lazy_installs false)"; fi
+
+hermes-skills-push: ## Copy hermes/skills/ into the Hermes-bound DATA_DIR/skills/ (additive — never deletes skills not tracked here)
+	@set -a; . ./$(ENV_FILE) 2>/dev/null; set +a; \
+	  dest="$${DATA_DIR:-$$HOME/.hermes/data}/skills"; \
+	  if [ ! -d hermes/skills ]; then echo "→ no hermes/skills/ in this repo — nothing to push"; exit 0; fi; \
+	  mkdir -p "$$dest"; \
+	  cp -R hermes/skills/. "$$dest/"; \
+	  echo "✓ copied hermes/skills/ → $$dest"; \
+	  echo "  (additive: any skill already under $$dest but not in this repo is left untouched)"
+
+hermes-skills-pull: ## Pull tracked skills FROM the Hermes-bound DATA_DIR/skills/ back into hermes/skills/ for review — scoped to skills already tracked here, never imports Hermes's bundled/curated skills
+	@set -a; . ./$(ENV_FILE) 2>/dev/null; set +a; \
+	  src="$${DATA_DIR:-$$HOME/.hermes/data}/skills"; \
+	  if [ ! -d hermes/skills ]; then echo "→ no hermes/skills/ in this repo yet — nothing to scope the pull to"; exit 0; fi; \
+	  if [ ! -d "$$src" ]; then echo "✗ $$src not found"; exit 1; fi; \
+	  found=0; \
+	  for d in $$(find hermes/skills -mindepth 2 -maxdepth 2 -type d); do \
+	    rel="$${d#hermes/skills/}"; \
+	    if [ -d "$$src/$$rel" ]; then \
+	      cp -R "$$src/$$rel/." "$$d/"; \
+	      echo "→ pulled $$rel"; found=1; \
+	    fi; \
+	  done; \
+	  if [ "$$found" = 1 ]; then echo "✓ pulled tracked skills from $$src — review 'git diff' before committing"; \
+	  else echo "→ none of the tracked skills under hermes/skills/ exist in $$src"; fi
 
 up: ## Start the stack (detached)
 	@$(COMPOSE) up -d
@@ -504,9 +529,23 @@ windmill-push: ## Push windmill/ assets (resource type, resource, scripts) to th
 	    -d '{"email":"admin@windmill.dev","password":"changeme"}' 2>/dev/null | tr -d '"'); \
 	  if [ -n "$$token" ]; then (cd windmill && wmill workspace add main main "$$remote" --token "$$token" >/dev/null 2>&1) || true; \
 	  else echo "→ default admin login failed — relying on your existing wmill profile (run 'wmill workspace add' once if none)"; fi; \
+	  lock_backup=$$(mktemp -d); \
+	  (cd windmill && find . -name '*.script.lock') | while read -r f; do \
+	    mkdir -p "$$lock_backup/$$(dirname "$$f")"; cp "windmill/$$f" "$$lock_backup/$$f"; \
+	  done; \
 	  (cd windmill && wmill generate-metadata >/dev/null 2>&1) || true; \
+	  (cd windmill && find . -name '*.script.lock') | while read -r f; do \
+	    [ -f "$$lock_backup/$$f" ] || continue; \
+	    old_n=$$(grep -vc '^#' "$$lock_backup/$$f" 2>/dev/null || echo 0); \
+	    new_n=$$(grep -vc '^#' "windmill/$$f" 2>/dev/null || echo 0); \
+	    if [ "$$old_n" -gt 0 ] && [ "$$new_n" -lt "$$old_n" ]; then \
+	      echo "⚠ generate-metadata emptied windmill/$$f's pinned deps ($$old_n → $$new_n) — restoring (see docs/data-platform-add-pipeline.md)"; \
+	      cp "$$lock_backup/$$f" "windmill/$$f"; \
+	    fi; \
+	  done; \
+	  rm -rf "$$lock_backup"; \
 	  esc=$$(printf '\033'); \
-	  dels="$$( (cd windmill && wmill sync push --dry-run --yes 2>&1) | sed "s/$${esc}\[[0-9;]*m//g" \
+	  dels="$$( (cd windmill && wmill sync push --dry-run --yes --skip-branch-validation 2>&1) | sed "s/$${esc}\[[0-9;]*m//g" \
 	    | grep -E '^- (folder|variable|resource|resource-type|script|flow|app|schedule|trigger|user|group|settings)( |$$)' || true)"; \
 	  if [ -n "$$dels" ] && [ "$(FORCE)" != "1" ]; then \
 	    echo "✗ push aborted — it would DELETE/ARCHIVE remote items not tracked in windmill/:"; \
@@ -515,7 +554,7 @@ windmill-push: ## Push windmill/ assets (resource type, resource, scripts) to th
 	    echo "  Or force:   make windmill-push FORCE=1 (destructive mirror)"; \
 	    exit 1; \
 	  fi; \
-	  (cd windmill && wmill sync push --yes) || { echo "✗ wmill sync push failed"; exit 1; }; \
+	  (cd windmill && wmill sync push --yes --skip-branch-validation) || { echo "✗ wmill sync push failed"; exit 1; }; \
 	  echo "✓ pushed windmill/ assets"; \
 	  if [ -n "$$token" ] && [ -n "$${API_SERVER_KEY:-}" ]; then \
 	    vp="f/hermes/api_key"; \
@@ -566,7 +605,7 @@ windmill-pull: ## Pull windmill/ assets FROM the server into the repo for versio
 	  token=$$(curl -fsS -H "Host: $$hh" -H 'Content-Type: application/json' -X POST "$$base/api/auth/login" \
 	    -d '{"email":"admin@windmill.dev","password":"changeme"}' 2>/dev/null | tr -d '"'); \
 	  if [ -n "$$token" ]; then (cd windmill && wmill workspace add main main "$$remote" --token "$$token" >/dev/null 2>&1) || true; fi; \
-	  (cd windmill && wmill sync pull --yes) || { echo "✗ wmill sync pull failed"; exit 1; }; \
+	  (cd windmill && wmill sync pull --yes --skip-branch-validation) || { echo "✗ wmill sync pull failed"; exit 1; }; \
 	  echo "✓ pulled windmill/ assets into windmill/ — review 'git diff' before committing"; \
 	  echo "  skipSecrets keeps secret values out of YAML — only placeholders are written."
 
@@ -580,7 +619,7 @@ windmill-check: ## Report whether the live Windmill server has drifted from wind
 	  token=$$(curl -fsS -H "Host: $$hh" -H 'Content-Type: application/json' -X POST "$$base/api/auth/login" \
 	    -d '{"email":"admin@windmill.dev","password":"changeme"}' 2>/dev/null | tr -d '"'); \
 	  if [ -n "$$token" ]; then (cd windmill && wmill workspace add main main "$$remote" --token "$$token" >/dev/null 2>&1) || true; fi; \
-	  (cd windmill && wmill sync pull --yes >/dev/null 2>&1) || { echo "✗ wmill sync pull failed (is the server running?)"; git checkout -- windmill/; exit 1; }; \
+	  (cd windmill && wmill sync pull --yes --skip-branch-validation >/dev/null 2>&1) || { echo "✗ wmill sync pull failed (is the server running?)"; git checkout -- windmill/; exit 1; }; \
 	  if git diff --quiet -- windmill/; then \
 	    echo "✓ windmill/ is in sync with the server"; rc=0; \
 	  else \
@@ -601,7 +640,34 @@ backup: ## Snapshot Postgres (Windmill + Hindsight + Collection) + the Hermes da
 	  $(COMPOSE) exec -T collection_db pg_dump -U "$${COLLECTION_DB_ADMIN_USER:-collection_admin}" "$${COLLECTION_DB_NAME:-collection}" | gzip > "backups/collection-$$STAMP.sql.gz"; \
 	  echo "→ archiving Hermes /data…"; \
 	  tar czf "backups/hermes-$$STAMP.tar.gz" -C "$${DATA_DIR:-$$HOME/.hermes/data}" . ; \
-	  echo "✓ backups written to ./backups/ (stamp $$STAMP)"
+	  echo "✓ backups written to ./backups/ (stamp $$STAMP)"; \
+	  keep_days="$${BACKUP_RETENTION_DAYS:-14}"; \
+	  pruned=$$(find backups -maxdepth 1 -type f \( -name 'windmill-*.sql.gz' -o -name 'hindsight-*.sql.gz' -o -name 'collection-*.sql.gz' -o -name 'hermes-*.tar.gz' \) -mtime "+$$keep_days" -print -delete); \
+	  if [ -n "$$pruned" ]; then echo "→ pruned backups older than $$keep_days days:"; printf '%s\n' "$$pruned" | sed 's/^/    /'; fi
+
+backup-schedule: ## Install a daily cron job (03:00) that runs `make backup` automatically — needs cron
+	@command -v crontab >/dev/null || { echo "✗ 'crontab' not found on this system"; exit 1; }
+	@dir="$$(pwd)"; mkdir -p backups; \
+	  marker="# hermesflow-backup:$$dir"; \
+	  mk="$$(command -v make)"; \
+	  docker_dir="$$(dirname "$$(command -v docker 2>/dev/null)" 2>/dev/null)"; \
+	  cron_path="/usr/local/bin:/usr/bin:/bin"; \
+	  [ -n "$$docker_dir" ] && cron_path="$$docker_dir:$$cron_path"; \
+	  cronline="0 3 * * * /bin/sh -c 'export PATH=\"$$cron_path\"; cd $$dir && $$mk backup' >> $$dir/backups/backup-cron.log 2>&1 $$marker"; \
+	  ( crontab -l 2>/dev/null | grep -vF "$$marker" ; echo "$$cronline" ) | crontab -; \
+	  echo "✓ scheduled: daily backup at 03:00 → $$dir/backups/backup-cron.log"; \
+	  echo "  cron PATH includes: $$cron_path"; \
+	  echo "  Revert with: make backup-schedule-revert"
+
+backup-schedule-revert: ## Remove the cron job installed by backup-schedule
+	@command -v crontab >/dev/null || { echo "✗ 'crontab' not found on this system"; exit 1; }
+	@dir="$$(pwd)"; marker="# hermesflow-backup:$$dir"; \
+	  if crontab -l 2>/dev/null | grep -qF "$$marker"; then \
+	    crontab -l 2>/dev/null | grep -vF "$$marker" | crontab -; \
+	    echo "✓ removed scheduled backup cron job"; \
+	  else \
+	    echo "→ no scheduled backup cron job found for $$dir"; \
+	  fi
 
 bootstrap: ## One-shot: check → init → secrets → wizard → secure → pull → build → up → heal → health
 	@$(MAKE) init

@@ -1,6 +1,9 @@
 summary: Run the data_platform dbt project (staging in DuckDB, marts attached to
   collection_db)
-description: ''
+description: Staging models run against an in-memory DuckDB instance reading
+  Parquet from /shared/datalake. Mart models materialized through dbt-duckdb
+  Postgres attach into collection_db `data_platform` schema. Auto-resolves db
+  resource via wmill.get_resource().
 lock: '!inline f/data_platform/dbt_run.script.lock'
 kind: script
 schema:
@@ -9,9 +12,8 @@ schema:
   properties:
     command:
       type: string
-      description: >-
-        dbt subcommand to run. Use `build` (default) for staging+mart in one
-        process — staging lives in an ephemeral in-memory DuckDB scoped to
+      description: dbt subcommand to run. Use `build` (default) for staging+mart in
+        one process — staging lives in an ephemeral in-memory DuckDB scoped to
         this job, so a standalone `test` run afterwards has nothing to check.
       default: build
       enum:
@@ -19,14 +21,8 @@ schema:
         - run
         - test
       originalType: string
-    db:
-      type: object
-      description: ''
-      default: null
-      format: resource-postgresql
     full_refresh:
       type: boolean
       description: Pass --full-refresh (only applies to `run`)
       default: false
-  required:
-    - db
+  required: []
