@@ -262,7 +262,10 @@ services:
   #  LLM is used for fact extraction and reflect synthesis — points at LM Studio.
   # ---------------------------------------------------------------------------
   hindsight:
-    image: ghcr.io/vectorize-io/hindsight:latest
+    # Pinnable via HINDSIGHT_VERSION. When sharing Hindsight with Joshu
+    # (make joshu-memory), pin near 0.7.x — Joshu's baked hindsight-client is
+    # 0.7.2 and a :latest server can drift API-incompatible. See docs/joshu.md.
+    image: ghcr.io/vectorize-io/hindsight:${HINDSIGHT_VERSION:-latest}
     container_name: hindsight
     restart: unless-stopped
     depends_on:

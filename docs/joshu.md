@@ -150,32 +150,38 @@ capable model pulled (e.g. `qwen2.5:14b`).
 3. Revert by deleting `/root/.hermes/config.user.yaml` (inside the container or
    under `$JOSHU_DATA_DIR/hermes/`) and restarting.
 
-## Phase 2 — share the stack's Hindsight (planned)
+## Shared Hindsight memory (`make joshu-memory`)
 
 By default Joshu's memory is off (`JOSHU_HINDSIGHT_ENABLED=false`) — its
 internal Hindsight is a slim build that needs external Gemini/Cohere keys, and
 running it would duplicate the stack's Hindsight + Postgres inside the fat
 container.
 
-Joshu can instead use **the stack's** Hindsight — its memory lands in a
-separate `joshu` bank, isolated from the stack hermes's memories, and it gets
-local embeddings/reranking for free. Verified upstream behaviour: a healthy
-remote `HINDSIGHT_API_URL` stops Joshu from spawning its own API, and a
-non-local `HINDSIGHT_API_DATABASE_URL` stops the in-container Postgres.
+Instead, Joshu uses **the stack's** Hindsight: its memory lands in a separate
+`joshu` bank (`JOSHU_HINDSIGHT_BANK_ID`), isolated from the stack hermes's
+memories, and it gets the stack's local embeddings/reranking for free. The
+override is pre-wired — Joshu's boot sees the remote `HINDSIGHT_API_URL`
+healthy and never starts its internal Hindsight, and the deliberately-inert
+`HINDSIGHT_API_DATABASE_URL` guarantees the in-container Postgres stays off
+and Joshu's fallback API can never attach to the stack's live database.
 
-1. In `docker-compose.joshu.yml`: add `memory` to `networks`, uncomment the
-   four `HINDSIGHT_*` lines, and set `JOSHU_HINDSIGHT_ENABLED=true` in `.env`.
-2. Pin the stack's Hindsight image in `docker-compose.yml` to a 0.7.x tag —
-   Joshu is built against `hindsight-client==0.7.2` and the stack currently
-   tracks `:latest`; API skew is the main risk here.
-3. Recreate: `docker compose up -d hindsight joshu-stack`.
+```bash
+make joshu-memory          # needs joshu-stack AND the base stack's hindsight running
+make joshu-memory-revert   # turn it back off (the joshu bank is preserved)
+```
+
+Before enabling, consider pinning `HINDSIGHT_VERSION` in `.env` near `0.7.x` —
+Joshu's baked `hindsight-client` is 0.7.2 and a `:latest` server can drift
+API-incompatible (pin changes take effect on the next
+`docker compose up -d hindsight`; check compatibility with your existing
+memory data before downgrading an established instance).
 
 Verify:
 
 ```bash
 docker exec joshu-stack curl -fsS http://hindsight:8888/health
-docker exec joshu-stack pgrep -f postgres || echo "OK: no in-container postgres"
-# hindsight.localhost UI should list a separate "joshu" bank
+docker exec joshu-stack pgrep -f "postgres" || echo "OK: no in-container postgres"
+# hindsight.localhost UI should list a separate "joshu" bank once Joshu writes memories
 ```
 
 ## Troubleshooting

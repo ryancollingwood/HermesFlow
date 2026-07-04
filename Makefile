@@ -27,7 +27,7 @@ else
   ON_WINDOWS :=
 endif
 
-.PHONY: help check init apikey secrets wizard secure fix-permissions pull build up down restart logs ps health backup backup-schedule backup-schedule-revert bootstrap hermes-heal hermes-workspace hermes-secure hermes-skills-push hermes-skills-pull lint validate ci headroom headroom-revert mlx mlx-revert mlx-status memory memory-revert hindsight-mlx hindsight-mlx-revert aux-cloud aux-local aux-hindsight aux-status windmill-push windmill-pull windmill-check baserow baserow-revert baserow-mcp directus directus-revert observability observability-revert ollama ollama-revert joshu joshu-revert joshu-build joshu-sync
+.PHONY: help check init apikey secrets wizard secure fix-permissions pull build up down restart logs ps health backup backup-schedule backup-schedule-revert bootstrap hermes-heal hermes-workspace hermes-secure hermes-skills-push hermes-skills-pull lint validate ci headroom headroom-revert mlx mlx-revert mlx-status memory memory-revert hindsight-mlx hindsight-mlx-revert aux-cloud aux-local aux-hindsight aux-status windmill-push windmill-pull windmill-check baserow baserow-revert baserow-mcp directus directus-revert observability observability-revert ollama ollama-revert joshu joshu-revert joshu-build joshu-sync joshu-memory joshu-memory-revert
 
 # Fill an .env variable with a generated value when it is empty OR still set to a
 # known-weak default. Usage: $(call ensure_secret,VAR,GENERATOR,WEAK_DEFAULT)
@@ -428,6 +428,24 @@ joshu-revert: ## Stop Joshu + drop its override from COMPOSE_FILE (data in JOSHU
 	  sed -i.bak "s|^COMPOSE_FILE=.*|COMPOSE_FILE=$$NEW|" $(ENV_FILE) && rm -f $(ENV_FILE).bak; \
 	  echo "✓ COMPOSE_FILE=$${NEW:-(cleared)}"
 	@echo "✓ Joshu stopped (desktop files, gateway config and GBrain index preserved in JOSHU_DATA_DIR)"
+
+joshu-memory: ## Give Joshu long-term memory via the stack's Hindsight (own "joshu" bank; needs joshu + hindsight running)
+	@docker ps --format '{{.Names}}' | grep -qx joshu-stack || { echo "✗ joshu-stack not running — 'make joshu' first"; exit 1; }
+	@docker ps --format '{{.Names}}' | grep -qx hindsight || { echo "✗ hindsight not running — start the base stack first (make up)"; exit 1; }
+	@if grep -qE '^JOSHU_HINDSIGHT_ENABLED=' $(ENV_FILE); then \
+	  sed -i.bak "s|^JOSHU_HINDSIGHT_ENABLED=.*|JOSHU_HINDSIGHT_ENABLED=true|" $(ENV_FILE) && rm -f $(ENV_FILE).bak; \
+	else echo "JOSHU_HINDSIGHT_ENABLED=true" >> $(ENV_FILE); fi
+	@$(COMPOSE) up -d joshu-stack
+	@echo "✓ Joshu memory routed through the stack's Hindsight (bank: joshu)"
+	@echo "  Browse it: http://hindsight.localhost — Joshu's memories appear in their own bank"
+	@echo "  Tip: pin HINDSIGHT_VERSION near 0.7.x in .env (Joshu's client is 0.7.2)"
+
+joshu-memory-revert: ## Disable Joshu's Hindsight memory (bank data preserved in the stack's Hindsight)
+	@if grep -qE '^JOSHU_HINDSIGHT_ENABLED=' $(ENV_FILE); then \
+	  sed -i.bak "s|^JOSHU_HINDSIGHT_ENABLED=.*|JOSHU_HINDSIGHT_ENABLED=false|" $(ENV_FILE) && rm -f $(ENV_FILE).bak; \
+	else echo "JOSHU_HINDSIGHT_ENABLED=false" >> $(ENV_FILE); fi
+	@$(COMPOSE) up -d joshu-stack 2>/dev/null || true
+	@echo "✓ Joshu memory disabled (the joshu bank stays in the stack's Hindsight)"
 
 joshu-build: ## Build the joshu-oss image from the local clone at JOSHU_SRC_DIR (slow; JOSHU_BUILD_NATIVE=1 for Apple Silicon)
 	@bash joshu/build.sh

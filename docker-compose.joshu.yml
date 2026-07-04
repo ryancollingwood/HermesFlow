@@ -22,9 +22,9 @@
 #  with `make joshu-build` (JOSHU_SRC_DIR in .env). Pull upstream updates and
 #  rebuild with `make joshu-sync`.
 #
-#  Phase 2 (share the stack's Hindsight instead of Joshu's internal one):
-#  see docs/joshu.md — add `memory` to networks and set the HINDSIGHT_* vars
-#  marked below.
+#  Long-term memory is optional and SHARED: `make joshu-memory` points Joshu
+#  at the stack's hindsight service (own "joshu" bank) — Joshu's internal
+#  Hindsight/Postgres never run. See docs/joshu.md.
 #
 #  NOTE: YAML anchors are file-scoped — the base file's &default-logging is not
 #  visible here, so it is redefined below.
@@ -92,19 +92,24 @@ services:
       - JOSHU_HERMES_DASHBOARD_PASSWORD=${JOSHU_HERMES_DASHBOARD_PASSWORD:-}
       # ── Camofox browser — baked into this image, started by vps-start.sh ──
       - CAMOFOX_URL=http://127.0.0.1:9377
-      # ── Hindsight memory ──────────────────────────────────────────────────
-      # Phase 1 default: OFF. Joshu's internal Hindsight is a slim build that
-      # requires external ML keys (Gemini embeddings) anyway. OPTIONAL=true
-      # keeps a Hindsight failure from blocking boot.
+      # ── Hindsight memory — SHARED with the stack's hindsight service ─────
+      # Default OFF. `make joshu-memory` flips JOSHU_HINDSIGHT_ENABLED=true:
+      # Joshu then uses the stack's Hindsight at http://hindsight:8888 with
+      # its own memory bank ("joshu"), isolated from the stack hermes's bank.
+      # Joshu's boot sees the remote URL healthy and never starts its
+      # internal Hindsight or Postgres. OPTIONAL=true keeps a Hindsight
+      # outage from blocking boot (memory just stays off until it returns).
       - JOSHU_HINDSIGHT_ENABLED=${JOSHU_HINDSIGHT_ENABLED:-false}
       - JOSHU_HINDSIGHT_OPTIONAL=true
-      # Phase 2 — share the stack's Hindsight (see docs/joshu.md): set
-      # JOSHU_HINDSIGHT_ENABLED=true in .env, add `memory` to networks below,
-      # and uncomment:
-      # - HINDSIGHT_API_URL=http://hindsight:8888
-      # - HINDSIGHT_API_DATABASE_URL=postgresql://${HINDSIGHT_DB_USER:-hindsight}:${HINDSIGHT_DB_PASSWORD:-hindsight}@hindsight_db:5432/${HINDSIGHT_DB_NAME:-hindsight}
-      # - HINDSIGHT_API_KEY=${HINDSIGHT_API_KEY:-}
-      # - HINDSIGHT_BANK_ID=joshu
+      - HINDSIGHT_API_URL=http://hindsight:8888
+      - HINDSIGHT_API_KEY=${HINDSIGHT_API_KEY:-}
+      - HINDSIGHT_BANK_ID=${JOSHU_HINDSIGHT_BANK_ID:-joshu}
+      # Deliberately-inert DB URL: being non-local it stops Joshu's boot from
+      # starting the in-container Postgres, and the bogus credentials make
+      # sure Joshu's FALLBACK hindsight-api (spawned only if the remote is
+      # down at boot) can never attach joshu's 0.7.2 schema to the stack's
+      # live Hindsight database.
+      - HINDSIGHT_API_DATABASE_URL=postgresql://joshu-remote-only:disabled@hindsight_db:5432/${HINDSIGHT_DB_NAME:-hindsight}
     volumes:
       # Same six persistence paths as joshu's upstream compose, as host bind
       # mounts under JOSHU_DATA_DIR (container runs as root — the dirs will be
@@ -131,9 +136,9 @@ services:
         limits:
           memory: ${JOSHU_MEM_LIMIT:-8G}
           cpus: "${JOSHU_CPU_LIMIT:-4.0}"
-    # Phase 2 (shared Hindsight) adds: memory
+    # memory: reach the stack's hindsight:8888 (used when JOSHU_HINDSIGHT_ENABLED=true).
     # Advanced Ollama wiring (docs/joshu.md) adds: inference
-    networks: [edge]
+    networks: [edge, memory]
     logging: *default-logging
 
   # ---------------------------------------------------------------------------
