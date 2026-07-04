@@ -13,7 +13,11 @@ USER root
 # (tmux for interactive PTY orchestration via send-keys/capture-pane; the CLIs
 # themselves). These install into system paths, not the venv, so they're
 # untouched by the venv re-lock below and don't interact with hermes-heal.
-RUN apt-get update && apt-get install -y --no-install-recommends tmux && \
+# tesseract-ocr backs liteparse's OCR path, and imagemagick backs its
+# non-PDF image handling (both PyPI-documented as optional local installs,
+# not bundled into the wheel — verified: `lit parse` on a raw PNG fails with
+# "ImageMagick is not installed" without it) — see hermes/requirements.txt.
+RUN apt-get update && apt-get install -y --no-install-recommends tmux tesseract-ocr imagemagick && \
     rm -rf /var/lib/apt/lists/*
 # mcp-remote bridges Hermes (stdio MCP client) to MCP servers that only speak
 # the legacy HTTP+SSE transport — e.g. Baserow. Baking it in (vs. `npx` at
