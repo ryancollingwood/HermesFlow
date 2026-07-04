@@ -50,6 +50,8 @@ http://prometheus.localhost {
 }
 
 # --- Ollama (local LLM inference — restrict to trusted networks in production)
+# Only resolves when the docker-compose.ollama.yml override is active
+# (COMPOSE_FILE / `make ollama`); otherwise this route 502s until Ollama is up.
 http://ollama.localhost {
     reverse_proxy ollama:11434
 }

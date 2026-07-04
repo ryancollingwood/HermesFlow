@@ -85,6 +85,8 @@ services:
     ports:
       # Direct host access (optional); primary access is via Caddy.
       - "${BASEROW_BIND:-127.0.0.1}:${BASEROW_PORT:-3010}:80"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # reach a host-native Ollama (--external-ollama)
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost/api/_health/"]
       interval: 30s

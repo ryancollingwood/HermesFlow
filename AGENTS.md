@@ -13,7 +13,7 @@ before touching any file.
 | Ingress | `caddy` |
 | Agent | `hermes`, `headroom` |
 | Memory | `hindsight`, `hindsight_db` |
-| Inference | `ollama` |
+| Inference (optional, `docker-compose.ollama.yml`) | `ollama` |
 | Workflow | `windmill_server`, `windmill_lsp`, `windmill_worker` (×2), `windmill_worker_native` |
 | Data | `db` (PostgreSQL 16) |
 | Observability (optional, `docker-compose.observability.yml`) | `prometheus`, `alertmanager`, `grafana`, `cadvisor`, `node_exporter`, `postgres_exporter`, `collection_postgres_exporter`, `hindsight_postgres_exporter`, `loki`, `promtail` |
@@ -174,10 +174,21 @@ toggled via `COMPOSE_FILE` in `.env`, leaving the default stack untouched. Docke
 Compose reads `COMPOSE_FILE` from `.env`, so every `docker compose` / `make` call
 picks the override up. Prefer this over uncommenting blocks in the base file.
 
-Three reference points, minimal → full:
+Four reference points, minimal → full:
 
+- **`docker-compose.ollama.yml`** — the simplest full subsystem: no secrets, no
+  dedicated DB, just the `ollama` service plus restoring `caddy`'s
+  `depends_on: ollama` (dropped from the base file since the service only
+  exists when this override is loaded — same trick as
+  `docker-compose.observability.yml` does for `alertmanager`). Also the
+  reference point for the "external service" variant of this pattern: instead
+  of `--with-ollama` layering the override, `--external-ollama <url>` skips it
+  entirely and repoints the consuming services' env vars
+  (`HINDSIGHT_LLM_BASE_URL`, `BASEROW_OLLAMA_HOST`) at a service running
+  outside this compose project altogether.
 - **`docker-compose.gpu.yml`** — one-service tweak: adds the NVIDIA device
-  reservation to `ollama` (`--gpu`).
+  reservation to `ollama` (`--gpu`, which implies `--with-ollama` since it
+  patches a service that only exists when that override is loaded).
 - **`docker-compose.baserow.yml`** — a full subsystem with its own dedicated
   Postgres/Redis: an extra app, its own network, a Caddy route, secrets, an
   installer flag, Makefile lifecycle targets, and an agent (MCP) bootstrap.
@@ -251,8 +262,9 @@ uses all of them. Keep `install.sh` and `install.py` at parity throughout.
    running, since the feature is usually off).
 6. **CI** — add the merged config to the compose job:
    `docker compose -f docker-compose.yml -f docker-compose.<feature>.yml config -q`
-   (the base CI run doesn't include overrides). `gpu`, `baserow`, and
-   `directus` are all covered
+   (the base CI run doesn't include overrides). `ollama`, `baserow`, and
+   `directus` are all covered this way; `gpu` additionally requires `ollama`
+   loaded first since it patches that override's `ollama` service.
 7. **Docs** — a README section + an INSTALL flag-table row; add a focused
    `docs/<feature>*.md` for deeper caveats when warranted.
 

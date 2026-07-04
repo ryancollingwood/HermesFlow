@@ -1,12 +1,13 @@
 # =============================================================================
 #  GPU passthrough override for the `ollama` container (NVIDIA + the
-#  nvidia-container-toolkit). The base compose file leaves the GPU device
-#  reservation commented out because env vars alone can't grant a container the
-#  GPU — Compose has to reserve the device. This override adds it.
+#  nvidia-container-toolkit). Patches the `ollama` service defined in
+#  docker-compose.ollama.yml, so that file must be loaded first — this
+#  override is not meant to be run standalone.
 #
-#  Enable it by layering this file on top of the base one. The installers do this
-#  for you with `--gpu`; manually, set in .env:
-#      COMPOSE_FILE=docker-compose.yml:docker-compose.gpu.yml
+#  Enable it by layering this file on top of the base + ollama ones. The
+#  installers do this for you with `--gpu` (which implies `--with-ollama`);
+#  manually, set in .env:
+#      COMPOSE_FILE=docker-compose.yml:docker-compose.ollama.yml:docker-compose.gpu.yml
 #      CUDA_VISIBLE_DEVICES=0
 #      OLLAMA_NUM_GPU=999
 #  then `docker compose up -d` (or `make up`).

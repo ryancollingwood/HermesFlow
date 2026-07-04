@@ -1,0 +1,101 @@
+# =============================================================================
+#  Ollama — local LLM inference server (OpenAI-compatible API at /v1)
+#
+#  Opt-in override layered on top of the base stack via COMPOSE_FILE in .env:
+#      COMPOSE_FILE=docker-compose.yml:docker-compose.ollama.yml
+#  The installers do this with `--with-ollama`; manually, run `make ollama`.
+#
+#  Already running Ollama elsewhere (the Docker host, another box on your
+#  LAN)? Skip this override entirely and point the stack at it instead —
+#  installers accept `--external-ollama <url>` (e.g.
+#  http://host.docker.internal:11434 for a host-native Ollama), which sets
+#  HINDSIGHT_LLM_BASE_URL / BASEROW_OLLAMA_HOST accordingly. Running both this
+#  override and `--external-ollama` makes no sense — pick one.
+#
+#  Models are stored in OLLAMA_DATA_DIR (can be several GB each). Pull one
+#  after first start:
+#    docker exec ollama ollama pull llama3.2
+#
+#  NVIDIA GPU support: layer docker-compose.gpu.yml on top of this file (it
+#  patches this service's deploy.resources.reservations) — COMPOSE_FILE must
+#  list this file before docker-compose.gpu.yml. The installers' `--gpu` flag
+#  implies `--with-ollama` for exactly this reason.
+#
+#  NOTE: YAML anchors are file-scoped — the base file's &default-logging is not
+#  visible here, so it is redefined below.
+# =============================================================================
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "20m"
+    max-file: "5"
+    compress: "true"
+
+services:
+  # Restores caddy's wait-for-ollama dependency, dropped from the base file
+  # since ollama only exists when this override is loaded.
+  caddy:
+    depends_on:
+      ollama:
+        condition: service_started
+
+  ollama:
+    image: ollama/ollama:${OLLAMA_VERSION:-latest}
+    container_name: ollama
+    restart: unless-stopped
+    ports:
+      - "${OLLAMA_BIND:-127.0.0.1}:${OLLAMA_PORT:-11434}:11434"
+    environment:
+      # Listen on all interfaces so Docker-networked services can reach it.
+      - OLLAMA_HOST=0.0.0.0:11434
+      - OLLAMA_KEEP_ALIVE=${OLLAMA_KEEP_ALIVE:-30m}
+      - OLLAMA_NUM_THREAD=${OLLAMA_NUM_THREAD:-8}
+      - OLLAMA_NUM_PARALLEL=${OLLAMA_NUM_PARALLEL:-1}
+      - OLLAMA_MAX_LOADED_MODELS=${OLLAMA_MAX_LOADED_MODELS:-1}
+      # Disable Intel iGPU detection — 2 GB VRAM limits it to <3B models;
+      # CPU path with AVX_VNNI handles larger models more reliably.
+      - OLLAMA_INTEL_GPU=${OLLAMA_INTEL_GPU:-0}
+      - OLLAMA_CONTEXT_LENGTH=${OLLAMA_CONTEXT_LENGTH:-16384}
+      - OLLAMA_VULKAN=${OLLAMA_VULKAN:-false}
+      # Device visibility — blank = CPU only. Set CUDA_VISIBLE_DEVICES=0 (or
+      # comma-separated indices) and layer docker-compose.gpu.yml on top to
+      # hand a specific GPU to Ollama.
+      - CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-}
+      - GGML_VK_VISIBLE_DEVICES=${GGML_VK_VISIBLE_DEVICES:-}
+      - HIP_VISIBLE_DEVICES=${HIP_VISIBLE_DEVICES:-}
+      - GPU_DEVICE_ORDINAL=${GPU_DEVICE_ORDINAL:-}
+      - ROCR_VISIBLE_DEVICES=${ROCR_VISIBLE_DEVICES:-}
+      # ── Prompt / History ───────────────────────────────────────
+      - OLLAMA_NOHISTORY=${OLLAMA_NOHISTORY:-false}
+      - OLLAMA_NOPRUNE=${OLLAMA_NOPRUNE:-false}
+      # Flash attention — beneficial for hybrid architectures (e.g. lfm2).
+      - OLLAMA_FLASH_ATTENTION=${OLLAMA_FLASH_ATTENTION:-true}
+      # q8_0 halves KV-cache RAM with minimal quality loss on CPU inference.
+      - OLLAMA_KV_CACHE_TYPE=${OLLAMA_KV_CACHE_TYPE:-q8_0}
+      # ── GPU layer offloading ────────────────────────────────────────────────
+      # OLLAMA_NUM_GPU: layers to offload to GPU (0 = CPU only, auto = detect).
+      # Pair with CUDA_VISIBLE_DEVICES / HIP_VISIBLE_DEVICES above.
+      - OLLAMA_NUM_GPU=${OLLAMA_NUM_GPU:-0}
+      # OLLAMA_MAX_VRAM: hard cap on VRAM bytes (prevents taking all GPU memory).
+      # Example: 6442450944 = 6 GB. Leave blank for no cap (auto).
+      - OLLAMA_MAX_VRAM=${OLLAMA_MAX_VRAM:-}
+      # OLLAMA_LOAD_TIMEOUT: how long to wait for a stalled model load.
+      - OLLAMA_LOAD_TIMEOUT=${OLLAMA_LOAD_TIMEOUT:-5m}
+    volumes:
+      - ${OLLAMA_DATA_DIR:-./data/ollama}:/root/.ollama
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    deploy:
+      resources:
+        limits:
+          memory: ${OLLAMA_MEM_LIMIT:-32G}
+          cpus: "${OLLAMA_CPU_LIMIT:-8.0}"
+        # NVIDIA GPU support: layer docker-compose.gpu.yml on top instead of
+        # uncommenting anything here (see header comment above).
+    networks: [inference, edge]
+    logging: *default-logging

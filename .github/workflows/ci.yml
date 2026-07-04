@@ -16,10 +16,11 @@ jobs:
           echo "✓ compose config valid"
       - name: Validate optional overrides (merged)
         run: |
-          docker compose -f docker-compose.yml -f docker-compose.gpu.yml config -q
           docker compose -f docker-compose.yml -f docker-compose.baserow.yml config -q
           docker compose -f docker-compose.yml -f docker-compose.directus.yml config -q
-          echo "✓ gpu + baserow + directus overrides merge cleanly"
+          docker compose -f docker-compose.yml -f docker-compose.ollama.yml config -q
+          docker compose -f docker-compose.yml -f docker-compose.ollama.yml -f docker-compose.gpu.yml config -q
+          echo "✓ baserow + directus + ollama (+ gpu) overrides merge cleanly"
       - name: Validate Caddyfile
         run: |
           docker run --rm -v "$PWD/Caddyfile:/etc/caddy/Caddyfile:ro" caddy:2 \

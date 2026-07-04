@@ -45,9 +45,9 @@ Optional Hindsight (memory) model overrides — written to .env before 'up':
 
 Profiles (presets; explicit flags still override them):
     --profile minimal   --no-memory --no-windmill (just the gateway + provider)
-    --profile full      memory + windmill + --with-headroom
-    --profile gpu       --gpu (Linux NVIDIA host, in-container Ollama)
-    --profile mac       --hindsight-model qwen2.5:3b (Apple Silicon, RAM-friendly)
+    --profile full      memory + windmill + --with-headroom + --with-ollama
+    --profile gpu       --gpu (Linux NVIDIA host, in-container Ollama; implies --with-ollama)
+    --profile mac       --hindsight-model qwen2.5:3b + --with-ollama (Apple Silicon, RAM-friendly)
     --profile server    --bind-lan (LAN exposure + auto Hindsight API key)
     --profile remote    route Hindsight at the cloud provider — no local Ollama
                         models (for low-powered hosts)
@@ -61,8 +61,13 @@ Other optional channels / toggles:
     --with-baserow                        add Baserow (structured-data UI + REST API)
     --with-directus                       add Directus (triage UI + REST/GraphQL API + MCP)
     --with-observability                  add Prometheus/Grafana/exporters/Loki+Promtail
+    --with-ollama                         add a local Ollama container (docker-compose.ollama.yml)
+    --external-ollama <url>               use an Ollama already running elsewhere instead of
+                                          the bundled container (e.g. http://host.docker.internal:11434
+                                          for one running on the Docker host) — mutually
+                                          exclusive with --with-ollama
     --bind-lan                            expose Hermes/Hindsight/Ollama on 0.0.0.0
-    --gpu                                 NVIDIA GPU passthrough for Ollama (Linux)
+    --gpu                                 NVIDIA GPU passthrough for Ollama (Linux; implies --with-ollama)
     --env KEY=VALUE                       set any other .env var (repeatable)
 """
 from __future__ import annotations
@@ -321,17 +326,29 @@ def wait_hermes_healthy() -> None:
     die(f"{CROSS} Hermes did not become healthy — check 'docker logs hermes'")
 
 
-def pull_hindsight_models() -> None:
-    base_url = env_value("HINDSIGHT_LLM_BASE_URL")
-    if "ollama" not in base_url:
-        say(f"{ARROW} Hindsight LLM backend is '{base_url or 'unset'}', not Ollama — skipping model pull")
-        return
-    models = []
+def _hindsight_models() -> list[str]:
+    models: list[str] = []
     for k in ("HINDSIGHT_LLM_MODEL", "HINDSIGHT_RETAIN_LLM_MODEL",
               "HINDSIGHT_CONSOLIDATION_LLM_MODEL", "HINDSIGHT_REFLECT_LLM_MODEL"):
         v = env_value(k)
         if v and v not in models:
             models.append(v)
+    return models
+
+
+def pull_hindsight_models(external_ollama: str = "") -> None:
+    """Pull the Ollama models Hindsight uses for fact extraction / consolidation
+    / reflection — embeddings are local (BAAI/bge-small-en-v1.5) so no
+    embedding model is needed. Branches on where Ollama actually lives: the
+    bundled container (docker exec), an external one (over HTTP), or neither
+    (skip — Hindsight isn't on Ollama)."""
+    if external_ollama:
+        pull_hindsight_models_external(external_ollama)
+        return
+    if "ollama" not in out(["docker", "ps", "--format", "{{.Names}}"]).splitlines():
+        say(f"{ARROW} no local Ollama container running — skipping model pull")
+        return
+    models = _hindsight_models()
     if not models:
         say(f"{ARROW} no Hindsight Ollama models configured — skipping")
         return
@@ -342,6 +359,36 @@ def pull_hindsight_models() -> None:
         else:
             say(f"{ARROW} pulling Ollama model '{m}' (can be large/slow)…")
             if not run_ok(["docker", "exec", "ollama", "ollama", "pull", m]):
+                say(f"{WARN} failed to pull '{m}' — Hindsight extraction won't work until it's available")
+
+
+def pull_hindsight_models_external(external_ollama: str) -> None:
+    """Same as pull_hindsight_models, but against an Ollama reachable only over
+    HTTP (no docker exec)."""
+    models = _hindsight_models()
+    if not models:
+        say(f"{ARROW} no Hindsight Ollama models configured — skipping")
+        return
+    url = external_ollama.rstrip("/")
+    present: set[str] = set()
+    try:
+        with urllib.request.urlopen(f"{url}/api/tags", timeout=10) as r:
+            data = json.loads(r.read().decode("utf-8"))
+        present = {m.get("name", "") for m in data.get("models", [])}
+    except Exception:
+        pass
+    for m in models:
+        if m in present:
+            say(f"{OK} Ollama model already present: {m}")
+        else:
+            say(f"{ARROW} pulling Ollama model '{m}' on external Ollama (can be large/slow)…")
+            try:
+                req = urllib.request.Request(
+                    f"{url}/api/pull", data=json.dumps({"name": m}).encode("utf-8"),
+                    method="POST", headers={"Content-Type": "application/json"})
+                with urllib.request.urlopen(req, timeout=1800):
+                    pass
+            except Exception:
                 say(f"{WARN} failed to pull '{m}' — Hindsight extraction won't work until it's available")
 
 
@@ -616,6 +663,11 @@ def main() -> None:
                     help="add Directus (triage UI + REST/GraphQL API + MCP) via its compose override")
     ap.add_argument("--with-observability", action="store_true",
                     help="add Prometheus/Grafana/exporters/Loki+Promtail via its compose override")
+    ap.add_argument("--with-ollama", action="store_true",
+                    help="add a local Ollama container via its compose override")
+    ap.add_argument("--external-ollama", default="",
+                    help="use an Ollama already running elsewhere (e.g. http://host.docker.internal:11434) "
+                         "instead of the bundled container — mutually exclusive with --with-ollama")
     ap.add_argument("--bind-lan", action="store_true",
                     help="expose Hermes/Hindsight/Ollama on 0.0.0.0 instead of loopback")
     ap.add_argument("--gpu", action="store_true",
@@ -633,9 +685,9 @@ def main() -> None:
     # the provider/key are known.)
     PROFILES = {
         "minimal": {"no_memory": True, "no_windmill": True},
-        "full":    {"with_headroom": True},
-        "gpu":     {"gpu": True},
-        "mac":     {"hindsight_model": "qwen2.5:3b"},
+        "full":    {"with_headroom": True, "with_ollama": True},
+        "gpu":     {"gpu": True, "with_ollama": True},
+        "mac":     {"hindsight_model": "qwen2.5:3b", "with_ollama": True},
         "server":  {"bind_lan": True},
     }
     if args.profile:
@@ -662,6 +714,15 @@ def main() -> None:
     if (dc_token or dc_users) and not (dc_token and dc_users):
         die(f"{CROSS} Discord needs BOTH --discord-bot-token and --discord-allowed-users\n"
             "  (allowed user IDs are required for the Hermes Discord channel).")
+
+    # --with-ollama and --external-ollama both answer "where does Ollama live?"
+    # — only one can be true.
+    if args.with_ollama and args.external_ollama:
+        die(f"{CROSS} --with-ollama and --external-ollama are mutually exclusive — pick one.")
+
+    # --gpu only makes sense with the bundled Ollama container running.
+    if args.gpu and platform.system() != "Darwin":
+        args.with_ollama = True
 
     # --hindsight-mlx: point Hindsight's extraction LLM at the host MLX server
     # (MLX_BASE_URL / MLX_MODEL or their defaults; explicit --hindsight-* win).
@@ -709,6 +770,11 @@ def main() -> None:
             + (" (docker-compose.directus.yml)" if args.with_directus else ""))
         say(f"  Observability:   {yn(args.with_observability)}"
             + (" (docker-compose.observability.yml)" if args.with_observability else ""))
+        if args.external_ollama:
+            say(f"  Ollama:          external ({args.external_ollama})")
+        else:
+            say(f"  Ollama:          {yn(args.with_ollama)}"
+                + (" (docker-compose.ollama.yml)" if args.with_ollama else ""))
         say(f"  Telegram:        {'configured' if tg_token else 'none'}    "
             f"Discord: {'configured' if dc_token else 'none'}")
         if args.env:
@@ -776,6 +842,24 @@ def main() -> None:
     # --hindsight-mlx: MLX needs no real key (placeholder).
     if args.hindsight_mlx:
         env_set("HINDSIGHT_LLM_API_KEY", "mlx")
+
+    # Ollama (local LLM inference) — layer its optional compose override. Must
+    # be added before docker-compose.gpu.yml (below), since that file patches
+    # this service.
+    if args.with_ollama:
+        compose_add("docker-compose.ollama.yml")
+        say(f"{OK} enabled Ollama — local LLM inference at http://ollama.localhost")
+
+    # External Ollama (already running on the Docker host or elsewhere) — point
+    # Hindsight/Baserow at it instead of starting a bundled container. Skip the
+    # Hindsight URL if an explicit --hindsight-base-url/--hindsight-mlx/remote
+    # profile already set one — those are more specific and should win.
+    if args.external_ollama:
+        external_ollama = args.external_ollama.rstrip("/")
+        if not args.hindsight_base_url:
+            env_set("HINDSIGHT_LLM_BASE_URL", f"{external_ollama}/v1")
+        env_set("BASEROW_OLLAMA_HOST", external_ollama)
+        say(f"{OK} pointed Hindsight/Baserow at external Ollama: {external_ollama}")
 
     # NVIDIA GPU passthrough for the ollama container.
     if args.gpu:
@@ -919,7 +1003,7 @@ def main() -> None:
 
     # 10. Hindsight memory
     if not args.no_memory:
-        pull_hindsight_models()
+        pull_hindsight_models(args.external_ollama)
         say(f"{ARROW} enabling Hindsight as Hermes's memory provider…")
         for k, v in (("memory.memory_enabled", "true"), ("memory.provider", "hindsight"),
                      ("memory.user_profile_enabled", "true"), ("memory.write_approval", "false")):

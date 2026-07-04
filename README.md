@@ -9,8 +9,9 @@ with the Windmill side pre-wired to call Hermes as an OpenAI-compatible endpoint
 
 | Path | Purpose |
 |---|---|
-| `docker-compose.yml` | The full stack: Hermes, Hindsight, Windmill (db/server/workers/LSP), Caddy |
-| `docker-compose.gpu.yml` | Optional override adding NVIDIA GPU passthrough to Ollama (`--gpu`) |
+| `docker-compose.yml` | The base stack: Hermes, Hindsight, Windmill (db/server/workers/LSP), Caddy |
+| `docker-compose.ollama.yml` | Optional override adding [Ollama](#ollama-optional) local LLM inference (`--with-ollama` / `make ollama`) |
+| `docker-compose.gpu.yml` | Optional override adding NVIDIA GPU passthrough to Ollama (`--gpu`; requires `docker-compose.ollama.yml`) |
 | `docker-compose.observability.yml` | Optional override adding Prometheus, Grafana, exporters, and Loki/Promtail (`--with-observability` / `make observability`) |
 | `docker-compose.baserow.yml` | Optional override adding [Baserow](#baserow-structured-data) (`--with-baserow` / `make baserow`) |
 | `docker-compose.directus.yml` | Optional override adding Directus (`--with-directus` / `make directus`) |
@@ -27,11 +28,13 @@ with the Windmill side pre-wired to call Hermes as an OpenAI-compatible endpoint
 Six Docker networks keep traffic segmented:
 
 - **`backend`** — Postgres ⇄ Windmill server/workers. The DB is reachable by nothing else.
-- **`edge`** — Caddy ⇄ all user-facing services (Windmill, Hermes, Hindsight, Headroom, Ollama).
+- **`edge`** — Caddy ⇄ all user-facing services (Windmill, Hermes, Hindsight, Headroom,
+  and Ollama when its optional override is enabled).
 - **`agent`** — Windmill server/workers ⇄ Hermes gateway (`hermes:8642`). Also carries
   Hermes → Headroom (`headroom:8787`).
 - **`memory`** — Hindsight ⇄ Hermes. Isolated from edge and backend.
-- **`inference`** — Ollama ⇄ Hermes, Hindsight, and Windmill workers (local LLM layer).
+- **`inference`** — Ollama ⇄ Hermes, Hindsight, and Windmill workers (local LLM layer;
+  populated only when the [Ollama override](#ollama-optional) is enabled).
 - **`monitoring`** — Headroom, plus (when the optional observability override is
   enabled) Prometheus, Alertmanager, Grafana, cAdvisor, exporters, Loki, and
   Promtail. Isolated from application networks.
@@ -58,11 +61,18 @@ OPENROUTER_API_KEY=sk-or-... ./install.sh
 ```
 
 Pick a **profile** for common scenarios (explicit flags still override it):
-`--profile minimal` (gateway only), `full` (+ Headroom), `gpu` (NVIDIA host),
-`mac` (Apple Silicon, RAM-friendly model), `server` (LAN), `remote` (all
-inference at the cloud provider — no local Ollama, for low-powered hosts). E.g.
-`./install.sh --profile gpu --api-key sk-or-...`. Add **`--dry-run`** to preview
-the full plan without changing anything.
+`--profile minimal` (gateway only), `full` (+ Headroom + local Ollama), `gpu`
+(NVIDIA host + local Ollama), `mac` (Apple Silicon, RAM-friendly model + local
+Ollama), `server` (LAN), `remote` (all inference at the cloud provider — no
+local Ollama, for low-powered hosts). E.g. `./install.sh --profile gpu
+--api-key sk-or-...`. Add **`--dry-run`** to preview the full plan without
+changing anything.
+
+> **Ollama is opt-in.** A bare `./install.sh` with no profile/flags does **not**
+> start a local Ollama container — pass `--with-ollama` (or a profile that
+> implies it: `full`/`gpu`/`mac`) to get one, or `--external-ollama <url>` to
+> point Hindsight/Baserow at an Ollama you already run elsewhere (e.g. on the
+> Docker host). See [Ollama (optional)](#ollama-optional).
 
 **On Windows (or any host without bash/make/openssl/curl), use the Python port**
 — same flags, same steps, stdlib-only:
@@ -79,7 +89,9 @@ messaging channels (`--telegram-bot-token`/`--telegram-allowed-users`,
 `--discord-bot-token`/`--discord-allowed-users`), `--with-mlx` (Apple Silicon —
 host-native MLX server), `--with-headroom` (route through the compression proxy),
 `--with-baserow` (add the [Baserow](#baserow-structured-data) structured-data
-store), `--bind-lan` (expose on `0.0.0.0`), `--gpu` (NVIDIA passthrough for Ollama),
+store), `--with-ollama` (add a local [Ollama](#ollama-optional) container),
+`--external-ollama <url>` (use an Ollama already running elsewhere instead),
+`--bind-lan` (expose on `0.0.0.0`), `--gpu` (NVIDIA passthrough for Ollama),
 Hindsight overrides (`--hindsight-model` /
 `--hindsight-{retain,consolidation,reflect}-model` / `--hindsight-base-url` /
 `--hindsight-mlx` / `--hindsight-api-key`), and `--env KEY=VALUE` to set any
@@ -407,6 +419,62 @@ curl http://localhost:8888/health
 Keep `./hindsight-pg0-backup.zip` and the old `HINDSIGHT_DATA_DIR` bind mount
 around as a rollback safety net until you've confirmed pre-existing memories
 are present via the web UI / API.
+
+---
+
+## Ollama (optional)
+
+[Ollama](https://ollama.com) is the stack's local LLM inference server —
+Hindsight's fact extraction and Baserow's AI fields both default to it. It's
+**opt-in**, layered as a compose override (`docker-compose.ollama.yml`), the
+same pattern as Baserow/Directus/Observability — so the base stack doesn't
+start a container you don't need.
+
+> **Upgrading an existing install?** Ollama used to be part of the base stack
+> and started unconditionally. It no longer does — run `make ollama` (or
+> re-run your installer with `--with-ollama`) to keep your local container
+> running after upgrading.
+
+### Enable it
+
+```sh
+./install.sh --with-ollama --api-key sk-or-...      # or add to any other flags
+# already installed? just:
+make ollama                                           # layers the override, brings it up
+```
+
+`make ollama` adds `docker-compose.ollama.yml` to `COMPOSE_FILE` in `.env`
+(additively — it coexists with `--with-baserow`/`--with-directus`), so every
+later `docker compose` / `make` call includes it. Then pull a model:
+
+```sh
+docker exec ollama ollama pull llama3.2
+```
+
+`make ollama-revert` stops the container and removes the override from
+`COMPOSE_FILE` (models stay on the `OLLAMA_DATA_DIR` volume).
+
+NVIDIA GPU passthrough (`--gpu` / `docker-compose.gpu.yml`) patches this
+service, so it requires the Ollama override to be loaded first — the
+installers' `--gpu` flag implies `--with-ollama` for exactly this reason.
+
+### Already running Ollama elsewhere?
+
+If Ollama is already running on the Docker host or another box on your LAN,
+skip the bundled container entirely and point the stack at it instead:
+
+```sh
+./install.sh --external-ollama http://host.docker.internal:11434 --api-key sk-or-...
+```
+
+This sets `HINDSIGHT_LLM_BASE_URL` and `BASEROW_OLLAMA_HOST` to the given URL
+and does **not** start a local `ollama` container. `http://host.docker.internal`
+is the address a container uses to reach the Docker host itself (`hermes`,
+`hindsight`, and `baserow` all carry the required `extra_hosts` entry already
+— same mechanism as [MLX](#mlx-inference-apple-silicon) and
+[LM Studio](#lm-studio-setup)); for an Ollama on another LAN host, use its
+IP/hostname instead. `--external-ollama` and `--with-ollama` are mutually
+exclusive.
 
 ---
 
