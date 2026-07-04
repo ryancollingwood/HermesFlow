@@ -1,0 +1,146 @@
+# =============================================================================
+#  Joshu — optional AI "cloud desktop" workspace (ArozOS + bundled Hermes +
+#  Camofox sandboxed browser + GBrain semantic file index)
+#
+#  Opt-in override layered on top of the base stack via COMPOSE_FILE in .env:
+#      COMPOSE_FILE=docker-compose.yml:docker-compose.joshu.yml
+#  Manually, run `make joshu` (build the image first with `make joshu-build`).
+#
+#  Joshu ships as ONE fat container: the Joshu API (:8788), the ArozOS web
+#  desktop (:8787), its own PINNED-and-PATCHED Hermes gateway (:8642), the
+#  Hermes admin dashboard (:9119), GBrain + MCP servers (:8794/:8795), an
+#  in-container Postgres for its optional Hindsight (:5432), and the Camofox
+#  browser (:9377) — all talking to each other over in-container loopback.
+#  That is why this stack does NOT share its `hermes` service with Joshu:
+#  Joshu writes config/skills/MCP registrations into ITS OWN gateway's local
+#  filesystem and spawns it as a child process bound to 127.0.0.1 (see
+#  docs/joshu.md "Why two Hermes gateways"). Bridge networking keeps all of
+#  those internal ports off the host — only 8788/8787 are published, and the
+#  primary path is Caddy (joshu.localhost / joshu-admin.localhost).
+#
+#  The image is NOT on a public registry — build it from your joshu-oss clone
+#  with `make joshu-build` (JOSHU_SRC_DIR in .env). Pull upstream updates and
+#  rebuild with `make joshu-sync`.
+#
+#  Phase 2 (share the stack's Hindsight instead of Joshu's internal one):
+#  see docs/joshu.md — add `memory` to networks and set the HINDSIGHT_* vars
+#  marked below.
+#
+#  NOTE: YAML anchors are file-scoped — the base file's &default-logging is not
+#  visible here, so it is redefined below.
+# =============================================================================
+
+x-logging: &default-logging
+  driver: "json-file"
+  options:
+    max-size: "20m"
+    max-file: "5"
+    compress: "true"
+
+services:
+  # Make Caddy wait for joshu-stack so the joshu.localhost route doesn't 502
+  # during boot (same pattern as the other opt-in overrides).
+  caddy:
+    depends_on:
+      joshu-stack:
+        condition: service_started
+
+  # ---------------------------------------------------------------------------
+  #  joshu-stack — the whole Joshu box in one container (~8G RAM under load;
+  #  first boot takes several minutes: gateway sync, GBrain index, Camofox).
+  # ---------------------------------------------------------------------------
+  joshu-stack:
+    image: ${JOSHU_IMAGE_REF:-joshu-oss:local}
+    container_name: joshu-stack
+    restart: unless-stopped
+    environment:
+      # ── Standalone box (no joshu.me control plane / fleet agent) ──────────
+      - JOSHU_STANDALONE=1
+      # Joshu Express defaults to 127.0.0.1; Caddy must reach it over the
+      # bridge network.
+      - HOST=0.0.0.0
+      - PUBLIC_BASE_PATH=/joshu
+      - AROZOS_ENABLED=true
+      - PUBLIC_AROZ_PORT=8787
+      # Desktop owner (email). Boot gates the bundled Hermes gateway and the
+      # GBrain index on this user's desktop paths — without it the instance
+      # stays 503/degraded until an ArozOS account is created in the web UI.
+      - JOSHU_AROZ_USER=${JOSHU_AROZ_USER:-}
+      # ── Bundled Hermes gateway (in-container, loopback-only by design) ────
+      # HERMES_API_KEY (what Joshu sends) and API_SERVER_KEY (what the gateway
+      # validates) must be the SAME value. This is Joshu's own gateway secret —
+      # deliberately NOT the stack's API_SERVER_KEY.
+      - HERMES_API_BASE_URL=http://127.0.0.1:8642
+      - HERMES_API_KEY=${JOSHU_HERMES_API_KEY}
+      - API_SERVER_KEY=${JOSHU_HERMES_API_KEY}
+      - HERMES_API_AUTO_START=true
+      - JOSHU_HERMES_PROVIDER=${JOSHU_HERMES_PROVIDER:-openrouter}
+      - JOSHU_HERMES_MODEL=${JOSHU_HERMES_MODEL:-deepseek/deepseek-v4-flash}
+      - OPENROUTER_API_KEY=${OPENROUTER_API_KEY:-}
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
+      - GEMINI_API_KEY=${GEMINI_API_KEY:-}
+      # GBrain's embeddings check accepts GOOGLE_API_KEY / OPENAI_API_KEY but
+      # not GEMINI_API_KEY — feed it the same Google key. Without any
+      # embeddings key the semantic file index stays empty (boot still works).
+      - GOOGLE_API_KEY=${GEMINI_API_KEY:-}
+      # ── Hermes admin dashboard, served via Caddy (joshu-admin.localhost) ──
+      - JOSHU_HERMES_DASHBOARD_ENABLED=true
+      - JOSHU_HERMES_DASHBOARD_DIRECT=true
+      - HERMES_DASHBOARD_HOST=0.0.0.0
+      - HERMES_DASHBOARD_PUBLIC_URL=http://joshu-admin.localhost
+      - JOSHU_HERMES_DASHBOARD_PASSWORD=${JOSHU_HERMES_DASHBOARD_PASSWORD:-}
+      # ── Camofox browser — baked into this image, started by vps-start.sh ──
+      - CAMOFOX_URL=http://127.0.0.1:9377
+      # ── Hindsight memory ──────────────────────────────────────────────────
+      # Phase 1 default: OFF. Joshu's internal Hindsight is a slim build that
+      # requires external ML keys (Gemini embeddings) anyway. OPTIONAL=true
+      # keeps a Hindsight failure from blocking boot.
+      - JOSHU_HINDSIGHT_ENABLED=${JOSHU_HINDSIGHT_ENABLED:-false}
+      - JOSHU_HINDSIGHT_OPTIONAL=true
+      # Phase 2 — share the stack's Hindsight (see docs/joshu.md): set
+      # JOSHU_HINDSIGHT_ENABLED=true in .env, add `memory` to networks below,
+      # and uncomment:
+      # - HINDSIGHT_API_URL=http://hindsight:8888
+      # - HINDSIGHT_API_DATABASE_URL=postgresql://${HINDSIGHT_DB_USER:-hindsight}:${HINDSIGHT_DB_PASSWORD:-hindsight}@hindsight_db:5432/${HINDSIGHT_DB_NAME:-hindsight}
+      # - HINDSIGHT_API_KEY=${HINDSIGHT_API_KEY:-}
+      # - HINDSIGHT_BANK_ID=joshu
+    volumes:
+      # Same six persistence paths as joshu's upstream compose, as host bind
+      # mounts under JOSHU_DATA_DIR (container runs as root — the dirs will be
+      # root-owned on the host).
+      - ${JOSHU_DATA_DIR:-./data/joshu}/arozos:/var/lib/arozos
+      - ${JOSHU_DATA_DIR:-./data/joshu}/hermes:/root/.hermes
+      - ${JOSHU_DATA_DIR:-./data/joshu}/hindsight-home:/home/hindsight/.hindsight
+      - ${JOSHU_DATA_DIR:-./data/joshu}/hindsight-cache:/home/hindsight/.cache/huggingface
+      - ${JOSHU_DATA_DIR:-./data/joshu}/postgres:/var/lib/postgresql/hindsight
+      - ${JOSHU_DATA_DIR:-./data/joshu}/gbrain:/root/.gbrain
+    ports:
+      # Direct host access (optional); primary access is via Caddy.
+      - "${JOSHU_BIND:-127.0.0.1}:${JOSHU_PORT:-8788}:8788"       # Joshu API
+      - "${JOSHU_BIND:-127.0.0.1}:${JOSHU_AROZ_PORT:-8790}:8787"  # ArozOS (host 8787 is headroom's)
+    shm_size: 1g   # Camofox/Firefox needs a real /dev/shm
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://127.0.0.1:8788/joshu/api/instance/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 300s   # gateway sync + GBrain index on first boot is slow
+    deploy:
+      resources:
+        limits:
+          memory: ${JOSHU_MEM_LIMIT:-8G}
+          cpus: "${JOSHU_CPU_LIMIT:-4.0}"
+    # Phase 2 (shared Hindsight) adds: memory
+    # Advanced Ollama wiring (docs/joshu.md) adds: inference
+    networks: [edge]
+    logging: *default-logging
+
+  # ---------------------------------------------------------------------------
+  #  Observability note (AGENTS.md §2): container-level metrics for joshu-stack
+  #  (CPU / memory / disk / net) are covered automatically by cAdvisor when the
+  #  observability override is active, and the `ContainerDown` alert guards its
+  #  liveness. Everything INSIDE the fat container (bundled Hermes, Postgres,
+  #  GBrain) is opaque to Prometheus — use `docker logs joshu-stack` and
+  #  http://joshu.localhost/joshu/api/instance/health for component health.
+  # ---------------------------------------------------------------------------

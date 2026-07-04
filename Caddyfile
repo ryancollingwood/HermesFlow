@@ -72,3 +72,21 @@ http://alertmanager.localhost {
 http://baserow.localhost {
     reverse_proxy baserow:80
 }
+
+# --- Joshu (ArozOS desktop at the root; Joshu API under /joshu/*) ------------
+# Only resolves when the docker-compose.joshu.yml override is active
+# (COMPOSE_FILE / `make joshu`); otherwise this route 502s until Joshu is up.
+http://joshu.localhost {
+    reverse_proxy /joshu/* joshu-stack:8788
+    reverse_proxy joshu-stack:8787
+}
+
+# --- Joshu's BUNDLED Hermes admin dashboard -----------------------------------
+# Not the stack's Hermes (that's hermes.localhost) — Joshu runs its own pinned,
+# patched gateway inside joshu-stack; see docs/joshu.md. The bundled dashboard
+# rejects non-loopback Host headers, hence the header_up rewrite.
+http://joshu-admin.localhost {
+    reverse_proxy joshu-stack:9119 {
+        header_up Host 127.0.0.1:9119
+    }
+}

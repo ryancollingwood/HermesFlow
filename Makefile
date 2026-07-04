@@ -27,7 +27,7 @@ else
   ON_WINDOWS :=
 endif
 
-.PHONY: help check init apikey secrets wizard secure fix-permissions pull build up down restart logs ps health backup backup-schedule backup-schedule-revert bootstrap hermes-heal hermes-workspace hermes-secure hermes-skills-push hermes-skills-pull lint validate ci headroom headroom-revert mlx mlx-revert mlx-status memory memory-revert hindsight-mlx hindsight-mlx-revert aux-cloud aux-local aux-hindsight aux-status windmill-push windmill-pull windmill-check baserow baserow-revert baserow-mcp directus directus-revert observability observability-revert ollama ollama-revert
+.PHONY: help check init apikey secrets wizard secure fix-permissions pull build up down restart logs ps health backup backup-schedule backup-schedule-revert bootstrap hermes-heal hermes-workspace hermes-secure hermes-skills-push hermes-skills-pull lint validate ci headroom headroom-revert mlx mlx-revert mlx-status memory memory-revert hindsight-mlx hindsight-mlx-revert aux-cloud aux-local aux-hindsight aux-status windmill-push windmill-pull windmill-check baserow baserow-revert baserow-mcp directus directus-revert observability observability-revert ollama ollama-revert joshu joshu-revert joshu-build joshu-sync
 
 # Fill an .env variable with a generated value when it is empty OR still set to a
 # known-weak default. Usage: $(call ensure_secret,VAR,GENERATOR,WEAK_DEFAULT)
@@ -99,6 +99,8 @@ secrets: ## Generate every required secret in .env that's blank or still a weak 
 	$(call ensure_secret,DIRECTUS_SECRET,openssl rand -hex 32,)
 	$(call ensure_secret,DIRECTUS_ADMIN_PASSWORD,openssl rand -hex 16,)
 	$(call ensure_secret,BASEROW_REDIS_PASSWORD,openssl rand -hex 16,)
+	$(call ensure_secret,JOSHU_HERMES_API_KEY,openssl rand -hex 32,)
+	$(call ensure_secret,JOSHU_HERMES_DASHBOARD_PASSWORD,openssl rand -hex 16,)
 
 wizard: ## Run the Hermes first-run setup wizard (interactive; writes ~/.hermes/.env + config)
 	@set -a; . ./$(ENV_FILE); set +a; \
@@ -387,6 +389,51 @@ ollama-revert: ## Stop Ollama + drop its override from COMPOSE_FILE (models in O
 	  echo "✓ COMPOSE_FILE=$${NEW:-(cleared)}"
 	@echo "✓ Ollama stopped (models preserved in OLLAMA_DATA_DIR)"
 	@echo "  Note: docker-compose.gpu.yml patches this service — drop it from COMPOSE_FILE too if it was enabled."
+
+joshu: ## Start Joshu (AI cloud desktop); adds the override to COMPOSE_FILE — build the image first with `make joshu-build`
+	@$(MAKE) --no-print-directory secrets
+	@set -a; . ./$(ENV_FILE); set +a; \
+	  [ -n "$$JOSHU_HERMES_API_KEY" ] || { echo "✗ JOSHU_HERMES_API_KEY is empty — run 'make secrets'"; exit 1; }; \
+	  [ -n "$$JOSHU_AROZ_USER" ] || echo "⚠ JOSHU_AROZ_USER is empty — the bundled Hermes gateway and GBrain won't start until it's set (desktop owner email)"; \
+	  { [ "$${JOSHU_HERMES_PROVIDER:-openrouter}" != "openrouter" ] || [ -n "$$OPENROUTER_API_KEY" ]; } \
+	    || echo "⚠ OPENROUTER_API_KEY is empty — Joshu's agent will boot but return empty completions"; \
+	  REF="$${JOSHU_IMAGE_REF:-joshu-oss:local}"; \
+	  docker image inspect "$$REF" >/dev/null 2>&1 || { \
+	    echo "✗ image $$REF not found — build it first: make joshu-build (20-30+ min)"; exit 1; }
+	@CUR=$$(grep -E '^COMPOSE_FILE=' $(ENV_FILE) 2>/dev/null | head -1 | cut -d= -f2- | xargs); \
+	  case ":$$CUR:" in \
+	    *:docker-compose.joshu.yml:*) NEW="$$CUR" ;; \
+	    *) if [ -z "$$CUR" ]; then NEW="docker-compose.yml:docker-compose.joshu.yml"; \
+	       else NEW="$$CUR:docker-compose.joshu.yml"; fi ;; \
+	  esac; \
+	  if grep -qE '^COMPOSE_FILE=' $(ENV_FILE); then \
+	    sed -i.bak "s|^COMPOSE_FILE=.*|COMPOSE_FILE=$$NEW|" $(ENV_FILE) && rm -f $(ENV_FILE).bak; \
+	  else \
+	    echo "COMPOSE_FILE=$$NEW" >> $(ENV_FILE); \
+	  fi; \
+	  echo "✓ COMPOSE_FILE=$$NEW"
+	@$(COMPOSE) up -d joshu-stack
+	@$(COMPOSE) up -d caddy
+	@echo "✓ Joshu is starting (first boot syncs the bundled gateway + indexes GBrain — allow 5-10 min)"
+	@echo "  Desktop:      http://joshu.localhost          (direct: http://localhost:$${JOSHU_AROZ_PORT:-8790})"
+	@echo "  Joshu API:    http://joshu.localhost/joshu/api/instance/health"
+	@echo "  Hermes admin: http://joshu-admin.localhost    (Joshu's BUNDLED gateway — not hermes.localhost)"
+	@echo "  Watch boot:   docker logs -f joshu-stack"
+
+joshu-revert: ## Stop Joshu + drop its override from COMPOSE_FILE (data in JOSHU_DATA_DIR preserved)
+	@$(COMPOSE) rm -sf joshu-stack 2>/dev/null || true
+	@CUR=$$(grep -E '^COMPOSE_FILE=' $(ENV_FILE) 2>/dev/null | head -1 | cut -d= -f2- | xargs); \
+	  NEW=$$(echo "$$CUR" | sed -E 's|:?docker-compose\.joshu\.yml||'); \
+	  if [ -z "$$NEW" ] || [ "$$NEW" = "docker-compose.yml" ]; then NEW=""; fi; \
+	  sed -i.bak "s|^COMPOSE_FILE=.*|COMPOSE_FILE=$$NEW|" $(ENV_FILE) && rm -f $(ENV_FILE).bak; \
+	  echo "✓ COMPOSE_FILE=$${NEW:-(cleared)}"
+	@echo "✓ Joshu stopped (desktop files, gateway config and GBrain index preserved in JOSHU_DATA_DIR)"
+
+joshu-build: ## Build the joshu-oss image from the local clone at JOSHU_SRC_DIR (slow; JOSHU_BUILD_NATIVE=1 for Apple Silicon)
+	@bash joshu/build.sh
+
+joshu-sync: ## Pull upstream joshu-oss changes, rebuild the image, restart joshu-stack
+	@bash joshu/sync.sh
 
 observability: ## Start observability (Prometheus, Grafana, exporters, Loki/Promtail); adds the override to COMPOSE_FILE
 	@$(MAKE) --no-print-directory secrets
