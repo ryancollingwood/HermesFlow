@@ -11,9 +11,9 @@
 #
 #  Profiles (presets; explicit flags still override them):
 #    --profile minimal   --no-memory --no-windmill (just the gateway + provider)
-#    --profile full       memory + windmill + --with-headroom
-#    --profile gpu        --gpu (Linux NVIDIA host, in-container Ollama)
-#    --profile mac        --hindsight-model qwen2.5:3b (Apple Silicon, RAM-friendly)
+#    --profile full       memory + windmill + --with-headroom + --with-ollama
+#    --profile gpu        --gpu (Linux NVIDIA host, in-container Ollama; implies --with-ollama)
+#    --profile mac        --hindsight-model qwen2.5:3b + --with-ollama (Apple Silicon, RAM-friendly)
 #    --profile server     --bind-lan (LAN exposure + auto Hindsight API key)
 #    --profile remote     route Hindsight at the cloud provider — no local Ollama
 #                         models (for low-powered hosts)
@@ -63,8 +63,14 @@
 #    --with-baserow                        add Baserow (structured-data UI + REST API)
 #    --with-directus                       add Directus (triage UI + REST/GraphQL API + MCP)
 #    --with-observability                  add Prometheus/Grafana/exporters/Loki+Promtail
+#    --with-ollama                         add a local Ollama container (docker-compose.ollama.yml);
+#                                          default (neither flag) assumes one already runs on the
+#                                          Docker host, at http://host.docker.internal:11434
+#    --external-ollama <url>               use an Ollama at a URL other than the Docker-host
+#                                          default above (a different LAN box, a non-standard
+#                                          port) — mutually exclusive with --with-ollama
 #    --bind-lan                            expose Hermes/Hindsight/Ollama on 0.0.0.0
-#    --gpu                                 NVIDIA GPU passthrough for Ollama (Linux)
+#    --gpu                                 NVIDIA GPU passthrough for Ollama (Linux; implies --with-ollama)
 #    --env KEY=VALUE                       set any other .env var (repeatable)
 # =============================================================================
 set -euo pipefail
@@ -96,6 +102,8 @@ WITH_HEADROOM=0
 WITH_BASEROW=0
 WITH_DIRECTUS=0
 WITH_OBSERVABILITY=0
+WITH_OLLAMA=0
+EXTERNAL_OLLAMA=""
 BIND_LAN=0
 GPU=0
 PROFILE=""
@@ -109,9 +117,9 @@ prev=""; for a in "$@"; do [ "$prev" = "--profile" ] && PROFILE="$a"; prev="$a";
 case "$PROFILE" in
   "")      : ;;
   minimal) WITH_MEMORY=0; WITH_WINDMILL=0 ;;
-  full)    WITH_HEADROOM=1 ;;
-  gpu)     GPU=1 ;;
-  mac)     HS_MODEL="qwen2.5:3b" ;;
+  full)    WITH_HEADROOM=1; WITH_OLLAMA=1 ;;
+  gpu)     GPU=1; WITH_OLLAMA=1 ;;
+  mac)     HS_MODEL="qwen2.5:3b"; WITH_OLLAMA=1 ;;
   server)  BIND_LAN=1 ;;
   remote)  HS_REMOTE=1 ;;
   *) echo "✗ unknown --profile '$PROFILE' (minimal|full|gpu|mac|server|remote)" >&2; exit 1 ;;
@@ -167,7 +175,10 @@ env_put() {
 # docker-compose.yml when COMPOSE_FILE is unset.
 compose_add() {
   local f="$1" cur
-  cur="$(grep -E '^COMPOSE_FILE=' .env 2>/dev/null | head -1 | cut -d= -f2-)"
+  # `|| true` matters: under `set -e -o pipefail`, a fresh .env with no
+  # COMPOSE_FILE= line yet makes grep exit 1 (no match), which without this
+  # guard silently kills the whole installer right here.
+  cur="$(grep -E '^COMPOSE_FILE=' .env 2>/dev/null | head -1 | cut -d= -f2- || true)"
   case ":$cur:" in
     *":$f:"*) return 0 ;;
     *) if [ -z "$cur" ]; then cur="docker-compose.yml:$f"; else cur="$cur:$f"; fi ;;
@@ -189,13 +200,19 @@ wait_hermes_healthy() {
 }
 
 # Pull the Ollama models Hindsight uses for fact extraction / consolidation /
-# reflection. Only runs when Hindsight points at the bundled `ollama` service —
-# embeddings are local (BAAI/bge-small-en-v1.5) so no embedding model is needed.
+# reflection — embeddings are local (BAAI/bge-small-en-v1.5) so no embedding
+# model is needed. Branches on where Ollama actually lives: the bundled
+# container (docker exec), an external one (--external-ollama, over HTTP), or
+# neither (skip — Hindsight isn't on Ollama).
 pull_hindsight_models() {
-  case "${HINDSIGHT_LLM_BASE_URL:-}" in
-    *ollama*) : ;;
-    *) echo "→ Hindsight LLM backend is '${HINDSIGHT_LLM_BASE_URL:-unset}', not Ollama — skipping model pull"; return 0 ;;
-  esac
+  if [ -n "$EXTERNAL_OLLAMA" ]; then
+    pull_hindsight_models_external
+    return
+  fi
+  if ! docker ps --format '{{.Names}}' | grep -qx ollama; then
+    echo "→ no local Ollama container running — skipping model pull"
+    return 0
+  fi
   local models m
   models="$(printf '%s\n' \
       "${HINDSIGHT_LLM_MODEL:-}" \
@@ -210,6 +227,34 @@ pull_hindsight_models() {
     else
       echo "→ pulling Ollama model '$m' (can be large/slow)…"
       docker exec ollama ollama pull "$m" \
+        || echo "⚠ failed to pull '$m' — Hindsight extraction won't work until it's available"
+    fi
+  done
+}
+
+# Same as above, but against an Ollama reachable only over HTTP (no docker exec).
+pull_hindsight_models_external() {
+  local models m url present
+  url="${EXTERNAL_OLLAMA%/}"
+  models="$(printf '%s\n' \
+      "${HINDSIGHT_LLM_MODEL:-}" \
+      "${HINDSIGHT_RETAIN_LLM_MODEL:-}" \
+      "${HINDSIGHT_CONSOLIDATION_LLM_MODEL:-}" \
+      "${HINDSIGHT_REFLECT_LLM_MODEL:-}" \
+    | sed '/^[[:space:]]*$/d' | sort -u)"
+  [ -n "$models" ] || { echo "→ no Hindsight Ollama models configured — skipping"; return 0; }
+  # `|| true` matters here too: curl failing (unreachable host) or grep finding
+  # no "name" fields (no models pulled yet) would otherwise abort the script
+  # under `set -e -o pipefail` — either case should just mean "nothing present".
+  present="$( { curl -fsS --max-time 10 "$url/api/tags" 2>/dev/null \
+    | grep -oE '"name"[[:space:]]*:[[:space:]]*"[^"]+"' | sed -E 's/.*"([^"]+)"$/\1/' ; } || true)"
+  for m in $models; do
+    if printf '%s\n' "$present" | grep -qx "$m"; then
+      echo "✓ Ollama model already present: $m"
+    else
+      echo "→ pulling Ollama model '$m' on external Ollama (can be large/slow)…"
+      curl -fsS --max-time 1800 -X POST "$url/api/pull" -H 'Content-Type: application/json' \
+          -d "{\"name\":\"$m\"}" >/dev/null \
         || echo "⚠ failed to pull '$m' — Hindsight extraction won't work until it's available"
     fi
   done
@@ -460,6 +505,8 @@ while [ $# -gt 0 ]; do
     --with-baserow) WITH_BASEROW=1; shift ;;
     --with-directus) WITH_DIRECTUS=1; shift ;;
     --with-observability) WITH_OBSERVABILITY=1; shift ;;
+    --with-ollama) WITH_OLLAMA=1; shift ;;
+    --external-ollama) EXTERNAL_OLLAMA="$2"; shift 2 ;;
     --bind-lan) BIND_LAN=1; shift ;;
     --gpu) GPU=1; shift ;;
     --profile) shift 2 ;;
@@ -511,6 +558,18 @@ if { [ -n "$DISCORD_TOKEN" ] || [ -n "$DISCORD_USERS" ]; } && { [ -z "$DISCORD_T
   exit 1
 fi
 
+# --with-ollama and --external-ollama both answer "where does Ollama live?" —
+# only one can be true.
+if [ "$WITH_OLLAMA" -eq 1 ] && [ -n "$EXTERNAL_OLLAMA" ]; then
+  echo "✗ --with-ollama and --external-ollama are mutually exclusive — pick one." >&2
+  exit 1
+fi
+
+# --gpu only makes sense with the bundled Ollama container running.
+if [ "$GPU" -eq 1 ] && [ "$(uname -s)" != "Darwin" ]; then
+  WITH_OLLAMA=1
+fi
+
 # --hindsight-mlx: point Hindsight's extraction LLM at the host MLX server (uses
 # MLX_BASE_URL / MLX_MODEL or their defaults; explicit --hindsight-* flags win).
 if [ "$HS_MLX" -eq 1 ]; then
@@ -545,6 +604,11 @@ if [ "$DRY_RUN" -eq 1 ]; then
   echo "  Baserow:         $(yn $WITH_BASEROW)$([ "$WITH_BASEROW" -eq 1 ] && echo " (docker-compose.baserow.yml)")"
   echo "  Directus:        $(yn $WITH_DIRECTUS)$([ "$WITH_DIRECTUS" -eq 1 ] && echo " (docker-compose.directus.yml)")"
   echo "  Observability:   $(yn $WITH_OBSERVABILITY)$([ "$WITH_OBSERVABILITY" -eq 1 ] && echo " (docker-compose.observability.yml)")"
+  if [ -n "$EXTERNAL_OLLAMA" ]; then
+    echo "  Ollama:          external ($EXTERNAL_OLLAMA)"
+  else
+    echo "  Ollama:          $(yn $WITH_OLLAMA)$([ "$WITH_OLLAMA" -eq 1 ] && echo " (docker-compose.ollama.yml)")"
+  fi
   echo "  Telegram:        $([ -n "$TG_TOKEN" ] && echo configured || echo none)    Discord: $([ -n "$DISCORD_TOKEN" ] && echo configured || echo none)"
   [ "${#EXTRA_ENV[@]}" -gt 0 ] && echo "  Extra .env:      ${EXTRA_ENV[*]}"
   echo "  Steps:           $([ "$DO_PULL" -eq 1 ] && echo 'pull → ')$([ "$DO_BUILD" -eq 1 ] && echo 'build → ')up → heal → set-model → probe$([ "$WITH_MEMORY" -eq 1 ] && echo ' → memory')$([ "$WITH_WINDMILL" -eq 1 ] && echo ' → windmill')$([ "$WITH_MLX" -eq 1 ] && echo ' → mlx')$([ "$WITH_HEADROOM" -eq 1 ] && echo ' → headroom')"
@@ -600,6 +664,29 @@ HS_REFLECT="${HS_REFLECT:-$HS_MODEL}"
 [ "$HS_MLX" -eq 1 ] && env_put HINDSIGHT_LLM_API_KEY mlx
 [ -n "$HS_MODEL$HS_RETAIN$HS_CONSOLIDATION$HS_REFLECT$HS_BASE_URL" ] \
   && echo "✓ applied Hindsight model/backend overrides to .env"
+
+# Ollama (local LLM inference) — layer its optional compose override. Must be
+# added before docker-compose.gpu.yml (below), since that file patches this
+# service. .env.example defaults Hindsight/Baserow at a host-native Ollama
+# (host.docker.internal), so repoint them at the bundled container here —
+# unless an explicit --hindsight-base-url already won that argument.
+if [ "$WITH_OLLAMA" -eq 1 ]; then
+  compose_add docker-compose.ollama.yml
+  [ -z "$HS_BASE_URL" ] && env_put HINDSIGHT_LLM_BASE_URL "http://ollama:11434/v1"
+  env_put BASEROW_OLLAMA_HOST "http://ollama:11434"
+  echo "✓ enabled Ollama — local LLM inference at http://ollama.localhost"
+fi
+
+# External Ollama (already running on the Docker host or elsewhere) — point
+# Hindsight/Baserow at it instead of starting a bundled container. Skip the
+# Hindsight URL if an explicit --hindsight-base-url/--hindsight-mlx/remote
+# profile already set one — those are more specific and should win.
+if [ -n "$EXTERNAL_OLLAMA" ]; then
+  EXTERNAL_OLLAMA="${EXTERNAL_OLLAMA%/}"
+  [ -z "$HS_BASE_URL" ] && env_put HINDSIGHT_LLM_BASE_URL "$EXTERNAL_OLLAMA/v1"
+  env_put BASEROW_OLLAMA_HOST "$EXTERNAL_OLLAMA"
+  echo "✓ pointed Hindsight/Baserow at external Ollama: $EXTERNAL_OLLAMA"
+fi
 
 # NVIDIA GPU passthrough for the ollama container (Linux / WSL2 + nvidia-container-toolkit).
 if [ "$GPU" -eq 1 ]; then

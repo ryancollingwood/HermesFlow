@@ -36,9 +36,9 @@ preset and tweak (e.g. `--profile gpu --bind-lan`).
 | Profile | Bundles | For |
 |---|---|---|
 | `minimal` | `--no-memory --no-windmill` | Just the Hermes gateway + provider. |
-| `full` | `--with-headroom` (memory + windmill are on by default) | Everything, plus context compression. |
-| `gpu` | `--gpu` | Linux/WSL2 NVIDIA host — in-container Ollama with the GPU and full-size models. |
-| `mac` | `--hindsight-model qwen2.5:3b` | Apple Silicon — one small RAM-friendly model (avoids the two-model reload thrash on the CPU-only container). |
+| `full` | `--with-headroom --with-ollama` (memory + windmill are on by default) | Everything, plus context compression and local inference. |
+| `gpu` | `--gpu` (implies `--with-ollama`) | Linux/WSL2 NVIDIA host — in-container Ollama with the GPU and full-size models. |
+| `mac` | `--hindsight-model qwen2.5:3b --with-ollama` | Apple Silicon — one small RAM-friendly model (avoids the two-model reload thrash on the CPU-only container). |
 | `server` | `--bind-lan` | Expose on the LAN (auto-generates a Hindsight API key). |
 | `remote` | routes Hindsight's LLM at the cloud provider (no local Ollama models pulled) | Low-powered hosts — all inference is remote. Needs an OpenAI-compatible provider (`openrouter`/`openai`). |
 
@@ -87,8 +87,10 @@ preview exactly what an install would do:
 | `--with-baserow` | off | Add Baserow (structured-data UI + REST API + MCP) by layering [`docker-compose.baserow.yml`](docker-compose.baserow.yml) on via `COMPOSE_FILE`. AI fields default to local Ollama. |
 | `--with-directus` | off | Add Directus (triage UI + REST/GraphQL API + MCP) by layering [`docker-compose.directus.yml`](docker-compose.directus.yml) on via `COMPOSE_FILE`. |
 | `--with-observability` | off | Add Prometheus, Grafana, exporters, and Loki/Promtail by layering [`docker-compose.observability.yml`](docker-compose.observability.yml) on via `COMPOSE_FILE`. |
+| `--with-ollama` | off (defaults to `http://host.docker.internal:11434`) | Add a local Ollama container by layering [`docker-compose.ollama.yml`](docker-compose.ollama.yml) on via `COMPOSE_FILE`, and repoint `HINDSIGHT_LLM_BASE_URL`/`BASEROW_OLLAMA_HOST` at it. Without this flag, both vars already default to an Ollama on the Docker host. |
+| `--external-ollama <url>` | — | Point `HINDSIGHT_LLM_BASE_URL`/`BASEROW_OLLAMA_HOST` at an Ollama at a URL other than the Docker-host default (a different LAN box, a non-standard port), instead of starting the bundled container. Mutually exclusive with `--with-ollama`. |
 | `--bind-lan` | off | Expose Hermes/Hindsight/Ollama on `0.0.0.0` instead of loopback. |
-| `--gpu` | off | NVIDIA GPU passthrough for the Ollama container (Linux/WSL2 + nvidia-container-toolkit). No-op on macOS. |
+| `--gpu` | off | NVIDIA GPU passthrough for the Ollama container (Linux/WSL2 + nvidia-container-toolkit). Implies `--with-ollama`. No-op on macOS. |
 | `--env KEY=VALUE` | — | Set any other `.env` variable. Repeatable. |
 | `--profile <name>` | — | Apply a preset bundle (see [Profiles](#profiles)). |
 | `--dry-run` | off | Print the resolved plan and exit without changing anything. |
@@ -123,14 +125,25 @@ Generates every required secret that's blank or still a known-weak default:
 `GRAFANA_ADMIN_PASSWORD` (otherwise Grafana boots as `admin`/`changeme`).
 Existing custom values are left alone.
 
-This step also applies the `--gpu`, `--with-baserow`, `--with-directus`,
+This step also applies the `--with-ollama`, `--external-ollama`, `--gpu`,
+`--with-baserow`, `--with-directus`,
 `--with-observability`, `--bind-lan`,
 `--hindsight-api-key`, and `--env` overrides to `.env` first, so they're in place
-before the stack starts. `--gpu` layers
-[`docker-compose.gpu.yml`](docker-compose.gpu.yml) on via `COMPOSE_FILE` (adding
-the NVIDIA device reservation the base file leaves commented) and sets
-`CUDA_VISIBLE_DEVICES` / `OLLAMA_NUM_GPU`. On a GPU host you'd keep Ollama
-in-container — there's no need for host-native MLX. `--with-baserow` layers
+before the stack starts. Without either Ollama flag, `HINDSIGHT_LLM_BASE_URL` /
+`BASEROW_OLLAMA_HOST` already default (from `.env.example`) to
+`http://host.docker.internal:11434[/v1]` — i.e. an Ollama already running on
+the Docker host. `--with-ollama` layers
+[`docker-compose.ollama.yml`](docker-compose.ollama.yml) on via `COMPOSE_FILE`
+(Ollama used to be part of the base stack; it's now opt-in like Baserow/Directus)
+and repoints those two vars at the bundled container instead (`http://ollama:11434[/v1]`).
+`--gpu` implies `--with-ollama` and additionally layers
+[`docker-compose.gpu.yml`](docker-compose.gpu.yml) on (adding the NVIDIA device
+reservation) and sets `CUDA_VISIBLE_DEVICES` / `OLLAMA_NUM_GPU`. On a GPU host
+you'd keep Ollama in-container — there's no need for host-native MLX.
+`--external-ollama <url>` skips the bundled container and instead points
+`HINDSIGHT_LLM_BASE_URL` / `BASEROW_OLLAMA_HOST` at a URL other than the
+Docker-host default above; it's mutually exclusive with `--with-ollama`.
+`--with-baserow` layers
 [`docker-compose.baserow.yml`](docker-compose.baserow.yml) on the same way
 (additively, so it coexists with `--gpu`); secrets `BASEROW_SECRET_KEY` /
 `BASEROW_DB_PASSWORD` / `BASEROW_REDIS_PASSWORD` are generated by the secrets step.
@@ -172,8 +185,10 @@ sends a one-shot `hermes -z "Say PONG"` and checks the reply — the real
 end-to-end verification that the provider, key, and model all work.
 
 ### 10. Hindsight memory (skip with `--no-memory`)
-- Pulls the `HINDSIGHT_*_LLM_MODEL` models into the bundled `ollama` container
-  (only when Hindsight points at `ollama`; embeddings are local). The models come
+- Pulls the `HINDSIGHT_*_LLM_MODEL` models (embeddings are local, so no
+  embedding model is needed): via `docker exec` into the bundled `ollama`
+  container when it's running, or over HTTP against `--external-ollama` when
+  that's set — otherwise this step is skipped. The models come
   from `.env`, which the `--hindsight-model` / `--hindsight-*-model` /
   `--hindsight-base-url` flags above write **before** the stack starts — so e.g.
   `--hindsight-model qwen2.5:3b` makes every scope use one small model (handy on
@@ -245,6 +260,19 @@ and Loki/Promtail come up — dashboards at `http://grafana.localhost` (`admin` 
 `GRAFANA_ADMIN_PASSWORD`). The same thing `make observability` does; revert
 (and drop the override) with `make observability-revert`. See
 [README → Observability](README.md#observability-optional).
+
+### 17. Ollama (opt-in with `--with-ollama`, or use `--external-ollama`)
+Without either flag, `HINDSIGHT_LLM_BASE_URL` / `BASEROW_OLLAMA_HOST` already
+default to `http://host.docker.internal:11434[/v1]` (an Ollama already running
+on the Docker host) — this step only runs when `--with-ollama` is passed (or
+implied by `--gpu`). It adds
+[`docker-compose.ollama.yml`](docker-compose.ollama.yml) to `COMPOSE_FILE` so
+the local Ollama container comes up — inference at `http://ollama.localhost`
+— and repoints those two vars at it. The same thing `make ollama` does;
+revert (and drop the override) with `make ollama-revert`. Pass
+`--external-ollama <url>` instead to point at a URL other than the
+Docker-host default. See
+[README → Ollama (optional)](README.md#ollama-optional).
 
 ## Re-running / repair
 

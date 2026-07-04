@@ -60,8 +60,6 @@ services:
         condition: service_started
       hermes:
         condition: service_started
-      ollama:
-        condition: service_started
       hindsight:
         condition: service_started
       headroom:
@@ -275,7 +273,7 @@ services:
       - HINDSIGHT_API_DATABASE_URL=postgresql://${HINDSIGHT_DB_USER:-hindsight}:${HINDSIGHT_DB_PASSWORD:-hindsight}@hindsight_db:5432/${HINDSIGHT_DB_NAME:-hindsight}
       # ── Primary LLM ────────────────────────────────────────────────────────
       - HINDSIGHT_API_LLM_API_KEY=${HINDSIGHT_LLM_API_KEY:-openai}
-      - HINDSIGHT_API_LLM_BASE_URL=${HINDSIGHT_LLM_BASE_URL:-http://ollama:11434/v1}
+      - HINDSIGHT_API_LLM_BASE_URL=${HINDSIGHT_LLM_BASE_URL:-http://host.docker.internal:11434/v1}
       - HINDSIGHT_API_LLM_MODEL=${HINDSIGHT_LLM_MODEL:-qwen2.5:14b}
       - HINDSIGHT_API_LLM_PROVIDER=${HINDSIGHT_LLM_PROVIDER:-openai}
       - HINDSIGHT_API_LLM_RESPONSE_FORMAT=${HINDSIGHT_LLM_RESPONSE_FORMAT:-json_schema}
@@ -346,77 +344,10 @@ services:
     logging: *default-logging
 
   # ---------------------------------------------------------------------------
-  #  Ollama — local LLM inference server (OpenAI-compatible API at /v1)
-  #  Models are stored in OLLAMA_DATA_DIR (can be several GB each).
-  #  Pull a model after first start:
-  #    docker exec ollama ollama pull llama3.2
-  #
-  #  NVIDIA GPU support: requires nvidia-container-toolkit on the host.
-  #  Uncomment the `reservations` block under deploy.resources and restart.
+  #  Ollama — local LLM inference server. Optional: lives in
+  #  docker-compose.ollama.yml (`--with-ollama` / `make ollama`). Already
+  #  running Ollama elsewhere? Use `--external-ollama <url>` instead.
   # ---------------------------------------------------------------------------
-  ollama:
-    image: ollama/ollama:${OLLAMA_VERSION:-latest}
-    container_name: ollama
-    restart: unless-stopped
-    ports:
-      - "${OLLAMA_BIND:-127.0.0.1}:${OLLAMA_PORT:-11434}:11434"
-    environment:
-      # Listen on all interfaces so Docker-networked services can reach it.
-      - OLLAMA_HOST=0.0.0.0:11434
-      - OLLAMA_KEEP_ALIVE=${OLLAMA_KEEP_ALIVE:-30m}
-      - OLLAMA_NUM_THREAD=${OLLAMA_NUM_THREAD:-8}
-      - OLLAMA_NUM_PARALLEL=${OLLAMA_NUM_PARALLEL:-1}
-      - OLLAMA_MAX_LOADED_MODELS=${OLLAMA_MAX_LOADED_MODELS:-1}
-      # Disable Intel iGPU detection — 2 GB VRAM limits it to <3B models;
-      # CPU path with AVX_VNNI handles larger models more reliably.
-      - OLLAMA_INTEL_GPU=${OLLAMA_INTEL_GPU:-0}
-      - OLLAMA_CONTEXT_LENGTH=${OLLAMA_CONTEXT_LENGTH:-16384}
-      - OLLAMA_VULKAN=${OLLAMA_VULKAN:-false}
-      # Device visibility — blank = CPU only. Set CUDA_VISIBLE_DEVICES=0 (or
-      # comma-separated indices) and uncomment the GPU reservations block below
-      # to hand a specific GPU to Ollama.
-      - CUDA_VISIBLE_DEVICES=${CUDA_VISIBLE_DEVICES:-}
-      - GGML_VK_VISIBLE_DEVICES=${GGML_VK_VISIBLE_DEVICES:-}
-      - HIP_VISIBLE_DEVICES=${HIP_VISIBLE_DEVICES:-}
-      - GPU_DEVICE_ORDINAL=${GPU_DEVICE_ORDINAL:-}
-      - ROCR_VISIBLE_DEVICES=${ROCR_VISIBLE_DEVICES:-}
-      # ── Prompt / History ───────────────────────────────────────
-      - OLLAMA_NOHISTORY=${OLLAMA_NOHISTORY:-false}
-      - OLLAMA_NOPRUNE=${OLLAMA_NOPRUNE:-false}
-      # Flash attention — beneficial for hybrid architectures (e.g. lfm2).
-      - OLLAMA_FLASH_ATTENTION=${OLLAMA_FLASH_ATTENTION:-true}
-      # q8_0 halves KV-cache RAM with minimal quality loss on CPU inference.
-      - OLLAMA_KV_CACHE_TYPE=${OLLAMA_KV_CACHE_TYPE:-q8_0}
-      # ── GPU layer offloading ────────────────────────────────────────────────
-      # OLLAMA_NUM_GPU: layers to offload to GPU (0 = CPU only, auto = detect).
-      # Pair with CUDA_VISIBLE_DEVICES / HIP_VISIBLE_DEVICES above.
-      - OLLAMA_NUM_GPU=${OLLAMA_NUM_GPU:-0}
-      # OLLAMA_MAX_VRAM: hard cap on VRAM bytes (prevents taking all GPU memory).
-      # Example: 6442450944 = 6 GB. Leave blank for no cap (auto).
-      - OLLAMA_MAX_VRAM=${OLLAMA_MAX_VRAM:-}
-      # OLLAMA_LOAD_TIMEOUT: how long to wait for a stalled model load.
-      - OLLAMA_LOAD_TIMEOUT=${OLLAMA_LOAD_TIMEOUT:-5m}
-    volumes:
-      - ${OLLAMA_DATA_DIR:-./data/ollama}:/root/.ollama
-    healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:11434/api/tags"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 60s
-    deploy:
-      resources:
-        limits:
-          memory: ${OLLAMA_MEM_LIMIT:-32G}
-          cpus: "${OLLAMA_CPU_LIMIT:-8.0}"
-        # Uncomment for NVIDIA GPU support (requires nvidia-container-toolkit):
-        # reservations:
-        #   devices:
-        #     - driver: nvidia
-        #       count: all
-        #       capabilities: [gpu]
-    networks: [inference, edge]
-    logging: *default-logging
 
   # ---------------------------------------------------------------------------
   #  Collection database — shared store for captured/derived data (page

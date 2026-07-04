@@ -69,8 +69,8 @@ services:
       - REDIS_HOST=baserow_redis
       - REDIS_PORT=6379
       - REDIS_PASSWORD=${BASEROW_REDIS_PASSWORD}
-      # ── Generative AI: local Ollama by default; cloud keys optional ───────
-      - BASEROW_OLLAMA_HOST=${BASEROW_OLLAMA_HOST:-http://ollama:11434}
+      # ── Generative AI: host-native Ollama by default; cloud keys optional ─
+      - BASEROW_OLLAMA_HOST=${BASEROW_OLLAMA_HOST:-http://host.docker.internal:11434}
       - BASEROW_OLLAMA_MODELS=${BASEROW_OLLAMA_MODELS:-}
       - BASEROW_OPENAI_API_KEY=${BASEROW_OPENAI_API_KEY:-}
       - BASEROW_OPENAI_MODELS=${BASEROW_OPENAI_MODELS:-}
@@ -85,6 +85,8 @@ services:
     ports:
       # Direct host access (optional); primary access is via Caddy.
       - "${BASEROW_BIND:-127.0.0.1}:${BASEROW_PORT:-3010}:80"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # reach a host-native Ollama (--external-ollama)
     healthcheck:
       test: ["CMD", "curl", "-fsS", "http://localhost/api/_health/"]
       interval: 30s

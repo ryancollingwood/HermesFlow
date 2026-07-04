@@ -27,7 +27,7 @@ else
   ON_WINDOWS :=
 endif
 
-.PHONY: help check init apikey secrets wizard secure fix-permissions pull build up down restart logs ps health backup backup-schedule backup-schedule-revert bootstrap hermes-heal hermes-workspace hermes-secure hermes-skills-push hermes-skills-pull lint validate ci headroom headroom-revert mlx mlx-revert mlx-status memory memory-revert hindsight-mlx hindsight-mlx-revert aux-cloud aux-local aux-hindsight aux-status windmill-push windmill-pull windmill-check baserow baserow-revert baserow-mcp directus directus-revert observability observability-revert
+.PHONY: help check init apikey secrets wizard secure fix-permissions pull build up down restart logs ps health backup backup-schedule backup-schedule-revert bootstrap hermes-heal hermes-workspace hermes-secure hermes-skills-push hermes-skills-pull lint validate ci headroom headroom-revert mlx mlx-revert mlx-status memory memory-revert hindsight-mlx hindsight-mlx-revert aux-cloud aux-local aux-hindsight aux-status windmill-push windmill-pull windmill-check baserow baserow-revert baserow-mcp directus directus-revert observability observability-revert ollama ollama-revert
 
 # Fill an .env variable with a generated value when it is empty OR still set to a
 # known-weak default. Usage: $(call ensure_secret,VAR,GENERATOR,WEAK_DEFAULT)
@@ -355,6 +355,39 @@ directus-revert: ## Stop Directus + drop its override from COMPOSE_FILE (volumes
 	  echo "✓ COMPOSE_FILE=$${NEW:-(cleared)}"
 	@echo "✓ Directus stopped (data preserved; collection_db keeps running for Baserow/Windmill)"
 
+ollama: ## Start Ollama (local LLM inference); adds the override to COMPOSE_FILE
+	@CUR=$$(grep -E '^COMPOSE_FILE=' $(ENV_FILE) 2>/dev/null | head -1 | cut -d= -f2- | xargs); \
+	  case ":$$CUR:" in \
+	    *:docker-compose.ollama.yml:*) NEW="$$CUR" ;; \
+	    *) if [ -z "$$CUR" ]; then NEW="docker-compose.yml:docker-compose.ollama.yml"; \
+	       else NEW="$$CUR:docker-compose.ollama.yml"; fi ;; \
+	  esac; \
+	  if grep -qE '^COMPOSE_FILE=' $(ENV_FILE); then \
+	    sed -i.bak "s|^COMPOSE_FILE=.*|COMPOSE_FILE=$$NEW|" $(ENV_FILE) && rm -f $(ENV_FILE).bak; \
+	  else \
+	    echo "COMPOSE_FILE=$$NEW" >> $(ENV_FILE); \
+	  fi; \
+	  echo "✓ COMPOSE_FILE=$$NEW"
+	@for kv in "HINDSIGHT_LLM_BASE_URL=http://ollama:11434/v1" "BASEROW_OLLAMA_HOST=http://ollama:11434"; do \
+	  k="$${kv%%=*}"; v="$${kv#*=}"; \
+	  if grep -qE "^$$k=" $(ENV_FILE); then sed -i.bak "s|^$$k=.*|$$k=$$v|" $(ENV_FILE) && rm -f $(ENV_FILE).bak; \
+	  else echo "$$kv" >> $(ENV_FILE); fi; \
+	done
+	@$(COMPOSE) up -d ollama
+	@echo "✓ Ollama is starting — http://ollama.localhost (direct: http://localhost:$${OLLAMA_PORT:-11434})"
+	@echo "  Pull a model: docker exec ollama ollama pull llama3.2"
+	@echo "  Pointed Hindsight/Baserow at the bundled container (HINDSIGHT_LLM_BASE_URL, BASEROW_OLLAMA_HOST)"
+
+ollama-revert: ## Stop Ollama + drop its override from COMPOSE_FILE (models in OLLAMA_DATA_DIR preserved)
+	@$(COMPOSE) rm -sf ollama 2>/dev/null || true
+	@CUR=$$(grep -E '^COMPOSE_FILE=' $(ENV_FILE) 2>/dev/null | head -1 | cut -d= -f2- | xargs); \
+	  NEW=$$(echo "$$CUR" | sed -E 's|:?docker-compose\.ollama\.yml||'); \
+	  if [ -z "$$NEW" ] || [ "$$NEW" = "docker-compose.yml" ]; then NEW=""; fi; \
+	  sed -i.bak "s|^COMPOSE_FILE=.*|COMPOSE_FILE=$$NEW|" $(ENV_FILE) && rm -f $(ENV_FILE).bak; \
+	  echo "✓ COMPOSE_FILE=$${NEW:-(cleared)}"
+	@echo "✓ Ollama stopped (models preserved in OLLAMA_DATA_DIR)"
+	@echo "  Note: docker-compose.gpu.yml patches this service — drop it from COMPOSE_FILE too if it was enabled."
+
 observability: ## Start observability (Prometheus, Grafana, exporters, Loki/Promtail); adds the override to COMPOSE_FILE
 	@$(MAKE) --no-print-directory secrets
 	@CUR=$$(grep -E '^COMPOSE_FILE=' $(ENV_FILE) 2>/dev/null | head -1 | cut -d= -f2- | xargs); \
@@ -471,6 +504,7 @@ hindsight-mlx-revert: ## Revert Hindsight memory extraction to the bundled Ollam
 	  done
 	@$(COMPOSE) up -d hindsight
 	@echo "✓ Hindsight memory extraction reverted to the bundled Ollama"
+	@echo "  Ollama is opt-in — if it isn't already running, enable it first: make ollama"
 
 aux-cloud: ## Pin vision/compression/web_extract/triage_specifier to cloud models, independent of main model
 	@docker exec hermes hermes config set auxiliary.vision.provider openrouter
