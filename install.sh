@@ -63,11 +63,12 @@
 #    --with-baserow                        add Baserow (structured-data UI + REST API)
 #    --with-directus                       add Directus (triage UI + REST/GraphQL API + MCP)
 #    --with-observability                  add Prometheus/Grafana/exporters/Loki+Promtail
-#    --with-ollama                         add a local Ollama container (docker-compose.ollama.yml)
-#    --external-ollama <url>               use an Ollama already running elsewhere instead of
-#                                          the bundled container (e.g. http://host.docker.internal:11434
-#                                          for one running on the Docker host) — mutually
-#                                          exclusive with --with-ollama
+#    --with-ollama                         add a local Ollama container (docker-compose.ollama.yml);
+#                                          default (neither flag) assumes one already runs on the
+#                                          Docker host, at http://host.docker.internal:11434
+#    --external-ollama <url>               use an Ollama at a URL other than the Docker-host
+#                                          default above (a different LAN box, a non-standard
+#                                          port) — mutually exclusive with --with-ollama
 #    --bind-lan                            expose Hermes/Hindsight/Ollama on 0.0.0.0
 #    --gpu                                 NVIDIA GPU passthrough for Ollama (Linux; implies --with-ollama)
 #    --env KEY=VALUE                       set any other .env var (repeatable)
@@ -174,7 +175,10 @@ env_put() {
 # docker-compose.yml when COMPOSE_FILE is unset.
 compose_add() {
   local f="$1" cur
-  cur="$(grep -E '^COMPOSE_FILE=' .env 2>/dev/null | head -1 | cut -d= -f2-)"
+  # `|| true` matters: under `set -e -o pipefail`, a fresh .env with no
+  # COMPOSE_FILE= line yet makes grep exit 1 (no match), which without this
+  # guard silently kills the whole installer right here.
+  cur="$(grep -E '^COMPOSE_FILE=' .env 2>/dev/null | head -1 | cut -d= -f2- || true)"
   case ":$cur:" in
     *":$f:"*) return 0 ;;
     *) if [ -z "$cur" ]; then cur="docker-compose.yml:$f"; else cur="$cur:$f"; fi ;;
@@ -239,8 +243,11 @@ pull_hindsight_models_external() {
       "${HINDSIGHT_REFLECT_LLM_MODEL:-}" \
     | sed '/^[[:space:]]*$/d' | sort -u)"
   [ -n "$models" ] || { echo "→ no Hindsight Ollama models configured — skipping"; return 0; }
-  present="$(curl -fsS --max-time 10 "$url/api/tags" 2>/dev/null \
-    | grep -oE '"name"[[:space:]]*:[[:space:]]*"[^"]+"' | sed -E 's/.*"([^"]+)"$/\1/')"
+  # `|| true` matters here too: curl failing (unreachable host) or grep finding
+  # no "name" fields (no models pulled yet) would otherwise abort the script
+  # under `set -e -o pipefail` — either case should just mean "nothing present".
+  present="$( { curl -fsS --max-time 10 "$url/api/tags" 2>/dev/null \
+    | grep -oE '"name"[[:space:]]*:[[:space:]]*"[^"]+"' | sed -E 's/.*"([^"]+)"$/\1/' ; } || true)"
   for m in $models; do
     if printf '%s\n' "$present" | grep -qx "$m"; then
       echo "✓ Ollama model already present: $m"
@@ -660,9 +667,13 @@ HS_REFLECT="${HS_REFLECT:-$HS_MODEL}"
 
 # Ollama (local LLM inference) — layer its optional compose override. Must be
 # added before docker-compose.gpu.yml (below), since that file patches this
-# service.
+# service. .env.example defaults Hindsight/Baserow at a host-native Ollama
+# (host.docker.internal), so repoint them at the bundled container here —
+# unless an explicit --hindsight-base-url already won that argument.
 if [ "$WITH_OLLAMA" -eq 1 ]; then
   compose_add docker-compose.ollama.yml
+  [ -z "$HS_BASE_URL" ] && env_put HINDSIGHT_LLM_BASE_URL "http://ollama:11434/v1"
+  env_put BASEROW_OLLAMA_HOST "http://ollama:11434"
   echo "✓ enabled Ollama — local LLM inference at http://ollama.localhost"
 fi
 

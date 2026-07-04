@@ -368,9 +368,15 @@ ollama: ## Start Ollama (local LLM inference); adds the override to COMPOSE_FILE
 	    echo "COMPOSE_FILE=$$NEW" >> $(ENV_FILE); \
 	  fi; \
 	  echo "✓ COMPOSE_FILE=$$NEW"
+	@for kv in "HINDSIGHT_LLM_BASE_URL=http://ollama:11434/v1" "BASEROW_OLLAMA_HOST=http://ollama:11434"; do \
+	  k="$${kv%%=*}"; v="$${kv#*=}"; \
+	  if grep -qE "^$$k=" $(ENV_FILE); then sed -i.bak "s|^$$k=.*|$$k=$$v|" $(ENV_FILE) && rm -f $(ENV_FILE).bak; \
+	  else echo "$$kv" >> $(ENV_FILE); fi; \
+	done
 	@$(COMPOSE) up -d ollama
 	@echo "✓ Ollama is starting — http://ollama.localhost (direct: http://localhost:$${OLLAMA_PORT:-11434})"
 	@echo "  Pull a model: docker exec ollama ollama pull llama3.2"
+	@echo "  Pointed Hindsight/Baserow at the bundled container (HINDSIGHT_LLM_BASE_URL, BASEROW_OLLAMA_HOST)"
 
 ollama-revert: ## Stop Ollama + drop its override from COMPOSE_FILE (models in OLLAMA_DATA_DIR preserved)
 	@$(COMPOSE) rm -sf ollama 2>/dev/null || true

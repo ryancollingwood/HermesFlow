@@ -61,11 +61,12 @@ Other optional channels / toggles:
     --with-baserow                        add Baserow (structured-data UI + REST API)
     --with-directus                       add Directus (triage UI + REST/GraphQL API + MCP)
     --with-observability                  add Prometheus/Grafana/exporters/Loki+Promtail
-    --with-ollama                         add a local Ollama container (docker-compose.ollama.yml)
-    --external-ollama <url>               use an Ollama already running elsewhere instead of
-                                          the bundled container (e.g. http://host.docker.internal:11434
-                                          for one running on the Docker host) — mutually
-                                          exclusive with --with-ollama
+    --with-ollama                         add a local Ollama container (docker-compose.ollama.yml);
+                                          default (neither flag) assumes one already runs on the
+                                          Docker host, at http://host.docker.internal:11434
+    --external-ollama <url>               use an Ollama at a URL other than the Docker-host
+                                          default above (a different LAN box, a non-standard
+                                          port) — mutually exclusive with --with-ollama
     --bind-lan                            expose Hermes/Hindsight/Ollama on 0.0.0.0
     --gpu                                 NVIDIA GPU passthrough for Ollama (Linux; implies --with-ollama)
     --env KEY=VALUE                       set any other .env var (repeatable)
@@ -664,10 +665,11 @@ def main() -> None:
     ap.add_argument("--with-observability", action="store_true",
                     help="add Prometheus/Grafana/exporters/Loki+Promtail via its compose override")
     ap.add_argument("--with-ollama", action="store_true",
-                    help="add a local Ollama container via its compose override")
+                    help="add a local Ollama container via its compose override (default assumes "
+                         "one already runs on the Docker host, at http://host.docker.internal:11434)")
     ap.add_argument("--external-ollama", default="",
-                    help="use an Ollama already running elsewhere (e.g. http://host.docker.internal:11434) "
-                         "instead of the bundled container — mutually exclusive with --with-ollama")
+                    help="use an Ollama at a URL other than the Docker-host default above "
+                         "— mutually exclusive with --with-ollama")
     ap.add_argument("--bind-lan", action="store_true",
                     help="expose Hermes/Hindsight/Ollama on 0.0.0.0 instead of loopback")
     ap.add_argument("--gpu", action="store_true",
@@ -845,9 +847,14 @@ def main() -> None:
 
     # Ollama (local LLM inference) — layer its optional compose override. Must
     # be added before docker-compose.gpu.yml (below), since that file patches
-    # this service.
+    # this service. .env.example defaults Hindsight/Baserow at a host-native
+    # Ollama (host.docker.internal), so repoint them at the bundled container
+    # here — unless an explicit --hindsight-base-url already won that argument.
     if args.with_ollama:
         compose_add("docker-compose.ollama.yml")
+        if not args.hindsight_base_url:
+            env_set("HINDSIGHT_LLM_BASE_URL", "http://ollama:11434/v1")
+        env_set("BASEROW_OLLAMA_HOST", "http://ollama:11434")
         say(f"{OK} enabled Ollama — local LLM inference at http://ollama.localhost")
 
     # External Ollama (already running on the Docker host or elsewhere) — point

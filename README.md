@@ -68,11 +68,13 @@ local Ollama, for low-powered hosts). E.g. `./install.sh --profile gpu
 --api-key sk-or-...`. Add **`--dry-run`** to preview the full plan without
 changing anything.
 
-> **Ollama is opt-in.** A bare `./install.sh` with no profile/flags does **not**
-> start a local Ollama container — pass `--with-ollama` (or a profile that
-> implies it: `full`/`gpu`/`mac`) to get one, or `--external-ollama <url>` to
-> point Hindsight/Baserow at an Ollama you already run elsewhere (e.g. on the
-> Docker host). See [Ollama (optional)](#ollama-optional).
+> **The bundled Ollama container is opt-in.** A bare `./install.sh` with no
+> profile/flags does **not** start a local Ollama container — it defaults to
+> `http://host.docker.internal:11434`, i.e. it assumes you already have Ollama
+> running on the Docker host. Pass `--with-ollama` (or a profile that implies
+> it: `full`/`gpu`/`mac`) to start a bundled one instead, or
+> `--external-ollama <url>` if yours runs somewhere other than the Docker
+> host. See [Ollama (optional)](#ollama-optional).
 
 **On Windows (or any host without bash/make/openssl/curl), use the Python port**
 — same flags, same steps, stdlib-only:
@@ -425,15 +427,25 @@ are present via the web UI / API.
 ## Ollama (optional)
 
 [Ollama](https://ollama.com) is the stack's local LLM inference server —
-Hindsight's fact extraction and Baserow's AI fields both default to it. It's
-**opt-in**, layered as a compose override (`docker-compose.ollama.yml`), the
-same pattern as Baserow/Directus/Observability — so the base stack doesn't
-start a container you don't need.
+Hindsight's fact extraction and Baserow's AI fields both default to it. The
+**bundled container** is opt-in, layered as a compose override
+(`docker-compose.ollama.yml`), the same pattern as Baserow/Directus/
+Observability — so the base stack doesn't start a container you don't need.
+
+**By default (no Ollama flags at all), `HINDSIGHT_LLM_BASE_URL` and
+`BASEROW_OLLAMA_HOST` point at `http://host.docker.internal:11434`** — i.e.
+they assume you already have Ollama running on the Docker host, which "just
+works" if that's true and otherwise fails closed (rather than pointing at a
+container that was never started). `hermes`, `hindsight`, and `baserow` all
+carry the `extra_hosts` entry needed to reach the host this way already (same
+mechanism as [MLX](#mlx-inference-apple-silicon) and
+[LM Studio](#lm-studio-setup)).
 
 > **Upgrading an existing install?** Ollama used to be part of the base stack
 > and started unconditionally. It no longer does — run `make ollama` (or
 > re-run your installer with `--with-ollama`) to keep your local container
-> running after upgrading.
+> running after upgrading (this also repoints `HINDSIGHT_LLM_BASE_URL` /
+> `BASEROW_OLLAMA_HOST` at it).
 
 ### Enable it
 
@@ -445,7 +457,10 @@ make ollama                                           # layers the override, bri
 
 `make ollama` adds `docker-compose.ollama.yml` to `COMPOSE_FILE` in `.env`
 (additively — it coexists with `--with-baserow`/`--with-directus`), so every
-later `docker compose` / `make` call includes it. Then pull a model:
+later `docker compose` / `make` call includes it, and repoints
+`HINDSIGHT_LLM_BASE_URL`/`BASEROW_OLLAMA_HOST` at `http://ollama:11434` (the
+bundled container, rather than the host-native default above). Then pull a
+model:
 
 ```sh
 docker exec ollama ollama pull llama3.2
@@ -458,23 +473,19 @@ NVIDIA GPU passthrough (`--gpu` / `docker-compose.gpu.yml`) patches this
 service, so it requires the Ollama override to be loaded first — the
 installers' `--gpu` flag implies `--with-ollama` for exactly this reason.
 
-### Already running Ollama elsewhere?
+### Ollama running somewhere other than the Docker host?
 
-If Ollama is already running on the Docker host or another box on your LAN,
-skip the bundled container entirely and point the stack at it instead:
+The `host.docker.internal` default (above) already covers "Ollama runs on the
+Docker host" with zero flags. If it instead runs on a **different** LAN box, a
+non-standard port, or you just want to be explicit, point the stack at it:
 
 ```sh
-./install.sh --external-ollama http://host.docker.internal:11434 --api-key sk-or-...
+./install.sh --external-ollama http://192.168.1.50:11434 --api-key sk-or-...
 ```
 
 This sets `HINDSIGHT_LLM_BASE_URL` and `BASEROW_OLLAMA_HOST` to the given URL
-and does **not** start a local `ollama` container. `http://host.docker.internal`
-is the address a container uses to reach the Docker host itself (`hermes`,
-`hindsight`, and `baserow` all carry the required `extra_hosts` entry already
-— same mechanism as [MLX](#mlx-inference-apple-silicon) and
-[LM Studio](#lm-studio-setup)); for an Ollama on another LAN host, use its
-IP/hostname instead. `--external-ollama` and `--with-ollama` are mutually
-exclusive.
+and does **not** start a local `ollama` container. `--external-ollama` and
+`--with-ollama` are mutually exclusive.
 
 ---
 

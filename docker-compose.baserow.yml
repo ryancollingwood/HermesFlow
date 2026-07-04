@@ -69,8 +69,8 @@ services:
       - REDIS_HOST=baserow_redis
       - REDIS_PORT=6379
       - REDIS_PASSWORD=${BASEROW_REDIS_PASSWORD}
-      # ── Generative AI: local Ollama by default; cloud keys optional ───────
-      - BASEROW_OLLAMA_HOST=${BASEROW_OLLAMA_HOST:-http://ollama:11434}
+      # ── Generative AI: host-native Ollama by default; cloud keys optional ─
+      - BASEROW_OLLAMA_HOST=${BASEROW_OLLAMA_HOST:-http://host.docker.internal:11434}
       - BASEROW_OLLAMA_MODELS=${BASEROW_OLLAMA_MODELS:-}
       - BASEROW_OPENAI_API_KEY=${BASEROW_OPENAI_API_KEY:-}
       - BASEROW_OPENAI_MODELS=${BASEROW_OPENAI_MODELS:-}
