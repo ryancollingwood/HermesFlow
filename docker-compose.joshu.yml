@@ -90,6 +90,20 @@ services:
       - HERMES_DASHBOARD_HOST=0.0.0.0
       - HERMES_DASHBOARD_PUBLIC_URL=http://joshu-admin.localhost
       - JOSHU_HERMES_DASHBOARD_PASSWORD=${JOSHU_HERMES_DASHBOARD_PASSWORD:-}
+      # ── Optional external connectors (blank = feature shows "not
+      #    configured" in the UI; see docs/joshu.md "Email and connectors") ──
+      # Nylas: jMail email/calendar sync (dashboard.nylas.com — API key +
+      # verified domain).
+      - NYLAS_API_KEY=${NYLAS_API_KEY:-}
+      - NYLAS_API_URI=${NYLAS_API_URI:-https://api.us.nylas.com}
+      # Composio: OAuth app tools (Gmail, GitHub, Slack, …) for Joshu's agent.
+      - COMPOSIO_API_KEY=${COMPOSIO_API_KEY:-}
+      - COMPOSIO_USER_ID=${COMPOSIO_USER_ID:-}
+      # Telegram chat channel for JOSHU's agent. JOSHU_-prefixed on purpose:
+      # the stack's hermes owns TELEGRAM_BOT_TOKEN, and two gateways polling
+      # one bot conflict — use a SEPARATE bot for Joshu.
+      - TELEGRAM_BOT_TOKEN=${JOSHU_TELEGRAM_BOT_TOKEN:-}
+      - TELEGRAM_ALLOWED_USERS=${JOSHU_TELEGRAM_ALLOWED_USERS:-}
       # ── Camofox browser — baked into this image, started by vps-start.sh ──
       - CAMOFOX_URL=http://127.0.0.1:9377
       # ── Hindsight memory — SHARED with the stack's hindsight service ─────

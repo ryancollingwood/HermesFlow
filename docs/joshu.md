@@ -184,6 +184,34 @@ docker exec joshu-stack pgrep -f "postgres" || echo "OK: no in-container postgre
 # hindsight.localhost UI should list a separate "joshu" bank once Joshu writes memories
 ```
 
+## Email and connectors (optional)
+
+A fresh box shows "not configured" banners in some desktop apps — e.g. jMail's
+*"Server not configured. Set NYLAS_API_KEY on the Joshu server and register a
+domain in the Nylas Dashboard."* These are optional hosted integrations, off
+by default. The override passes the vars through from `.env`; recreate after
+changing them (`docker compose up -d joshu-stack`).
+
+- **jMail (email/calendar) — Nylas.** Create an app at
+  [dashboard.nylas.com](https://dashboard.nylas.com), copy the API key into
+  `NYLAS_API_KEY`, and register + verify a sending domain
+  ([Nylas agent accounts](https://developer.nylas.com/docs/v3/getting-started/agent-own-email/)).
+  `NYLAS_API_URI` must match the app's region (`api.us.nylas.com` /
+  `api.eu.nylas.com`). Nylas provisions Joshu a **dedicated agent email
+  address** on your domain — it does not read your personal mailbox.
+  Upstream details: `docs/nylas-agent-mailbox.md` in the joshu-oss repo.
+- **Agent OAuth tools (Gmail, GitHub, Slack, …) — Composio.** Set
+  `COMPOSIO_API_KEY` + `COMPOSIO_USER_ID`; connect accounts from Joshu's
+  Connectors app. Upstream details: `docs/connectors.md` in joshu-oss.
+- **Telegram channel** — `JOSHU_TELEGRAM_BOT_TOKEN` +
+  `JOSHU_TELEGRAM_ALLOWED_USERS`. Deliberately separate vars from the stack's
+  `TELEGRAM_BOT_TOKEN`: two gateways polling one bot conflict, so create a
+  second bot for Joshu.
+- **Twilio voice / phone** — not wired in this override: Twilio needs a
+  publicly reachable webhook URL, which a `.localhost` deployment doesn't
+  have. Self-host on a real domain first (see the Caddyfile TLS notes), then
+  add the `TWILIO_*` vars from joshu-oss's `deploy/.env.vps.example`.
+
 ## Troubleshooting
 
 - **Unhealthy after 5 min** — first boot can exceed the grace period on slow
