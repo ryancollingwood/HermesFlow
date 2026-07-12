@@ -311,6 +311,16 @@ resulting endpoint/token with Hermes directly. Don't add a
 `make directus-mcp`-style target for this; it's a one-time manual step, not
 a repeatable provisioning flow like `baserow-mcp`.
 
+Windmill is the same no-bridge, native-MCP case as Directus — but unlike
+Directus, its token minting *is* scriptable (`/api/users/tokens/create`
+takes a `scopes` array via REST, no UI-only step), so it gets a
+`make windmill-mcp` target after all, following the `baserow-mcp` template.
+See [`docs/windmill-sync.md#windmill-mcp-registration`](docs/windmill-sync.md#windmill-mcp-registration)
+— notably, Windmill's MCP endpoint requires an `mcp:*`-family scope (e.g.
+`mcp:all`) just to be reachable, layered *on top of* the normal per-operation
+REST scopes that actually gate what each tool call can do; don't assume
+narrow REST scopes alone are sufficient to register an MCP connection here.
+
 > **GPU notes.** Docker Desktop on **macOS cannot pass the GPU** into containers,
 > so the bundled `ollama` is CPU-only there (use host-native `mlx/` or remote
 > inference). On a **Linux/NVIDIA** host, `--gpu` makes the in-container `ollama`

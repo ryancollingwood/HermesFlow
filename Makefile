@@ -27,7 +27,7 @@ else
   ON_WINDOWS :=
 endif
 
-.PHONY: help check init apikey secrets wizard secure fix-permissions pull build up down restart logs ps health backup backup-schedule backup-schedule-revert bootstrap hermes-heal hermes-workspace hermes-secure hermes-skills-push hermes-skills-pull lint validate ci headroom headroom-revert mlx mlx-revert mlx-status memory memory-revert hindsight-mlx hindsight-mlx-revert aux-cloud aux-local aux-hindsight aux-status windmill-push windmill-pull windmill-check baserow baserow-revert baserow-mcp directus directus-revert observability observability-revert ollama ollama-revert
+.PHONY: help check init apikey secrets wizard secure fix-permissions pull build up down restart logs ps health backup backup-schedule backup-schedule-revert bootstrap hermes-heal hermes-workspace hermes-secure hermes-skills-push hermes-skills-pull lint validate ci headroom headroom-revert mlx mlx-revert mlx-status memory memory-revert hindsight-mlx hindsight-mlx-revert aux-cloud aux-local aux-hindsight aux-status windmill-push windmill-pull windmill-check windmill-mcp baserow baserow-revert baserow-mcp directus directus-revert observability observability-revert ollama ollama-revert
 
 # Fill an .env variable with a generated value when it is empty OR still set to a
 # known-weak default. Usage: $(call ensure_secret,VAR,GENERATOR,WEAK_DEFAULT)
@@ -661,6 +661,48 @@ windmill-check: ## Report whether the live Windmill server has drifted from wind
 	    echo "  Run 'make windmill-pull' to bring changes into the repo, or 'make windmill-push' to overwrite the server."; rc=1; \
 	  fi; \
 	  git checkout -- windmill/; exit $$rc
+
+windmill-mcp: ## Register Windmill with Hermes as a native MCP server (idempotent; mints a narrowly-scoped token if none exists)
+	@docker ps --format '{{.Names}}' | grep -qx windmill_server || { echo "✗ Windmill isn't running — run 'make up' first"; exit 1; }
+	@docker exec hermes sh -c 'command -v hermes >/dev/null' 2>/dev/null || { echo "✗ 'hermes' CLI not found in the running Hermes container"; exit 1; }
+	@set -a; . ./$(ENV_FILE); set +a; \
+	  ENVF="$(ENV_FILE)"; \
+	  envput() { if grep -qE "^$$1=" "$$ENVF"; then sed -i.bak "s|^$$1=.*|$$1=$$2|" "$$ENVF" && rm -f "$$ENVF.bak"; else { [ -s "$$ENVF" ] && [ -n "$$(tail -c1 "$$ENVF")" ] && printf '\n' >> "$$ENVF"; }; printf '%s=%s\n' "$$1" "$$2" >> "$$ENVF"; fi; }; \
+	  base="http://127.0.0.1:$${CADDY_HTTP_PORT:-80}"; hh="windmill.localhost"; \
+	  MCP_URL="http://windmill_server:8000/api/mcp/w/main/sse"; \
+	  if docker exec hermes hermes mcp list 2>/dev/null | grep -qE '^  windmill\b.*enabled' \
+	     && docker exec hermes hermes mcp test windmill 2>&1 | grep -qi "Tools discovered"; then \
+	    echo "→ Hermes already has a working 'windmill' MCP connection — leaving it as-is"; \
+	    echo "  (to rotate it to the narrowly-scoped token this target mints, run"; \
+	    echo "   'docker exec hermes hermes mcp remove windmill' then 'make windmill-mcp' again)"; \
+	    exit 0; \
+	  fi; \
+	  TOKEN="$${WM_MCP_TOKEN}"; \
+	  if [ -n "$$TOKEN" ] && curl -fsS -H "Host: $$hh" -H "Authorization: Bearer $$TOKEN" "$$base/api/w/main/scripts/list?per_page=1" >/dev/null 2>&1; then \
+	    echo "→ reusing existing WM_MCP_TOKEN from $$ENVF"; \
+	  else \
+	    [ -n "$$TOKEN" ] && echo "→ WM_MCP_TOKEN in $$ENVF no longer works — minting a new one"; \
+	    ADMIN=$$(curl -fsS -H "Host: $$hh" -H 'Content-Type: application/json' -X POST "$$base/api/auth/login" \
+	      -d '{"email":"admin@windmill.dev","password":"changeme"}' 2>/dev/null | tr -d '"'); \
+	    [ -n "$$ADMIN" ] || { echo "✗ couldn't log in to Windmill as admin@windmill.dev — is the server up and still on the default admin credentials?"; \
+	      echo "  If you've changed them, set WM_MCP_TOKEN in $$ENVF by hand (a token with mcp:all, scripts:read,"; \
+	      echo "  flows:read, jobs:read, jobs:run:scripts, jobs:run:flows scopes, minted via the Windmill UI or API) and re-run."; exit 1; }; \
+	    TOKEN=$$(curl -fsS -H "Host: $$hh" -H "Authorization: Bearer $$ADMIN" -H 'Content-Type: application/json' -X POST "$$base/api/users/tokens/create" \
+	      -d '{"label":"windmill-mcp","scopes":["mcp:all","scripts:read","flows:read","jobs:read","jobs:run:scripts","jobs:run:flows"]}' 2>/dev/null); \
+	    [ -n "$$TOKEN" ] || { echo "✗ token creation failed"; exit 1; }; \
+	    envput WM_MCP_TOKEN "$$TOKEN"; \
+	    echo "→ minted a Windmill token (mcp:all — required to reach the MCP endpoint at all — plus"; \
+	    echo "  scripts:read, flows:read, jobs:read, jobs:run:scripts, jobs:run:flows; no *:write scope,"; \
+	    echo "  so write-shaped MCP tools like createScript/createVariable are visible but 403 when called)"; \
+	    echo "  — saved WM_MCP_TOKEN to $$ENVF"; \
+	  fi; \
+	  docker exec hermes sh -c "sed -i '/^MCP_WINDMILL_API_KEY=/d' /opt/data/.env 2>/dev/null" || true; \
+	  docker exec hermes hermes mcp remove windmill >/dev/null 2>&1 || true; \
+	  printf 'y\n%s\ny\n' "$$TOKEN" | docker exec -i hermes hermes mcp add windmill --url "$$MCP_URL" --auth header >/dev/null 2>&1; \
+	  echo "→ verifying connection…"; \
+	  docker exec hermes hermes mcp test windmill 2>&1 | grep -iE "Connected|Tools discovered" \
+	    || { echo "⚠ couldn't confirm — check: docker exec hermes hermes mcp test windmill"; exit 0; }; \
+	  echo "✓ Windmill MCP tools are available to Hermes (start a new session to use them)"
 
 backup: ## Snapshot Postgres (Windmill + Hindsight + Collection) + the Hermes data dir into ./backups/
 	@mkdir -p backups

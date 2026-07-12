@@ -58,14 +58,17 @@ a resource-typed arg (`conn: hermes_endpoint`) got `None` instead — which is
 a real, load-bearing constraint on capability design (see the ADR's
 Consequences), not a transport failure.
 
-**Follow-up (not yet scheduled as an issue):** this MCP wiring is live but
-reproduced nowhere — no Makefile target creates it, so a fresh install
-wouldn't have it, and the existing token (`mcp:all`, unscoped to workspace)
-is broader than the bounded-autonomy model this plan is building toward.
-Productize it as an idempotent `make windmill-mcp` target (mint/reuse a
-narrowly-scoped token via Windmill's own token-scoping API, register with
-Hermes, verify — same shape as `baserow-mcp`) before Phase 2 depends on it
-more heavily.
+**Follow-up (done):** the MCP wiring is now reproducible via `make
+windmill-mcp` — mints/reuses a token scoped to `mcp:all` (required just to
+reach the MCP endpoint — Windmill gates it behind a separate `mcp:*` scope
+family, independent of the REST scopes below; narrower `mcp:` values connect
+but expose zero tools) plus `scripts:read`/`flows:read`/`jobs:read`/
+`jobs:run:scripts`/`jobs:run:flows` (no `*:write` — verified writes still
+403 at call time even though `mcp:all` makes write-shaped tools visible) via
+Windmill's own token-scoping API, registers with Hermes, verifies, and
+leaves an already-working connection untouched (idempotent, non-destructive).
+See the ADR's Consequences section and
+`docs/windmill-sync.md#windmill-mcp-registration`.
 
 ## Sprint 1 — Execution contract and foundations (Phase 1)
 
