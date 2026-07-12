@@ -96,7 +96,7 @@ See the ADR's Consequences section and
 
 | Task | Work in this repo | Notes |
 |---|---|---|
-| HF-008 Catalogue model & loader | `windmill/capability-index.yaml` + loader/validator script under `f/hermes_flow/catalogue/`; CI check that every catalogue path exists | CI = existing `make lint validate ci` chain |
+| HF-008 Catalogue model & loader (done) | `Catalogue`/`CatalogueEntry` in `f/hermes_flow/catalogue/models.py` (wraps `CapabilityMetadata` + `kind`/`tags`/`inputs_summary`/`outputs_summary`); `windmill/capability-index.yaml` with 2 real entries (`f/hermes/client`, `f/data_platform/extract_hn_stories`); 18 tests incl. empty/valid/duplicate/malformed catalogues and a path-existence check | `load_catalogue()` names the offending entry (by path, or index if unparseable) and field on every validation error; CI (`make test`) fails if a catalogue path has no matching `.py` file — see `windmill/tests/test_catalogue.py` |
 | HF-009 Search & ranking | Agent-facing search op (via HF-000B transport) with primitives-before-workflows ranking; fixed evaluation set as test fixture | Deterministic, no LLM in ranking |
 | HF-010 Policy evaluator | Deterministic evaluator under `f/hermes_flow/policies/`; fails closed on missing metadata; table-driven tests | Must not require an LLM |
 | HF-011 Candidate creation | Admin op writing to the candidate namespace; idempotent by request key; records reason + base version | Never touches active paths |

@@ -1,0 +1,270 @@
+{
+  "$defs": {
+    "AutonomyLevel": {
+      "description": "Whether an action may run unattended or needs a human approval step.",
+      "enum": [
+        "automatic",
+        "approval_required"
+      ],
+      "title": "AutonomyLevel",
+      "type": "string"
+    },
+    "AutonomyPolicy": {
+      "description": "Per-action autonomy for one capability. See ALWAYS_APPROVAL_REQUIRED.",
+      "properties": {
+        "compose": {
+          "$ref": "#/$defs/AutonomyLevel",
+          "default": "automatic"
+        },
+        "create_candidate": {
+          "$ref": "#/$defs/AutonomyLevel",
+          "default": "automatic"
+        },
+        "discover": {
+          "$ref": "#/$defs/AutonomyLevel",
+          "default": "automatic"
+        },
+        "execute": {
+          "$ref": "#/$defs/AutonomyLevel",
+          "default": "automatic"
+        },
+        "modify_candidate": {
+          "$ref": "#/$defs/AutonomyLevel",
+          "default": "automatic"
+        },
+        "promote": {
+          "$ref": "#/$defs/AutonomyLevel",
+          "default": "approval_required"
+        },
+        "schedule": {
+          "$ref": "#/$defs/AutonomyLevel",
+          "default": "approval_required"
+        }
+      },
+      "title": "AutonomyPolicy",
+      "type": "object"
+    },
+    "CapabilityEffects": {
+      "description": "Side-effect categories this capability may cause when it runs.",
+      "properties": {
+        "database": {
+          "default": false,
+          "title": "Database",
+          "type": "boolean"
+        },
+        "external": {
+          "default": false,
+          "description": "Any other externally-visible side effect not covered above (sending a notification, calling a third-party API that isn't a plain network fetch, etc.).",
+          "title": "External",
+          "type": "boolean"
+        },
+        "filesystem": {
+          "default": false,
+          "title": "Filesystem",
+          "type": "boolean"
+        },
+        "network": {
+          "default": false,
+          "title": "Network",
+          "type": "boolean"
+        }
+      },
+      "title": "CapabilityEffects",
+      "type": "object"
+    },
+    "CapabilityKind": {
+      "enum": [
+        "script",
+        "flow"
+      ],
+      "title": "CapabilityKind",
+      "type": "string"
+    },
+    "CapabilityLimits": {
+      "description": "Bounds enforced when this capability runs. All optional \u2014 unset means unbounded.",
+      "properties": {
+        "max_concurrency": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Concurrency"
+        },
+        "rate_limit_per_minute": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Rate Limit Per Minute"
+        },
+        "timeout_seconds": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Timeout Seconds"
+        }
+      },
+      "title": "CapabilityLimits",
+      "type": "object"
+    },
+    "CapabilityMaturity": {
+      "description": "How much this capability has proven itself in production.",
+      "enum": [
+        "experimental",
+        "stable",
+        "deprecated"
+      ],
+      "title": "CapabilityMaturity",
+      "type": "string"
+    },
+    "CapabilityMetadata": {
+      "description": "Agent-selection metadata for one discoverable capability.",
+      "properties": {
+        "autonomy": {
+          "$ref": "#/$defs/AutonomyPolicy"
+        },
+        "capability_version": {
+          "minLength": 1,
+          "title": "Capability Version",
+          "type": "string"
+        },
+        "dependencies": {
+          "description": "Other capability paths this one depends on (HF-012 impact analysis traverses these).",
+          "items": {
+            "type": "string"
+          },
+          "title": "Dependencies",
+          "type": "array"
+        },
+        "effects": {
+          "$ref": "#/$defs/CapabilityEffects"
+        },
+        "limits": {
+          "$ref": "#/$defs/CapabilityLimits"
+        },
+        "maturity": {
+          "$ref": "#/$defs/CapabilityMaturity"
+        },
+        "owners": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Owners",
+          "type": "array"
+        },
+        "path": {
+          "description": "Windmill path this metadata describes, e.g. f/capabilities/collection/web_fetch. Windmill remains authoritative for the script's own argument schema \u2014 this only points at it.",
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "schema_version": {
+          "default": "1.0",
+          "description": "Schema MAJOR.MINOR this record was written against.",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "summary": {
+          "description": "One-line, agent-facing description used for discovery/search.",
+          "minLength": 1,
+          "title": "Summary",
+          "type": "string"
+        },
+        "test_requirements": {
+          "description": "Paths/ids of promotion-gating tests this capability must pass, e.g. under windmill/tests/contracts/ (HF-015).",
+          "items": {
+            "type": "string"
+          },
+          "title": "Test Requirements",
+          "type": "array"
+        }
+      },
+      "required": [
+        "path",
+        "capability_version",
+        "summary",
+        "maturity",
+        "owners"
+      ],
+      "title": "CapabilityMetadata",
+      "type": "object"
+    },
+    "CatalogueEntry": {
+      "description": "One discoverable capability: a Windmill script/flow plus its metadata.",
+      "properties": {
+        "inputs_summary": {
+          "description": "Short, agent-facing description of what this capability takes as input. Not the full argument schema \u2014 read that from Windmill via getScriptByPath/getFlowByPath using metadata.path.",
+          "minLength": 1,
+          "title": "Inputs Summary",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/CapabilityKind"
+        },
+        "metadata": {
+          "$ref": "#/$defs/CapabilityMetadata"
+        },
+        "outputs_summary": {
+          "description": "Short, agent-facing description of what this capability returns.",
+          "minLength": 1,
+          "title": "Outputs Summary",
+          "type": "string"
+        },
+        "tags": {
+          "description": "Discovery keywords, e.g. ['web', 'fetch', 'read-only'].",
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        }
+      },
+      "required": [
+        "kind",
+        "inputs_summary",
+        "outputs_summary",
+        "metadata"
+      ],
+      "title": "CatalogueEntry",
+      "type": "object"
+    }
+  },
+  "description": "The full capability index.",
+  "properties": {
+    "entries": {
+      "items": {
+        "$ref": "#/$defs/CatalogueEntry"
+      },
+      "title": "Entries",
+      "type": "array"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "description": "Schema MAJOR.MINOR this record was written against.",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "title": "Catalogue",
+  "type": "object"
+}
