@@ -49,7 +49,12 @@ failed or deferred task, communicated as such.
 ## Consequences
 
 - Every executed task has a Windmill job reference; see [HF-004](https://github.com/ryancollingwood/HermesFlow/issues/42)
-  (result envelope) for how that reference is surfaced.
+  (result envelope, done) for how that reference is surfaced.
+  `ExecutionResult` in `windmill/f/libraries/results/models.py` enforces this
+  structurally — a `windmill_job` result cannot validate as `success` or
+  `partial` without a `WindmillJobRef` — rather than leaving it to
+  convention. The one exception is `execution_type=conversational`, matching
+  this ADR's own non-executable-conversation exception above.
 - Enforcement requires auditing and restricting Hermes's own execution-capable
   tools for HermesFlow sessions — tracked separately as
   [HF-006](https://github.com/ryancollingwood/HermesFlow/issues/44).

@@ -6,3 +6,4 @@ locks:
   f/hermes/chat: e8d58cf77c012bc4312bc1c9696e850213e8f75f6714a931ba788a9186a9b830
   f/hermes/client: 718f0db16e26856211e6fd76023ff8af80c04b3ec014deb86521e36a135f31d4
   f/libraries/lineage/models: d760b405b4cc8cd4cf0e3cea6617f42a9aef7ceac24a6fe5b16519a0a07fab0e
+  f/libraries/results/models: fb56e4445bb517671b3f75b5eb8cb8eed72bdf485f40dfc2fd2d05720184679a
