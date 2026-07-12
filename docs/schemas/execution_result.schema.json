@@ -1,0 +1,251 @@
+{
+  "$defs": {
+    "ArtifactStage": {
+      "description": "Where an artifact sits in a run's raw -> intermediate -> final pipeline.",
+      "enum": [
+        "raw",
+        "intermediate",
+        "final"
+      ],
+      "title": "ArtifactStage",
+      "type": "string"
+    },
+    "ArtifactSummary": {
+      "description": "A lightweight, presentation-facing pointer to one produced artifact.\n\nReferences an ArtifactRef by id rather than duplicating its full record\n(see f.libraries.lineage.models.ArtifactRef) \u2014 this is what a result\nenvelope shows a user, not the authoritative artifact store entry.",
+      "properties": {
+        "artifact_id": {
+          "format": "uuid",
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Short, human-facing description of what this artifact is.",
+          "title": "Description"
+        },
+        "stage": {
+          "$ref": "#/$defs/ArtifactStage"
+        },
+        "storage_uri": {
+          "minLength": 1,
+          "title": "Storage Uri",
+          "type": "string"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "stage",
+        "storage_uri"
+      ],
+      "title": "ArtifactSummary",
+      "type": "object"
+    },
+    "CapabilityChange": {
+      "description": "One capability-lifecycle change (architecture/adr/0002) this task caused.",
+      "properties": {
+        "from_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "From Version"
+        },
+        "kind": {
+          "$ref": "#/$defs/CapabilityChangeKind"
+        },
+        "path": {
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "to_version": {
+          "minLength": 1,
+          "title": "To Version",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "kind",
+        "to_version"
+      ],
+      "title": "CapabilityChange",
+      "type": "object"
+    },
+    "CapabilityChangeKind": {
+      "enum": [
+        "created_candidate",
+        "modified_candidate",
+        "promoted"
+      ],
+      "title": "CapabilityChangeKind",
+      "type": "string"
+    },
+    "ExecutionType": {
+      "description": "What kind of work this result describes.\n\n`windmill_job` \u2014 task code ran through Windmill (architecture/adr/0001's\nexclusive execution boundary); `conversational` \u2014 Hermes answered,\nexplained, or drafted text without executing anything (ADR 0001's\nexplicit exception).",
+      "enum": [
+        "windmill_job",
+        "conversational"
+      ],
+      "title": "ExecutionType",
+      "type": "string"
+    },
+    "ResultOutcome": {
+      "description": "How a task ended.",
+      "enum": [
+        "success",
+        "partial",
+        "failure"
+      ],
+      "title": "ResultOutcome",
+      "type": "string"
+    },
+    "WindmillJobRef": {
+      "description": "Points at the Windmill job that proves a windmill_job result actually ran.",
+      "properties": {
+        "job_id": {
+          "minLength": 1,
+          "title": "Job Id",
+          "type": "string"
+        },
+        "path": {
+          "description": "Script or flow path that ran.",
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "workspace": {
+          "default": "main",
+          "minLength": 1,
+          "title": "Workspace",
+          "type": "string"
+        }
+      },
+      "required": [
+        "job_id",
+        "path"
+      ],
+      "title": "WindmillJobRef",
+      "type": "object"
+    }
+  },
+  "description": "The standard envelope Hermes uses to present one task's outcome.",
+  "properties": {
+    "artifacts": {
+      "items": {
+        "$ref": "#/$defs/ArtifactSummary"
+      },
+      "title": "Artifacts",
+      "type": "array"
+    },
+    "capability_changes": {
+      "items": {
+        "$ref": "#/$defs/CapabilityChange"
+      },
+      "title": "Capability Changes",
+      "type": "array"
+    },
+    "capability_version": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Version of workflow_path that ran, if known.",
+      "title": "Capability Version"
+    },
+    "duration_seconds": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Duration Seconds"
+    },
+    "execution_type": {
+      "$ref": "#/$defs/ExecutionType"
+    },
+    "failure_summary": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Actionable explanation of what went wrong and, where possible, what to do about it. Required when outcome is failure.",
+      "title": "Failure Summary"
+    },
+    "job": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/WindmillJobRef"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "The Windmill job that proves this ran. Required whenever outcome is success or partial for a windmill_job result. May be absent for a failure that occurred before a job could be submitted (e.g. Windmill unreachable) or for a conversational result, where it must always be absent."
+    },
+    "outcome": {
+      "$ref": "#/$defs/ResultOutcome"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "description": "Schema MAJOR.MINOR this record was written against.",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Warnings",
+      "type": "array"
+    },
+    "workflow_path": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Windmill script/flow path that ran. Required when execution_type is windmill_job; always None for conversational results.",
+      "title": "Workflow Path"
+    }
+  },
+  "required": [
+    "outcome",
+    "execution_type"
+  ],
+  "title": "ExecutionResult",
+  "type": "object"
+}
