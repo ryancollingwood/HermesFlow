@@ -1,7 +1,7 @@
 ---
 name: hermesflow
 description: Orchestrate HermesFlow tasks — select or generate a capability, run it exclusively through Windmill, and present the result. Use for any task that needs code to run, not just conversation.
-version: 0.1.0
+version: 0.2.0
 author: Ryan Philip Collingwood
 license: MIT
 metadata:
@@ -71,19 +71,52 @@ summarizing, answering, drafting text — never needs Windmill at all. That's
 not a workaround for this rule; it's the rule correctly not applying,
 because nothing is being executed on the user's behalf.
 
+**This rule is stated at the prompt level and, on its own, is advisory
+only — an unscoped session can and will reach for a built-in tool anyway**
+(confirmed by [HF-006](https://github.com/ryancollingwood/HermesFlow/issues/44)'s
+live testing: asked to fetch a URL "directly, don't overthink it" with no
+toolset restriction, the model called the built-in `web_extract` tool
+despite this rule). **A HermesFlow session must be started with a
+restricted toolset, not just this skill preloaded:**
+
+```sh
+hermes chat -t windmill,memory,todo,clarify,session_search -s hermesflow
+# or, non-interactively:
+hermes chat -Q -t windmill,memory,todo,clarify,session_search -s hermesflow -q "..."
+```
+
+`-t` is a session-scoped **allowlist**, not additive to whatever's globally
+enabled — a session started this way has *only* those tools, confirmed by
+listing available tools inside such a session and by directly attempting
+shell, browser, filesystem, and Python execution, all of which report the
+tool as simply not present rather than being declined. **Do not** reach
+for `hermes tools disable <name>` to achieve this instead — that changes
+the *global* `cli` platform config, permanently removing the tool from
+every Hermes session (including ordinary, non-HermesFlow assistant use,
+where those tools are legitimate). Scope the *session*, not the
+installation.
+
+**Known gap:** the `delegation` toolset (spawning sub-agent tasks) is
+deliberately excluded from the list above rather than resolved — a
+delegated sub-agent's own toolset scoping is an open question this hasn't
+addressed. Don't enable `delegation` in a HermesFlow session until that's
+worked out; a sub-agent with unrestricted tools would silently reopen this
+exact gap one level down.
+
 **If Windmill is unreachable:** say so plainly and stop. Do not fall back
 to direct execution "just this once" to get the task done anyway, no
 matter how simple the task looks. Report an `ExecutionResult` with
 `outcome=failure` and an actionable `failure_summary` (e.g. "Windmill is
 unavailable — retry once it's back"); `job` will legitimately be absent,
-since nothing was submitted.
+since nothing was submitted. Under the restricted toolset above this is
+also structural, not just a request you're honoring: there is no other
+tool available to fall back to.
 
 **Transport:** talk to Windmill through the `windmill` MCP server (native
 Streamable-HTTP/SSE, decided in
 [`architecture/adr/0005-hermes-windmill-transport.md`](../../../../architecture/adr/0005-hermes-windmill-transport.md)) —
 `listScripts`/`getScriptByPath` to inspect a capability, `runScriptByPath`
-to execute one, `getJob`/`getJobLogs` to inspect what happened. A session
-scoped to just this toolset uses `hermes chat -t windmill`. Known
+to execute one, `getJob`/`getJobLogs` to inspect what happened. Known
 constraint: `runScriptByPath`'s MCP schema doesn't pass resource-typed
 arguments (e.g. a `conn: hermes_endpoint` parameter) — a capability that
 needs one will fail with the resource unresolved. Don't route around this

@@ -55,14 +55,20 @@ failed or deferred task, communicated as such.
   `partial` without a `WindmillJobRef` — rather than leaving it to
   convention. The one exception is `execution_type=conversational`, matching
   this ADR's own non-executable-conversation exception above.
-- Enforcement requires auditing and restricting Hermes's own execution-capable
-  tools for HermesFlow sessions — tracked separately as
-  [HF-006](https://github.com/ryancollingwood/HermesFlow/issues/44).
-  **Confirmed necessary, not theoretical:** live-tested against the HF-005
-  skill (`hermes chat -s hermesflow`, asked to fetch a URL "directly, don't
-  overthink it") — the model called the built-in `web_extract` tool anyway.
-  A prompt-level rule alone doesn't stop this; HF-006's tool-level
-  restriction is what would.
+- **Enforcement (HF-006, done)**: a HermesFlow session must be started with
+  a restricted toolset — `hermes chat -t
+  windmill,memory,todo,clarify,session_search -s hermesflow` — not just the
+  skill preloaded. `-t` is a session-scoped allowlist; a session started
+  this way has verifiably no shell, browser, filesystem, Python, or
+  raw-web-fetch tool available at all, confirmed by listing a scoped
+  session's tools and by directly attempting all four execution paths (each
+  reported the tool as absent, not declined). Full inventory, rationale,
+  and verification transcript in
+  [`docs/hermesflow-session-scoping.md`](../../docs/hermesflow-session-scoping.md).
+  Global `hermes tools disable` was deliberately **not** used for this — it
+  would remove these tools from every Hermes session on the deployment,
+  including legitimate non-HermesFlow assistant use. A sub-agent delegation
+  gap remains open (see that doc).
 - This ADR is a prerequisite for the HermesFlow orchestration skill
   ([HF-005](https://github.com/ryancollingwood/HermesFlow/issues/43), done),
   which *states* this principle at the prompt level (`hermes/skills/
