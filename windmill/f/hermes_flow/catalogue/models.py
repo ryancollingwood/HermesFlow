@@ -71,6 +71,19 @@ class CatalogueEntry(BaseModel):
         min_length=1,
         description="Short, agent-facing description of what this capability returns.",
     )
+    input_kinds: list[str] = Field(
+        default_factory=list,
+        description="Controlled-vocabulary-by-convention short labels for what this "
+        "capability consumes, e.g. ['resource:hermes_endpoint']. For HF-009's "
+        "schema-compatibility search — exact-match only, not a real type system. "
+        "Optional: an entry with none just never matches a kind-based search.",
+    )
+    output_kinds: list[str] = Field(
+        default_factory=list,
+        description="Same convention as input_kinds, for what this capability produces, "
+        "e.g. ['model_list']. Lets one capability's output_kinds be matched against "
+        "another's input_kinds for primitive-chaining searches.",
+    )
     metadata: CapabilityMetadata
 
 
