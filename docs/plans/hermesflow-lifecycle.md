@@ -16,7 +16,7 @@ directly.
 | Skill deployment "commands include the new skill" (HF-005) | `make hermes-skills-push` is additive over `hermes/skills/<category>/<skill>/` | HF-005 only needs the skill authored in the right place; deployment is free |
 | Language unstated (JSON Schema *or* Pydantic) | All Windmill assets are Python; `defaultTs: bun` in wmill.yaml is only the CLI default | Use **Pydantic** models as source of truth; export JSON Schema for docs/CI |
 | "existing collection database" (HF-025) | `collection_db/` Postgres + `f/collection/collection_db.resource.yaml` exist | HF-025 targets that database; migrations live under `collection_db/` |
-| Hermes ↔ lifecycle controls "via MCP" (§4 diagram) | Hermes has MCP auxiliary routing (Makefile) but no Windmill MCP wiring exists yet | New task **HF-000B** below — decide and wire the transport before Phase 2 |
+| Hermes ↔ lifecycle controls "via MCP" (§4 diagram) | **Already wired, undocumented**: `hermes mcp list` shows a live, enabled `windmill` MCP connection (native Streamable-HTTP, no bridge), token created 2026-06-21 — no ADR, no Makefile target, no mention anywhere in the repo | New task **HF-000B** below — document the existing wiring, prove it live, and flag it for productization |
 | "content-addressed mounted artifact filesystem" (HF-017) | No artifact volume is defined in compose | New task **HF-000A** below |
 
 ## Added tasks (gaps in the document)
@@ -31,15 +31,41 @@ across container restarts.
 
 ### HF-000B — Decide and wire the Hermes → Windmill invocation transport
 **Phase 1 (ADR).** The document's diagram says "MCP" but never tasks it.
-**Decision: default to the Windmill HTTP API driven by a Hermes tool + skill
-guidance** — MCP connectivity has been flaky in this stack previously, and the
-HTTP path has fewer moving parts. Record the decision (and MCP as a possible
-later addition for discovery/execution) as
-`architecture/adr/0005-hermes-windmill-transport.md`. Everything in Phase 2
-(catalogue search, policy evaluation, candidate ops) is exposed *through* this
-transport, so it must be settled first.
-*Exit:* Hermes can list and run one Windmill script through the chosen
-transport in a live session.
+Initial framing (before investigation) favoured a bespoke HTTP-API tool over
+MCP, on the assumption MCP connectivity had been flaky here before. Two facts
+changed that: (1) Hermes has no generic HTTP-tool mechanism — every external
+service it reaches (Baserow, Directus) is wired in as MCP, so "avoid MCP"
+meant building unproven new plumbing instead of reusing the pattern already
+in use; (2) the past MCP pain was specifically about bridging legacy SSE-only
+services via `mcp-remote` (the `baserow-mcp` pattern) — Windmill CE ships a
+**native** Streamable-HTTP/SSE MCP server (`/api/mcp/w/{workspace}/sse`, ~38
+curated `x-mcp-tool` operations), the same zero-bridge case as Directus.
+
+**Further discovery: it was already wired up** — `docker exec hermes hermes
+mcp list` showed `windmill` registered and enabled, token dated 2026-06-21,
+predating this plan entirely and undocumented anywhere in the repo.
+
+**Decision: native MCP**, recorded as
+`architecture/adr/0005-hermes-windmill-transport.md`, along with a live proof
+run and the limitation it surfaced (see below). Everything in Phase 2
+(catalogue search, policy evaluation, candidate ops) is exposed *through*
+this transport.
+*Exit (met):* `hermes chat -Q -t windmill -q "..."` listed `f/hermes`'s
+scripts and submitted a real job (`019f55ef-e96c-a968-3e94-5610d732b37b`) for
+`f/hermes/client` via `runScriptByPath`. The job itself failed — MCP's
+`runScriptByPath` schema doesn't pass script arguments, so a script requiring
+a resource-typed arg (`conn: hermes_endpoint`) got `None` instead — which is
+a real, load-bearing constraint on capability design (see the ADR's
+Consequences), not a transport failure.
+
+**Follow-up (not yet scheduled as an issue):** this MCP wiring is live but
+reproduced nowhere — no Makefile target creates it, so a fresh install
+wouldn't have it, and the existing token (`mcp:all`, unscoped to workspace)
+is broader than the bounded-autonomy model this plan is building toward.
+Productize it as an idempotent `make windmill-mcp` target (mint/reuse a
+narrowly-scoped token via Windmill's own token-scoping API, register with
+Hermes, verify — same shape as `baserow-mcp`) before Phase 2 depends on it
+more heavily.
 
 ## Sprint 1 — Execution contract and foundations (Phase 1)
 
