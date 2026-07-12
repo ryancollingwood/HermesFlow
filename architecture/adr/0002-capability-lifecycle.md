@@ -63,13 +63,37 @@ open. Key design points:
   drift-checked against the live models the same way HF-002 checks the
   lineage schemas.
 
-This still leaves the policy *evaluator* (HF-010: how a capability's
-metadata plus request context decides discover/execute/etc. at runtime) and
-the promotion *workflow* (HF-013: the actual approval flow) undesigned.
+**Policy evaluator implemented (HF-010).** `evaluate_policy()` in
+`f/hermes_flow/policies/evaluator.py` takes a `PolicyContext` (the
+requested action, the target capability's `CapabilityMetadata` if known,
+and request-time facts — requested concurrency/rate, a caller-supplied
+`destructive` flag) and returns a `PolicyDecision`
+(`automatic`/`approval_required`/`denied`, with a reason). This is
+deliberately a *different* question from `AutonomyPolicy` itself:
+`AutonomyPolicy` is the capability's static declared default; the
+evaluator combines that default with request-time context to reach a
+decision that can only be as permissive as the default, never more so.
+Fail-closed rules, in priority order: `discover` is always `automatic`
+(searching/listing has no side effects); any other action against an
+**unknown** capability path is `denied`, not `approval_required` — there's
+nothing safe to default to, and "approval_required" implies something
+reviewable exists, which it doesn't for an unknown path; `promote`/
+`schedule` are always `approval_required` for a known capability, matching
+`AutonomyPolicy`'s structural invariant; a request flagged `destructive`
+escalates an otherwise-`automatic` decision to `approval_required` (never
+further, and never de-escalates an already-gated action); a request whose
+declared concurrency/rate needs exceed the capability's own
+`CapabilityLimits` is `denied` outright, not routed to approval. 45 tests
+cover every action against a representative context set, including a
+table-driven sweep.
+
+This still leaves the promotion *workflow* (HF-013: the actual approval
+flow that acts on an `approval_required` decision) undesigned.
 
 ## Status
 
-Autonomy schema implemented ([HF-003](https://github.com/ryancollingwood/HermesFlow/issues/41),
-done). Still pending the policy evaluator ([HF-010](https://github.com/ryancollingwood/HermesFlow/issues/48))
-and promotion workflow ([HF-013](https://github.com/ryancollingwood/HermesFlow/issues/51))
-before this ADR can be marked Accepted.
+Autonomy schema ([HF-003](https://github.com/ryancollingwood/HermesFlow/issues/41))
+and policy evaluator ([HF-010](https://github.com/ryancollingwood/HermesFlow/issues/48))
+both implemented and done. Still pending the promotion workflow
+([HF-013](https://github.com/ryancollingwood/HermesFlow/issues/51)) before
+this ADR can be marked Accepted.

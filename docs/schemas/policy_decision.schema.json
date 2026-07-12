@@ -1,0 +1,64 @@
+{
+  "$defs": {
+    "AutonomyAction": {
+      "description": "The lifecycle actions a capability's autonomy policy governs.\n\nMatches the lifecycle in architecture/adr/0002-capability-lifecycle.md:\nREQUESTED -> SEARCH (discover) -> COMPOSE/REUSE/GENERATE (compose) ->\nCANDIDATE (create_candidate) -> TESTED -> ACTIVE -> EXECUTE (execute) ->\n... -> PATCH (modify_candidate) -> TEST -> PROMOTE (promote). `schedule`\ncovers turning a capability into a recurring Windmill schedule.",
+      "enum": [
+        "discover",
+        "execute",
+        "compose",
+        "create_candidate",
+        "modify_candidate",
+        "promote",
+        "schedule"
+      ],
+      "title": "AutonomyAction",
+      "type": "string"
+    },
+    "PolicyOutcome": {
+      "enum": [
+        "automatic",
+        "approval_required",
+        "denied"
+      ],
+      "title": "PolicyOutcome",
+      "type": "string"
+    }
+  },
+  "properties": {
+    "action": {
+      "$ref": "#/$defs/AutonomyAction"
+    },
+    "capability_path": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Capability Path"
+    },
+    "outcome": {
+      "$ref": "#/$defs/PolicyOutcome"
+    },
+    "reason": {
+      "minLength": 1,
+      "title": "Reason",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "action",
+    "outcome",
+    "reason"
+  ],
+  "title": "PolicyDecision",
+  "type": "object"
+}
