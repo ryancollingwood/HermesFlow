@@ -12,12 +12,15 @@ defaultTs: bun
 # deliberately never synced to git, same as f/hermes_state) shares that root
 # and a `f/hermes_flow/**` wildcard would sweep candidates into version
 # control the moment one exists, defeating the whole point of a
-# review-before-promotion gate. Everything else (f/hermes_state, f/capabilities/
-# and f/workflows/ — reserved namespaces with no content yet, see
-# docs/windmill-sync.md — any other f/ folder, all u/ namespaces, and the
-# ~250 inherited resource-types) is intentionally OUT of scope so a mirror
-# push can never delete it. See docs/windmill-sync.md for the full scenario
-# breakdown.
+# review-before-promotion gate. The operation that WRITES those candidates
+# lives at the sibling path `f/hermes_flow/candidate_ops/` specifically so
+# its own code (which must be synced) never collides with the excluded
+# `f/hermes_flow/candidates/` data namespace it manages. Everything else
+# (f/hermes_state, f/capabilities/ and f/workflows/ — reserved namespaces
+# with no content yet, see docs/windmill-sync.md — any other f/ folder, all
+# u/ namespaces, and the ~250 inherited resource-types) is intentionally
+# OUT of scope so a mirror push can never delete it. See
+# docs/windmill-sync.md for the full scenario breakdown.
 includes:
   - "f/hermes/**"
   - "f/collection/**"
@@ -26,6 +29,8 @@ includes:
   - "f/hermes_flow/catalogue/models.*"
   - "f/hermes_flow/catalogue/search.*"
   - "f/hermes_flow/policies/evaluator.*"
+  - "f/hermes_flow/candidate_ops/models.*"
+  - "f/hermes_flow/candidate_ops/create.*"
   - "f/data_platform/folder.meta.yaml"
   - "f/data_platform/data_platform_db.resource.yaml"
   - "f/data_platform/db_password.variable.yaml"
