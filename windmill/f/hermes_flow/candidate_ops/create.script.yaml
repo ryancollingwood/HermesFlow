@@ -1,0 +1,57 @@
+summary: ''
+description: ''
+lock: '!inline f/hermes_flow/candidate_ops/create.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    content:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    base_version:
+      type: string
+      description: ''
+      default: ''
+      originalType: string
+    conversation_id:
+      type: string
+      description: ''
+      default: ''
+      originalType: string
+    generated_by_capability:
+      type: string
+      description: ''
+      default: ''
+      originalType: string
+    language:
+      type: string
+      description: ''
+      default: python3
+      originalType: string
+    reason:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    request_id:
+      type: string
+      description: ''
+      default: ''
+      originalType: string
+    request_key:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    source_path:
+      type: string
+      description: ''
+      default: ''
+      originalType: string
+  required:
+    - request_key
+    - reason
+    - content

@@ -1,8 +1,11 @@
 # Test-only dependencies for windmill/tests/ — not part of any Windmill script's
 # own lock file (those are generated per-script by `wmill generate-metadata`;
-# see f/libraries/lineage/models.script.lock). pydantic/pyyaml are pinned to
-# match f/hermes_flow/catalogue/models.script.lock so tests validate against
-# the exact versions scripts run under.
+# see f/libraries/lineage/models.script.lock). pydantic/pyyaml/wmill are pinned
+# to match f/hermes_flow/candidate_ops/create.script.lock (and siblings) so
+# tests validate against the exact versions scripts run under. wmill is only
+# imported (never actually called — tests inject a fake client), but the
+# import itself must resolve for pytest to collect the module at all.
 pydantic==2.13.4
 pytest==9.1.1
 pyyaml==6.0.3
+wmill==1.756.0

@@ -87,13 +87,37 @@ declared concurrency/rate needs exceed the capability's own
 cover every action against a representative context set, including a
 table-driven sweep.
 
+**Candidate creation implemented (HF-011).** `create_candidate()` in
+`f/hermes_flow/candidate_ops/create.py` is the first concrete `CANDIDATE`
+state producer — this is where the lifecycle stops being descriptive and
+starts being enforced by actual write access. It surfaced a mechanism this
+ADR's original text didn't anticipate: Windmill jobs execute with the
+permissions of the *script's own owner* (`WM_PERMISSIONED_AS`), not the
+caller's token scope. Confirmed empirically: a job triggered with a token
+scoped to only `scripts:read`/`jobs:run:scripts` (no `scripts:write`) still
+successfully created a new script, because the *called script's* identity
+— not the caller's — governed the write. Practically, this means Hermes's
+narrowly-scoped `windmill-mcp` token never needs broadened to
+`scripts:write` to support candidate creation; it only needs to invoke
+*this one, narrow, auditable script*, whose own code (not Windmill's RBAC)
+enforces that writes never land anywhere outside
+`f/hermes_flow/candidates/`. This is the general pattern any future
+admin-capable HermesFlow operation should follow — a privileged gateway
+with its own internal safety check, not a broadened caller grant.
+Idempotency (`compute_candidate_id(request_key)` is deterministic) and
+derivation provenance (`source_path`/`base_version`, the latter
+auto-resolved from the source's live Windmill script hash) were both
+verified live, including that deriving a candidate leaves the source
+capability byte-for-byte unchanged.
+
 This still leaves the promotion *workflow* (HF-013: the actual approval
 flow that acts on an `approval_required` decision) undesigned.
 
 ## Status
 
-Autonomy schema ([HF-003](https://github.com/ryancollingwood/HermesFlow/issues/41))
-and policy evaluator ([HF-010](https://github.com/ryancollingwood/HermesFlow/issues/48))
-both implemented and done. Still pending the promotion workflow
+Autonomy schema ([HF-003](https://github.com/ryancollingwood/HermesFlow/issues/41)),
+policy evaluator ([HF-010](https://github.com/ryancollingwood/HermesFlow/issues/48)),
+and candidate creation ([HF-011](https://github.com/ryancollingwood/HermesFlow/issues/49))
+all implemented and done. Still pending the promotion workflow
 ([HF-013](https://github.com/ryancollingwood/HermesFlow/issues/51)) before
 this ADR can be marked Accepted.
