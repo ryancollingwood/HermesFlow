@@ -27,7 +27,7 @@ else
   ON_WINDOWS :=
 endif
 
-.PHONY: help check init apikey secrets wizard secure fix-permissions pull build up down restart logs ps health backup backup-schedule backup-schedule-revert bootstrap hermes-heal hermes-workspace hermes-secure hermes-skills-push hermes-skills-pull lint validate ci headroom headroom-revert mlx mlx-revert mlx-status memory memory-revert hindsight-mlx hindsight-mlx-revert aux-cloud aux-local aux-hindsight aux-status windmill-push windmill-pull windmill-check windmill-mcp baserow baserow-revert baserow-mcp directus directus-revert observability observability-revert ollama ollama-revert
+.PHONY: help check init apikey secrets wizard secure fix-permissions pull build up down restart logs ps health backup backup-schedule backup-schedule-revert bootstrap hermes-heal hermes-workspace hermes-secure hermes-skills-push hermes-skills-pull lint validate test ci headroom headroom-revert mlx mlx-revert mlx-status memory memory-revert hindsight-mlx hindsight-mlx-revert aux-cloud aux-local aux-hindsight aux-status windmill-push windmill-pull windmill-check windmill-mcp baserow baserow-revert baserow-mcp directus directus-revert observability observability-revert ollama ollama-revert
 
 # Fill an .env variable with a generated value when it is empty OR still set to a
 # known-weak default. Usage: $(call ensure_secret,VAR,GENERATOR,WEAK_DEFAULT)
@@ -552,7 +552,11 @@ lint: ## Ruff + py_compile the Windmill scripts (mirrors CI)
 	@command -v ruff >/dev/null && ruff check windmill/ || echo "(install ruff for full lint)"
 	@find windmill -name '*.py' -exec python3 -m py_compile {} + && echo "✓ python syntax OK"
 
-ci: validate lint ## Run the same checks as GitHub Actions
+test: ## Run windmill/tests/ (pip install -r windmill/tests/requirements.txt first; mirrors CI)
+	@command -v pytest >/dev/null && (cd windmill && pytest tests/ -q) \
+	  || echo "(install windmill/tests/requirements.txt for tests: pip install -r windmill/tests/requirements.txt)"
+
+ci: validate lint test ## Run the same checks as GitHub Actions
 
 windmill-push: ## Push windmill/ assets (resource type, resource, scripts) to the server — needs the wmill CLI
 	@command -v wmill >/dev/null || { echo "✗ 'wmill' CLI not found — npm install -g windmill-cli"; exit 1; }
