@@ -22,6 +22,7 @@ with the Windmill side pre-wired to call Hermes as an OpenAI-compatible endpoint
 | `windmill/` | wmill-syncable resource type, resource, secret, and example scripts |
 | `mlx/` | Host-native MLX inference server for Apple Silicon (setup + launch script) |
 | `hermes/` | Thin derived Hermes image — bakes extra Python packages into the venv ([how & why](docs/hermes-docker-build.md)) — plus `hermes/skills/`, version-controlled custom Hermes skills pushed to `DATA_DIR/skills/` via `make hermes-skills-push` |
+| `architecture/adr/` | Architecture Decision Records — starting with the [Windmill-exclusive-execution principle](architecture/adr/0001-windmill-exclusive-execution.md) |
 
 ## Architecture
 
@@ -42,6 +43,18 @@ Six Docker networks keep traffic segmented:
 The Hermes dashboard and the OpenAI-compatible API run **inside the single Hermes
 container** (the dashboard is a supervised s6 service — it cannot run as a
 separate container).
+
+### Execution principle
+
+**Windmill is the exclusive execution boundary for task code.** Hermes
+interprets, plans, and discovers or generates capabilities, but never
+executes task code directly or falls back to shell/Python/browser/filesystem
+tools to get a task done — every executed task runs through Windmill and
+returns a job reference. See
+[architecture/adr/0001-windmill-exclusive-execution.md](architecture/adr/0001-windmill-exclusive-execution.md)
+for the full decision record, and
+[docs/plans/hermesflow-lifecycle.md](docs/plans/hermesflow-lifecycle.md) for
+the implementation backlog.
 
 ## Prerequisites
 
