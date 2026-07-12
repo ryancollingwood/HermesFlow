@@ -1,17 +1,17 @@
 # Presenting `ExecutionResult` to a user
 
-This is the human-presentation guidance for
-`windmill/f/libraries/results/models.py`'s `ExecutionResult` — how Hermes
-should turn one machine-readable result into what a user actually reads.
-`render_summary()` in that module is the reference implementation these
-rules describe; `windmill/tests/test_result_models.py` snapshot-tests its
-output for the success/partial/failure cases below.
+How to turn one machine-readable `ExecutionResult`
+(`f/libraries/results/models.py`) into what a user actually reads.
+`render_summary()` in that module is the reference implementation;
+`windmill/tests/test_result_models.py` snapshot-tests its output for the
+success/partial/failure/conversational cases below.
 
-**This is the canonical, human-authored version.**
-[`hermes/skills/workflow-orchestration/hermesflow/references/result-presentation.md`](../hermes/skills/workflow-orchestration/hermesflow/references/result-presentation.md)
-mirrors it for MCP-driven use (same two-track pattern
-`data-platform-add-pipeline` uses for its own canonical docs) — if the two
-conflict, this one wins. Keep them in sync when either changes.
+> This mirrors
+> [`docs/result-envelope-rendering.md`](../../../../../docs/result-envelope-rendering.md)
+> in the repo, which is the canonical, human-authored version. If the two
+> conflict, the repo doc wins — flag the discrepancy rather than silently
+> following whichever one you read first (same rule
+> `data-platform-add-pipeline` uses for its own canonical docs).
 
 ## The one rule that overrides all formatting preferences
 

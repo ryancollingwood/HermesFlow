@@ -58,9 +58,16 @@ failed or deferred task, communicated as such.
 - Enforcement requires auditing and restricting Hermes's own execution-capable
   tools for HermesFlow sessions — tracked separately as
   [HF-006](https://github.com/ryancollingwood/HermesFlow/issues/44).
+  **Confirmed necessary, not theoretical:** live-tested against the HF-005
+  skill (`hermes chat -s hermesflow`, asked to fetch a URL "directly, don't
+  overthink it") — the model called the built-in `web_extract` tool anyway.
+  A prompt-level rule alone doesn't stop this; HF-006's tool-level
+  restriction is what would.
 - This ADR is a prerequisite for the HermesFlow orchestration skill
-  ([HF-005](https://github.com/ryancollingwood/HermesFlow/issues/43)), which
-  states and enforces this principle at the prompt level.
+  ([HF-005](https://github.com/ryancollingwood/HermesFlow/issues/43), done),
+  which *states* this principle at the prompt level (`hermes/skills/
+  workflow-orchestration/hermesflow/SKILL.md`'s Rule 1) — *enforcing* it is
+  HF-006's job, not this ADR's or HF-005's.
 
 ## Verification
 

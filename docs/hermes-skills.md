@@ -21,7 +21,12 @@ auxiliary task manages itself. **None of that belongs in this repo.** Only
 the skills *we* author for this stack do — currently
 [`hermes/skills/data-science/data-platform-add-pipeline/`](../hermes/skills/data-science/data-platform-add-pipeline/),
 which teaches Hermes the dlt → dbt → Windmill pipeline workflow from
-[docs/data-platform-add-pipeline.md](data-platform-add-pipeline.md).
+[docs/data-platform-add-pipeline.md](data-platform-add-pipeline.md), and
+[`hermes/skills/workflow-orchestration/hermesflow/`](../hermes/skills/workflow-orchestration/hermesflow/),
+which teaches the HermesFlow capability-selection/generation/repair/
+result-presentation lifecycle from
+[`architecture/adr/0001-windmill-exclusive-execution.md`](../architecture/adr/0001-windmill-exclusive-execution.md)
+and [`architecture/adr/0002-capability-lifecycle.md`](../architecture/adr/0002-capability-lifecycle.md).
 
 This is the same bind-mount-plus-narrow-scope pattern as `windmill/` (see
 [docs/windmill-sync.md](windmill-sync.md)): the live directory has far more
