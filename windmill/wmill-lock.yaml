@@ -4,6 +4,7 @@ locks:
   f/data_platform/dbt_run: be748a82045ce31e96fdfa1d7cfba8e83d8ce96c71ca343fd296c86225f32524
   f/data_platform/extract_hn_stories: 1f5ade62733cfb40962b1732ef2720cd6f4e8599ebb4f274cad6a66ea599036e
   f/hermes_flow/candidate_ops/create: 09068ba34e5dae123425e5eda1db181c5c15cd6ace44af8a74f920f23bb97b1c
+  f/hermes_flow/candidate_ops/diff: 5de87fff9209e7b15623d619d9259939ab7d124c9a677310b3afe34e267258ef
   f/hermes_flow/candidate_ops/models: f160b43fc39278dfadaa2a999337d88092ebb6822b73d747d026a5460d20d7bf
   f/hermes_flow/catalogue/models: 1554e3e8302ec054a2a90dbcf9a6df004bed04c84c6970482a70d5499183f412
   f/hermes_flow/catalogue/search: 992a61e0b836d51df24747baf18796117410ee4ef8e6551221ddf517f461dec0

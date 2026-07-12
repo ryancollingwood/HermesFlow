@@ -1,0 +1,23 @@
+summary: Candidate diff and dependency impact analysis
+description: Produces HF-012 promotion evidence for a candidate and its active source.
+lock: '!inline f/hermes_flow/candidate_ops/diff.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    candidate_capability_metadata:
+      type: object
+      default: null
+      properties: {}
+    candidate_id:
+      type: string
+      default: null
+      originalType: string
+    catalogue_yaml:
+      type: string
+      default: null
+      originalType: string
+  required:
+    - candidate_id
+    - catalogue_yaml
