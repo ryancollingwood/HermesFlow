@@ -1,0 +1,52 @@
+# HermesFlow capability catalogue — version-controlled, repo-only (not synced
+# to the Windmill server; outside wmill.yaml's scope, like wmill.yaml itself).
+#
+# Validated and loaded by f/hermes_flow/catalogue/models.py (load_catalogue).
+# CI (windmill/tests/test_catalogue.py) fails if this file doesn't parse, an
+# entry is malformed, two entries share a path, or an entry's path doesn't
+# correspond to a real script/flow under windmill/f/.
+#
+# Deliberately small right now: these are the first two entries, covering
+# capabilities that already exist. Cataloguing the rest of windmill/f/ is
+# incremental follow-up work, not something this file needs to do all at
+# once — an empty or partial catalogue is valid (see the empty-catalogue
+# test case).
+schema_version: "1.0"
+entries:
+  - kind: script
+    tags: [hermes, connectivity, diagnostics]
+    inputs_summary: >-
+      conn: a hermes_endpoint resource (base_url + api_key) identifying
+      which Hermes gateway to call. No other arguments.
+    outputs_summary: >-
+      List of model ids the gateway serves. Used as a connectivity check;
+      f.hermes.client also exposes chat() for single completions when
+      imported directly, though only main()'s own signature is catalogued
+      here.
+    metadata:
+      path: f/hermes/client
+      capability_version: "1.0.0"
+      summary: Connectivity check against the Hermes gateway; lists the models it serves.
+      maturity: stable
+      owners: [platform]
+      effects:
+        network: true
+
+  - kind: script
+    tags: [data-platform, extract, hacker-news, dlt]
+    inputs_summary: >-
+      limit: optional integer, number of top stories to fetch (default 20).
+    outputs_summary: >-
+      Writes immutable raw Parquet rows to
+      /shared/datalake/hn_stories/<date>/ via the dlt pipeline in
+      data-platform/dlt/pipelines/hn_stories.py; returns the dlt run's
+      LoadInfo summary (row/table counts), not the story data itself.
+    metadata:
+      path: f/data_platform/extract_hn_stories
+      capability_version: "1.0.0"
+      summary: Extract Hacker News top stories via dlt into the immutable Parquet datalake.
+      maturity: stable
+      owners: [data-platform]
+      effects:
+        network: true
+        filesystem: true
