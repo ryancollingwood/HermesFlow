@@ -1,0 +1,88 @@
+{
+  "description": "Identifies one workflow/capability execution and who/what initiated it.",
+  "properties": {
+    "capability": {
+      "description": "Capability path that is executing, e.g. f/capabilities/collection/web_fetch.",
+      "minLength": 1,
+      "title": "Capability",
+      "type": "string"
+    },
+    "capability_version": {
+      "description": "Version of that capability that is executing.",
+      "minLength": 1,
+      "title": "Capability Version",
+      "type": "string"
+    },
+    "conversation_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Hermes conversation/session this execution was requested from, if any.",
+      "title": "Conversation Id"
+    },
+    "initiating_actor": {
+      "description": "Who/what initiated this execution: a user id, 'hermes', a schedule name, etc.",
+      "minLength": 1,
+      "title": "Initiating Actor",
+      "type": "string"
+    },
+    "parent_trace_id": {
+      "anyOf": [
+        {
+          "format": "uuid",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "trace_id of the execution that spawned this one, if any (e.g. a flow step's sub-run). Absent for a top-level execution.",
+      "title": "Parent Trace Id"
+    },
+    "request_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Caller-supplied idempotency/correlation key for this specific request, if any.",
+      "title": "Request Id"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "description": "Schema MAJOR.MINOR this record was written against.",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "started_at": {
+      "description": "When this execution began (UTC).",
+      "format": "date-time",
+      "title": "Started At",
+      "type": "string"
+    },
+    "trace_id": {
+      "description": "Unique ID for this execution.",
+      "format": "uuid",
+      "title": "Trace Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "capability",
+    "capability_version",
+    "initiating_actor"
+  ],
+  "title": "ExecutionContext",
+  "type": "object"
+}

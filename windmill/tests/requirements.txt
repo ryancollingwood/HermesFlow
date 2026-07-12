@@ -1,0 +1,6 @@
+# Test-only dependencies for windmill/tests/ — not part of any Windmill script's
+# own lock file (those are generated per-script by `wmill generate-metadata`;
+# see f/libraries/lineage/models.script.lock). pydantic is pinned to match that
+# lock so tests validate against the exact version scripts run under.
+pydantic==2.13.4
+pytest==9.1.1
