@@ -2,26 +2,39 @@
 # wmill CLI sync config. Run `wmill` commands from this `windmill/` directory.
 defaultTs: bun
 # Sync scope is deliberately narrow — only the versioned Hermes + collection
-# + data_platform + libraries code lives here. `f/hermes/**`, `f/collection/**`,
-# and `f/libraries/**` are tracked code/config wholesale (they hold only
-# versioned code, no runtime-state subfolder); `f/data_platform/**` is instead
-# enumerated item-by-item below so that any extra script/flow/app someone adds
-# in that folder (locally or on the server) is never swept into a push/pull —
-# everything else (the f/hermes_state runtime-state folder, any other f/
-# folder, all u/ namespaces, and the ~250 inherited resource-types) is
-# intentionally OUT of scope so a mirror push can never delete it. See
-# docs/windmill-sync.md for the full scenario breakdown.
+# + data_platform + libraries + hermes_flow code lives here. `f/hermes/**`,
+# `f/collection/**`, and `f/libraries/**` are tracked code/config wholesale
+# (they hold only versioned code, no runtime-state subfolder). `f/data_platform/**`
+# and `f/hermes_flow/**` are instead enumerated item-by-item below — for
+# f/data_platform so any extra script/flow/app someone adds there (locally or
+# on the server) is never swept into a push/pull; for f/hermes_flow because
+# f/hermes_flow/candidates/ (HF-011's candidate namespace — Windmill-only,
+# deliberately never synced to git, same as f/hermes_state) shares that root
+# and a `f/hermes_flow/**` wildcard would sweep candidates into version
+# control the moment one exists, defeating the whole point of a
+# review-before-promotion gate. Everything else (f/hermes_state, f/capabilities/
+# and f/workflows/ — reserved namespaces with no content yet, see
+# docs/windmill-sync.md — any other f/ folder, all u/ namespaces, and the
+# ~250 inherited resource-types) is intentionally OUT of scope so a mirror
+# push can never delete it. See docs/windmill-sync.md for the full scenario
+# breakdown.
 includes:
   - "f/hermes/**"
   - "f/collection/**"
   - "f/libraries/**"
+  - "f/hermes_flow/folder.meta.yaml"
   - "f/data_platform/folder.meta.yaml"
   - "f/data_platform/data_platform_db.resource.yaml"
   - "f/data_platform/db_password.variable.yaml"
   - "f/data_platform/dbt_run.*"
   - "f/data_platform/extract_hn_stories.*"
   - "hermes_endpoint.resource-type.yaml"
-excludes: []
+# Defense-in-depth, not load-bearing today (candidates/ isn't in includes
+# above so it's already out of scope): if a future edit ever widens
+# f/hermes_flow's includes entry toward a wildcard, this exclude still stops
+# candidates from syncing. Keep it even though it's currently redundant.
+excludes:
+  - "f/hermes_flow/candidates/**"
 # Keep secret values OUT of the synced YAML by default. When false, pulling a
 # secret variable writes a placeholder, not the real value.
 skipSecrets: true

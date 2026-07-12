@@ -93,9 +93,10 @@ start / flags) and `INSTALL.md` (flag table + step description).
 `wmill sync` is a **mirror** (`push` makes the server match the repo and
 **deletes/archives** anything in scope that isn't tracked). Scope is set by
 `includes` in `windmill/wmill.yaml` and is deliberately narrow — currently
-`f/hermes/**` + `f/collection/**` + an explicit, item-by-item list of
-`f/data_platform/` files + the `hermes_endpoint` resource-type. Full
-breakdown in [`docs/windmill-sync.md`](docs/windmill-sync.md). When you author or
+`f/hermes/**` + `f/collection/**` + `f/libraries/**` + an explicit,
+item-by-item list of `f/data_platform/` and `f/hermes_flow/` files + the
+`hermes_endpoint` resource-type. Full breakdown in
+[`docs/windmill-sync.md`](docs/windmill-sync.md). When you author or
 generate a Windmill script, follow these rules so a push can never wipe data:
 
 - **Never hand someone (or run yourself) a bare `wmill sync push`/`pull`
@@ -110,16 +111,26 @@ generate a Windmill script, follow these rules so a push can never wipe data:
   (push) dry-run-and-abort on any deletion.
 
 - **Code/config that must be versioned → one of the synced folders** (currently
-  `f/hermes/`, `f/collection/`, and `f/data_platform/`). Commit it; it
-  round-trips via `make windmill-push` / `make windmill-pull`.
-- **`f/data_platform/` is scoped item-by-item, not `f/data_platform/**`.**
-  Unlike `f/hermes/` and `f/collection/`, that folder's `includes` entries
-  name each file/pattern explicitly (e.g. `f/data_platform/dbt_run.*`). This
-  is deliberate: a blanket wildcard would sweep up any script/flow/app
-  someone adds to that folder later — on the server or locally — into the
-  mirror's blast radius. When you add a new pipeline's assets under
-  `f/data_platform/`, add their specific filenames/patterns to `includes`
-  rather than relying on the folder already being in scope.
+  `f/hermes/`, `f/collection/`, `f/libraries/`, `f/data_platform/`, and
+  `f/hermes_flow/`). Commit it; it round-trips via `make windmill-push` /
+  `make windmill-pull`.
+- **`f/data_platform/` and `f/hermes_flow/` are scoped item-by-item, not a
+  `**` wildcard.** Unlike `f/hermes/`, `f/collection/`, and `f/libraries/`,
+  those folders' `includes` entries name each file/pattern explicitly (e.g.
+  `f/data_platform/dbt_run.*`, `f/hermes_flow/folder.meta.yaml`). Two
+  different reasons land on the same rule: `f/data_platform/` because a
+  blanket wildcard would sweep up any script/flow/app someone adds to that
+  folder later — on the server or locally — into the mirror's blast radius;
+  `f/hermes_flow/` because `f/hermes_flow/candidates/` (HF-011's
+  not-yet-promoted-capability namespace) shares that root, and a wildcard
+  there would sync candidates into git the moment one exists, which defeats
+  the review-before-promotion gate entirely — see
+  [`docs/windmill-sync.md`](docs/windmill-sync.md) for the live-tested
+  proof. When you add a new pipeline's assets under `f/data_platform/` or a
+  new catalogue/policy file under `f/hermes_flow/`, add their specific
+  filenames/patterns to `includes` rather than relying on the folder
+  already being in scope — and never add anything under
+  `f/hermes_flow/candidates/` to `includes`, ever.
 - **Non-secret runtime state → a sibling `<folder>_state/` folder, never inside
   the synced folder itself.** Any variable a script *writes at runtime* — last-run
   timestamps, cursors, sync markers, paging state — goes under `f/hermes_state/`
