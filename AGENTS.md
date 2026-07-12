@@ -85,7 +85,8 @@ start / flags) and `INSTALL.md` (flag table + step description).
 - Generating a DB password only helps **before** the volume is initialized —
   Postgres applies `POSTGRES_PASSWORD` once, on first init. Rotating it later
   breaks auth. Installers therefore generate secrets before the first `up`.
-
+- If you need to interact with Windmill MCP look for a token 
+  `WINDMILL_MCP_TOKEN` in `.env` in the root of the repo
 ---
 
 ## Windmill assets & sync conventions
