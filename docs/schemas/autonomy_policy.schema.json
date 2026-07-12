@@ -1,0 +1,46 @@
+{
+  "$defs": {
+    "AutonomyLevel": {
+      "description": "Whether an action may run unattended or needs a human approval step.",
+      "enum": [
+        "automatic",
+        "approval_required"
+      ],
+      "title": "AutonomyLevel",
+      "type": "string"
+    }
+  },
+  "description": "Per-action autonomy for one capability. See ALWAYS_APPROVAL_REQUIRED.",
+  "properties": {
+    "compose": {
+      "$ref": "#/$defs/AutonomyLevel",
+      "default": "automatic"
+    },
+    "create_candidate": {
+      "$ref": "#/$defs/AutonomyLevel",
+      "default": "automatic"
+    },
+    "discover": {
+      "$ref": "#/$defs/AutonomyLevel",
+      "default": "automatic"
+    },
+    "execute": {
+      "$ref": "#/$defs/AutonomyLevel",
+      "default": "automatic"
+    },
+    "modify_candidate": {
+      "$ref": "#/$defs/AutonomyLevel",
+      "default": "automatic"
+    },
+    "promote": {
+      "$ref": "#/$defs/AutonomyLevel",
+      "default": "approval_required"
+    },
+    "schedule": {
+      "$ref": "#/$defs/AutonomyLevel",
+      "default": "approval_required"
+    }
+  },
+  "title": "AutonomyPolicy",
+  "type": "object"
+}
