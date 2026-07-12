@@ -270,7 +270,7 @@ def make_dirs_and_fix_perms() -> None:
     caddy_d = d("CADDY_DATA_DIR", f"{home}/.caddy/data")
     caddy_c = d("CADDY_CONFIG_DIR", f"{home}/.caddy/config")
 
-    targets = [data, shared, f"{wm}/db", f"{wm}/logs", f"{wm}/cache",
+    targets = [data, f"{shared}/artifacts", f"{wm}/db", f"{wm}/logs", f"{wm}/cache",
                wm_lsp, caddy_d, caddy_c]
     for t in targets:
         Path(t).mkdir(parents=True, exist_ok=True)
