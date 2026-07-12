@@ -263,24 +263,128 @@
       ],
       "title": "CatalogueEntry",
       "type": "object"
+    },
+    "SearchQuery": {
+      "description": "What to search for. See module docstring for filter vs. score semantics.",
+      "properties": {
+        "include_deprecated": {
+          "default": false,
+          "title": "Include Deprecated",
+          "type": "boolean"
+        },
+        "kind": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CapabilityKind"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Restrict to script or flow only."
+        },
+        "max_effects": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CapabilityEffects"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Ceiling on acceptable effects \u2014 an entry with any effect True where max_effects has it False is excluded entirely, not just ranked lower."
+        },
+        "required_input_kinds": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Required Input Kinds",
+          "type": "array"
+        },
+        "required_output_kinds": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Required Output Kinds",
+          "type": "array"
+        },
+        "schema_version": {
+          "default": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "tags": {
+          "description": "Exact-match tags, scored not filtered.",
+          "items": {
+            "type": "string"
+          },
+          "title": "Tags",
+          "type": "array"
+        },
+        "task": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Free-text task description, matched by keyword overlap against each entry's summary/inputs_summary/outputs_summary/tags. Deterministic token overlap, not real semantic search \u2014 no embeddings, no LLM.",
+          "title": "Task"
+        }
+      },
+      "title": "SearchQuery",
+      "type": "object"
+    },
+    "SearchResult": {
+      "properties": {
+        "entry": {
+          "$ref": "#/$defs/CatalogueEntry"
+        },
+        "rationale": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Rationale",
+          "type": "array"
+        },
+        "score": {
+          "title": "Score",
+          "type": "number"
+        }
+      },
+      "required": [
+        "entry",
+        "score"
+      ],
+      "title": "SearchResult",
+      "type": "object"
     }
   },
-  "description": "The full capability index.",
   "properties": {
-    "entries": {
+    "query": {
+      "$ref": "#/$defs/SearchQuery"
+    },
+    "results": {
       "items": {
-        "$ref": "#/$defs/CatalogueEntry"
+        "$ref": "#/$defs/SearchResult"
       },
-      "title": "Entries",
+      "title": "Results",
       "type": "array"
     },
     "schema_version": {
       "default": "1.0",
-      "description": "Schema MAJOR.MINOR this record was written against.",
       "title": "Schema Version",
       "type": "string"
     }
   },
-  "title": "Catalogue",
+  "required": [
+    "query"
+  ],
+  "title": "SearchResponse",
   "type": "object"
 }

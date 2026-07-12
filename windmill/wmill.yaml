@@ -24,6 +24,7 @@ includes:
   - "f/libraries/**"
   - "f/hermes_flow/folder.meta.yaml"
   - "f/hermes_flow/catalogue/models.*"
+  - "f/hermes_flow/catalogue/search.*"
   - "f/data_platform/folder.meta.yaml"
   - "f/data_platform/data_platform_db.resource.yaml"
   - "f/data_platform/db_password.variable.yaml"

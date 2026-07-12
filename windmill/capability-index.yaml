@@ -23,6 +23,8 @@ entries:
       f.hermes.client also exposes chat() for single completions when
       imported directly, though only main()'s own signature is catalogued
       here.
+    input_kinds: [resource:hermes_endpoint]
+    output_kinds: [model_list]
     metadata:
       path: f/hermes/client
       capability_version: "1.0.0"
@@ -41,6 +43,8 @@ entries:
       /shared/datalake/hn_stories/<date>/ via the dlt pipeline in
       data-platform/dlt/pipelines/hn_stories.py; returns the dlt run's
       LoadInfo summary (row/table counts), not the story data itself.
+    input_kinds: []
+    output_kinds: [parquet:hn_stories, dlt_load_info]
     metadata:
       path: f/data_platform/extract_hn_stories
       capability_version: "1.0.0"
