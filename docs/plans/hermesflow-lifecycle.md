@@ -17,17 +17,25 @@ directly.
 | Language unstated (JSON Schema *or* Pydantic) | All Windmill assets are Python; `defaultTs: bun` in wmill.yaml is only the CLI default | Use **Pydantic** models as source of truth; export JSON Schema for docs/CI |
 | "existing collection database" (HF-025) | `collection_db/` Postgres + `f/collection/collection_db.resource.yaml` exist | HF-025 targets that database; migrations live under `collection_db/` |
 | Hermes ↔ lifecycle controls "via MCP" (§4 diagram) | **Already wired, undocumented**: `hermes mcp list` shows a live, enabled `windmill` MCP connection (native Streamable-HTTP, no bridge), token created 2026-06-21 — no ADR, no Makefile target, no mention anywhere in the repo | New task **HF-000B** below — document the existing wiring, prove it live, and flag it for productization |
-| "content-addressed mounted artifact filesystem" (HF-017) | No artifact volume is defined in compose | New task **HF-000A** below |
+| "content-addressed mounted artifact filesystem" (HF-017) | No new volume needed — `${SHARED_DIR}` is already mounted into Hermes and all Windmill services; just needed an `artifacts/` subdir provisioned + documented (task **HF-000A**, now done) | HF-017 builds its storage adapter directly on `${SHARED_DIR}/artifacts/`, no compose change required |
 
 ## Added tasks (gaps in the document)
 
-### HF-000A — Provision the artifact store volume
-**Phase 1.** HF-017 assumes a mounted filesystem exists. Add a named volume (or
-`data/artifacts/` bind mount, consistent with the existing `data/` layout) to
-`docker-compose.yml`, mounted into the Windmill workers, with permissions
-handled by `fix-permissions`/`install.py` the same way other data dirs are.
-*Exit:* a Windmill script can write and re-read a file under the artifact root
-across container restarts.
+### HF-000A — Provision the artifact store volume (done)
+**Phase 1.** HF-017 assumes a mounted filesystem exists. Initial framing
+called for a new named volume or `data/artifacts/` bind mount. Investigation
+found that's unnecessary: `${SHARED_DIR}` is *already* bind-mounted into
+`hermes`, `windmill_server`, `windmill_worker`, and `windmill_worker_native`
+(`docker-compose.yml`) — the same mount the data-platform pipeline already
+reuses for `${SHARED_DIR}/datalake/` (`docs/plans/datalake.md`). So this
+became provisioning a subdirectory + updating docs, not a compose change:
+`make init`/`install.py` now create `${SHARED_DIR}/artifacts/`, and the
+existing recursive `fix-permissions`/`install.py` chown step covers it with
+no separate permission logic. Recorded in
+`architecture/adr/0003-artifact-lineage-model.md`.
+*Exit (met):* a Windmill job (`POST .../jobs/run/preview`) wrote and re-read
+a file under `/shared/artifacts/`, and it survived `docker restart` of the
+worker container.
 
 ### HF-000B — Decide and wire the Hermes → Windmill invocation transport
 **Phase 1 (ADR).** The document's diagram says "MCP" but never tasks it.
@@ -76,7 +84,7 @@ See the ADR's Consequences section and
 |---|---|---|
 | HF-001 Exclusive-execution ADR | Create `architecture/adr/0001-windmill-exclusive-execution.md`; link from README | New top-level dir; also seed ADRs 0002–0004 as stubs per §11 |
 | HF-000B Transport ADR | `architecture/adr/0005-…`; prove one round trip | Blocks HF-005/006/008+ |
-| HF-000A Artifact volume | compose + permissions | Blocks HF-017 |
+| HF-000A Artifact volume (done) | `artifacts/` subdir on the existing `${SHARED_DIR}` mount + docs | Blocks HF-017 |
 | HF-002 Context & artifact schemas | Pydantic models in a shared Windmill module, e.g. `f/libraries/lineage/models.py`; schema_version field; unit tests | Importable via `from f.libraries.lineage.models import …` (same pattern as `f.hermes.client`) |
 | HF-003 Capability metadata & autonomy schema | Pydantic models + two worked examples (read-only web capability, write capability); validation tests incl. "low-risk label ≠ promote permission" | Feeds `windmill/capability-index.yaml` |
 | HF-004 Result envelope | Model + rendering guidance destined for the skill; snapshot tests for success/failure/partial | Failure rendering must always include Windmill job ref |

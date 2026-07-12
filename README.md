@@ -837,7 +837,7 @@ equivalent Baserow flow).
 | Variable | Default | Notes |
 |---|---|---|
 | `DATA_DIR` | `${HOME}/.hermes` | Mounted to Hermes `/opt/data` (config, sessions, keys) |
-| `SHARED_DIR` | `${HOME}/.shared_agent_data` | Cross-app `/shared` drop folder |
+| `SHARED_DIR` | `${HOME}/.shared_agent_data` | Cross-app `/shared` drop folder — mounted into Hermes and all Windmill services; `artifacts/` is the content-addressed artifact store root ([HF-017](https://github.com/ryancollingwood/HermesFlow/issues/55)), `datalake/` is the data-platform raw layer ([docs/plans/datalake.md](docs/plans/datalake.md)) |
 | `WM_DATA_DIR` | `${HOME}/.windmill` | Postgres + Windmill logs/cache |
 | `HERMES_BIND` | `127.0.0.1` | Set `0.0.0.0` for LAN access to Hermes ports |
 | `HERMES_DASHBOARD` | `1` | Enable the built-in dashboard (port 9119) |

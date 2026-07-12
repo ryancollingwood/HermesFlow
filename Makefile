@@ -67,7 +67,7 @@ init: ## Create .env from the example and make the data directories
 	@set -a; . ./$(ENV_FILE); set +a; \
 	  DOCKER_HOME="$(DOCKER_HOME)"; \
 	  mkdir -p "$${DATA_DIR:-$$DOCKER_HOME/.hermes}" \
-	           "$${SHARED_DIR:-$$DOCKER_HOME/.shared_agent_data}" \
+	           "$${SHARED_DIR:-$$DOCKER_HOME/.shared_agent_data}/artifacts" \
 	           "$${WM_DATA_DIR:-$$DOCKER_HOME/.windmill}"/{db,logs,cache} \
 	           "$${WM_LSP_CACHE_DIR:-$$DOCKER_HOME/.windmill/lsp_cache}" \
 	           "$${CADDY_DATA_DIR:-$$DOCKER_HOME/.caddy/data}" \
