@@ -177,3 +177,62 @@ This is **load-bearing** — the protection above only holds if scripts follow i
 1. **Authoring in the UI?** → `make windmill-pull`, review `git diff`, commit.
 2. **Authoring in the repo?** → `make windmill-check` first, then `make windmill-push`.
 3. **Unsure?** → `make windmill-check` before either direction.
+
+## Windmill MCP registration (`make windmill-mcp`)
+
+Separate from asset sync above: this is how **Hermes reaches Windmill at
+runtime** as a tool provider, not how `windmill/` assets get versioned.
+Windmill ships a native Streamable-HTTP/SSE MCP server
+(`/api/mcp/w/main/sse`, ~38 `x-mcp-tool` operations); see
+[`architecture/adr/0005-hermes-windmill-transport.md`](../architecture/adr/0005-hermes-windmill-transport.md)
+for why that transport was chosen over a bespoke HTTP tool.
+
+`make windmill-mcp` productizes what used to be undocumented, hand-run
+plumbing:
+
+1. **Idempotency guard first.** If Hermes already has a `windmill` MCP entry
+   registered *and* `hermes mcp test windmill` succeeds, the target leaves it
+   completely alone and exits — it never silently swaps out a working
+   connection's token or re-registers over it. (To rotate an existing
+   connection onto the narrower token this target mints, remove it yourself
+   first: `docker exec hermes hermes mcp remove windmill`, then re-run.)
+2. **Token: reuse, then mint.** If `WM_MCP_TOKEN` is already set in `.env`
+   and still authenticates, it's reused as-is. Otherwise the target logs in
+   as the default Windmill admin (`admin@windmill.dev` / `changeme` — same
+   pattern as `windmill-push`/`-pull`/`-check`) and mints a new token via
+   `/api/users/tokens/create`, scoped to:
+   `mcp:all`, `scripts:read`, `flows:read`, `jobs:read`, `jobs:run:scripts`,
+   `jobs:run:flows`. The token is persisted to `.env` as `WM_MCP_TOKEN`
+   (newline-safe, same `envput` pattern as `baserow-mcp`).
+
+   `mcp:all` looks broad but isn't optional: Windmill gates the MCP
+   endpoint itself (`/api/mcp/w/main/sse`) behind a separate `mcp:*`
+   scope family (`mcp:all`, `mcp:favorites`, `mcp:scripts`, `mcp:flows`, …)
+   independent of the per-operation REST scopes — a token with only
+   `scripts:read`/`jobs:run:scripts`/etc. and no `mcp:*` scope gets a flat
+   `403 Permission denied: Access denied. Required scope: mcp:*` before it
+   ever reaches a single tool. Narrower `mcp:` values were tried
+   (`mcp:scripts` + `mcp:flows`) and connect but currently report **zero**
+   tools, so `mcp:all` is the only value observed to actually expose the
+   tool set. This does *not* widen what the token can do, though: `mcp:all`
+   only unlocks *visibility* into all ~38–43 MCP tools (including
+   write-shaped ones like `createScript`/`createVariable`/`deleteFlowByPath`)
+   — invoking one still hits Windmill's normal per-operation REST
+   authorization underneath, which the token's other scopes gate as usual.
+   Verified directly: with this exact scope set, `POST
+   /api/w/main/scripts/create` and `POST /api/w/main/variables/create`
+   both return `403` (no `scripts:write`/`variables:write`), while `GET
+   /api/w/main/scripts/list` returns `200` (has `scripts:read`). So Hermes
+   can *see* write tools in its tool list but any call to one fails closed
+   — net effect matches the "Hermes never mutates active code" boundary in
+   [`architecture/adr/0001-windmill-exclusive-execution.md`](../architecture/adr/0001-windmill-exclusive-execution.md),
+   just enforced at call-time rather than by hiding the tool.
+3. **Register with Hermes and verify.** Registers via
+   `hermes mcp add windmill --url http://windmill_server:8000/api/mcp/w/main/sse --auth header`
+   (the CLI prompts interactively for the token rather than taking it as a
+   flag — the target pipes the y/token/y sequence over stdin), then confirms
+   with `hermes mcp test windmill`.
+
+Re-running `make windmill-mcp` on a host that already has a healthy
+connection is a no-op (step 1); on a fresh install it mints and wires up a
+narrowly-scoped token end to end.

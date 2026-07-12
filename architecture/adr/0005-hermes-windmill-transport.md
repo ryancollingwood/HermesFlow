@@ -101,15 +101,37 @@ capability work.
   direct Windmill job-run REST calls (as `windmill-push`/`windmill-pull`
   already do for admin auth) rather than through the MCP tool, or design
   their signatures to avoid resource-typed args entirely.
-- **This wiring is currently undocumented, unscoped runtime state** — no
-  Makefile target creates it, so a fresh install of this repo would not
-  reproduce it, and the existing token (`mcp:all`, no workspace restriction)
-  is broader than the "bounded read-only automatic, promote/schedule
-  approval-required" autonomy model this platform is building toward. A
-  follow-up task should productize this into an idempotent
-  `make windmill-mcp` target (matching the `baserow-mcp` pattern: mint or
-  reuse a scoped token via Windmill's REST API, persist it, register with
-  Hermes, verify) with the narrowest scope the exemplar workflow needs.
+- **Done: this wiring is now productized.** `make windmill-mcp`
+  (see [`docs/windmill-sync.md#windmill-mcp-registration`](../../docs/windmill-sync.md#windmill-mcp-registration))
+  mints or reuses a token scoped to `mcp:all`, `scripts:read`, `flows:read`,
+  `jobs:read`, `jobs:run:scripts`, `jobs:run:flows` via Windmill's
+  `/api/users/tokens/create`, persists it to `.env` as `WM_MCP_TOKEN`,
+  registers it with Hermes, and verifies the connection — matching the
+  `baserow-mcp` pattern, so a fresh install now reproduces this transport
+  instead of depending on undocumented runtime state. It is idempotent and
+  non-destructive: if a `windmill` MCP connection is already registered and
+  healthy (as the pre-existing `mcp:all`/`mcp:favorites`-scoped tokens on
+  this host are), the target leaves it alone rather than silently replacing
+  it — rotating an existing connection onto the token this target mints is a
+  deliberate, separate step (`docker exec hermes hermes mcp remove windmill`
+  then re-run).
+
+  **Scope-model correction found while building this:** the `mcp:all`
+  scope in `hermes-mcp`'s original token (§Context above) is not, as first
+  assumed, a broad "grant everything" scope — Windmill's MCP endpoint
+  requires *some* `mcp:*`-family scope just to be reachable at all (verified:
+  a token with only REST scopes like `scripts:read` gets `403 Required
+  scope: mcp:*` before any tool runs), independently of the granular REST
+  scopes that actually gate what each tool call is allowed to do.
+  `mcp:scripts`/`mcp:flows` were tried as a narrower alternative but connect
+  while reporting zero tools, so `mcp:all` remains the only value that
+  exposes the tool set. The narrowing this ADR called for is real, just
+  enforced one layer down: with `mcp:all` + the five granular scopes above
+  (no `*:write`), Hermes can see all ~38–43 MCP tools including
+  write-shaped ones, but a direct test of the underlying REST calls confirms
+  `scripts/create` and `variables/create` both `403` while `scripts/list`
+  `200`s — writes fail closed at call time rather than being hidden from
+  the tool list.
 - `-t <toolset>` on `hermes chat`/`hermes -z` (scoping a session to a named
   MCP server's tools) is confirmed to work and is the mechanism
   [HF-006](https://github.com/ryancollingwood/HermesFlow/issues/44) (audit
