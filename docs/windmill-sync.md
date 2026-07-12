@@ -42,7 +42,7 @@ by folder boundaries. It is deliberately narrow:
 | `f/collection/**` | collection_db Postgres resource + Baserow webhook receiver | ✅ yes | ✅ yes |
 | `f/libraries/**` | shared, importable Pydantic-model modules (`f.libraries.lineage.models`, `f.libraries.capability.models`, `f.libraries.results.models`, …) | ✅ yes | ✅ yes |
 | `f/data_platform/{folder.meta,data_platform_db.resource,db_password.variable,dbt_run.*,extract_hn_stories.*}` | dlt/dbt pipeline scripts + their resource/secret | ✅ yes | ✅ yes (named explicitly, not wildcarded) |
-| `f/hermes_flow/{folder.meta.yaml,catalogue/models.*,catalogue/search.*}` (+ future policy files as HF-010 lands, named explicitly) | HermesFlow's own control-plane: capability catalogue (HF-008, done), search/ranking (HF-009, done), policy evaluator (HF-010) | ✅ yes | ✅ yes (named explicitly, not wildcarded — see below) |
+| `f/hermes_flow/{folder.meta.yaml,catalogue/models.*,catalogue/search.*,policies/evaluator.*}` | HermesFlow's own control-plane: capability catalogue (HF-008), search/ranking (HF-009), policy evaluator (HF-010) — all done | ✅ yes | ✅ yes (named explicitly, not wildcarded — see below) |
 | `capability-index.yaml` (top level, not under `f/`) | the version-controlled capability index itself, validated/loaded by `f/hermes_flow/catalogue/models.py` | ✅ yes | ❌ no — repo-only, like `wmill.yaml` itself; not a Windmill script/flow/resource asset, so there's nothing for `wmill sync` to push. Read directly from the checked-out repo by CI and by whatever eventually calls `load_catalogue()` |
 | `hermes_endpoint` resource-type | the shared endpoint type | ✅ yes | ✅ yes |
 | `f/hermes_state/**` | **runtime state** (timestamps, cursors, non-secret vars) | ❌ no | ❌ **no** |
@@ -75,8 +75,8 @@ Two settings enforce this:
     `includes` explicitly; see
     [`docs/data-platform-add-pipeline.md`](data-platform-add-pipeline.md).
   - `f/hermes_flow/` (currently `f/hermes_flow/folder.meta.yaml`,
-    `f/hermes_flow/catalogue/models.*`, and `f/hermes_flow/catalogue/search.*`)
-    has a harder requirement:
+    `f/hermes_flow/catalogue/models.*`, `f/hermes_flow/catalogue/search.*`,
+    and `f/hermes_flow/policies/evaluator.*`) has a harder requirement:
     `f/hermes_flow/candidates/` (HF-011's candidate namespace — proposed
     capabilities awaiting promotion, deliberately Windmill-only) shares
     that same root. A `f/hermes_flow/**` wildcard would sweep candidates
@@ -85,9 +85,9 @@ Two settings enforce this:
     between "candidate" and "active" if both landed in version control
     identically. `excludes: ["f/hermes_flow/candidates/**"]` backs this up
     defensively, but the real protection is that `includes` never lists
-    anything under `candidates/` in the first place. As HF-010 adds real
-    policy files under `f/hermes_flow/`, add each one to `includes` by
-    name — never widen this entry to a wildcard.
+    anything under `candidates/` in the first place. As HF-011 adds
+    candidate-lifecycle scripts under `f/hermes_flow/`, add each one to
+    `includes` by name — never widen this entry to a wildcard.
 - **`skipSecrets: true`** — secret variables are invisible to sync in both
   directions. Pull writes a placeholder, never the real value.
 
