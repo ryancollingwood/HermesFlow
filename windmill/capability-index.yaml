@@ -184,3 +184,30 @@ entries:
       dependencies: [f/capabilities/collection/extract_products]
       test_requirements: [contracts/product-normalization-result]
       effects: {}
+
+  - kind: script
+    tags: [product, snapshot, persistence, postgres, idempotent]
+    inputs_summary: >-
+      A validated HF-024 ProductNormalizationResult, an HF-018 execution
+      context, the collection_db PostgreSQL resource, and an optional preview flag.
+    outputs_summary: >-
+      Per-product planned/inserted/updated/unchanged dispositions and stable payload hashes,
+      with execution trace and source artifact identifiers; preview performs no writes.
+    input_kinds: [normalized_products, execution_context, resource:postgresql]
+    output_kinds: [product_snapshot_write_result]
+    metadata:
+      path: f/capabilities/collection/product_snapshot_write
+      capability_version: "1.0.0"
+      summary: Transactionally upsert normalized product snapshots using execution/source/product idempotency keys.
+      maturity: experimental
+      deterministic: false
+      owners: [platform]
+      dependencies:
+        - f/capabilities/collection/normalise_products
+        - f/libraries/lineage/models
+      test_requirements: [contracts/product-snapshot-write-result]
+      limits:
+        timeout_seconds: 60
+        max_concurrency: 4
+      effects:
+        database: true

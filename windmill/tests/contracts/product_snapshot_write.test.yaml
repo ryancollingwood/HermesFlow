@@ -1,0 +1,10 @@
+schema_version: "1.0"
+tests:
+  - id: contracts/product-snapshot-write-result
+    capability_paths: [f/capabilities/collection/product_snapshot_write]
+    type: contract
+    mode: promotion_gating
+    script_path: f/capabilities/collection/product_snapshot_write
+    timeout_seconds: 60
+    max_data_bytes: 2097152
+    skip_reason: Output schema contract is validated directly by test_product_snapshot_write.py.

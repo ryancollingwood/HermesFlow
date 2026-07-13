@@ -1,0 +1,130 @@
+{
+  "$defs": {
+    "SnapshotDisposition": {
+      "enum": [
+        "planned",
+        "inserted",
+        "updated",
+        "unchanged"
+      ],
+      "title": "SnapshotDisposition",
+      "type": "string"
+    },
+    "SnapshotWriteRecord": {
+      "additionalProperties": false,
+      "properties": {
+        "disposition": {
+          "$ref": "#/$defs/SnapshotDisposition"
+        },
+        "normalized_product_id": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Normalized Product Id",
+          "type": "string"
+        },
+        "payload_hash": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Payload Hash",
+          "type": "string"
+        },
+        "snapshot_id": {
+          "anyOf": [
+            {
+              "minimum": 1,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Snapshot Id"
+        },
+        "source_product_id": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Source Product Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "normalized_product_id",
+        "source_product_id",
+        "payload_hash",
+        "disposition"
+      ],
+      "title": "SnapshotWriteRecord",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "execution_trace_id": {
+      "format": "uuid",
+      "title": "Execution Trace Id",
+      "type": "string"
+    },
+    "inserted_count": {
+      "minimum": 0,
+      "title": "Inserted Count",
+      "type": "integer"
+    },
+    "planned_count": {
+      "minimum": 0,
+      "title": "Planned Count",
+      "type": "integer"
+    },
+    "preview": {
+      "title": "Preview",
+      "type": "boolean"
+    },
+    "records": {
+      "items": {
+        "$ref": "#/$defs/SnapshotWriteRecord"
+      },
+      "title": "Records",
+      "type": "array"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_artifact_id": {
+      "format": "uuid",
+      "title": "Source Artifact Id",
+      "type": "string"
+    },
+    "source_trace_id": {
+      "format": "uuid",
+      "title": "Source Trace Id",
+      "type": "string"
+    },
+    "status": {
+      "title": "Status",
+      "type": "string"
+    },
+    "unchanged_count": {
+      "minimum": 0,
+      "title": "Unchanged Count",
+      "type": "integer"
+    },
+    "updated_count": {
+      "minimum": 0,
+      "title": "Updated Count",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "status",
+    "preview",
+    "execution_trace_id",
+    "source_trace_id",
+    "source_artifact_id",
+    "planned_count",
+    "inserted_count",
+    "updated_count",
+    "unchanged_count",
+    "records"
+  ],
+  "title": "ProductSnapshotWriteResult",
+  "type": "object"
+}
