@@ -2,7 +2,8 @@
 # wmill CLI sync config. Run `wmill` commands from this `windmill/` directory.
 defaultTs: bun
 # Sync scope is deliberately narrow — only the versioned Hermes + collection
-# + data_platform + libraries + hermes_flow + capabilities code lives here. `f/hermes/**`,
+# + data_platform + libraries + hermes_flow + capabilities + explicitly named workflow code
+# lives here. `f/hermes/**`,
 # `f/collection/**`, `f/libraries/**`, and `f/capabilities/**` are tracked code/config wholesale
 # (they hold only versioned code, no runtime-state subfolder). `f/data_platform/**`
 # and `f/hermes_flow/**` are instead enumerated item-by-item below — for
@@ -16,8 +17,7 @@ defaultTs: bun
 # lives at the sibling path `f/hermes_flow/candidate_ops/` specifically so
 # its own code (which must be synced) never collides with the excluded
 # `f/hermes_flow/candidates/` data namespace it manages. Everything else
-# (f/hermes_state, f/workflows/ — a reserved namespace with no content yet,
-# see docs/windmill-sync.md — any other f/ folder, all
+# (f/hermes_state, unenumerated f/workflows/ items, any other f/ folder, all
 # u/ namespaces, and the ~250 inherited resource-types) is intentionally
 # OUT of scope so a mirror push can never delete it. See
 # docs/windmill-sync.md for the full scenario breakdown.
@@ -46,6 +46,8 @@ includes:
   - "f/data_platform/db_password.variable.yaml"
   - "f/data_platform/dbt_run.*"
   - "f/data_platform/extract_hn_stories.*"
+  - "f/workflows/folder.meta.yaml"
+  - "f/workflows/product_collection.flow/**"
   - "hermes_endpoint.resource-type.yaml"
 # Defense-in-depth, not load-bearing today (candidates/ isn't in includes
 # above so it's already out of scope): if a future edit ever widens

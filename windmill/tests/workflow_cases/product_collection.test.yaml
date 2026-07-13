@@ -1,0 +1,33 @@
+schema_version: "1.0"
+tests:
+  - id: smoke/product-collection-fixtures
+    capability_paths: [f/workflows/product_collection]
+    type: smoke
+    mode: promotion_gating
+    script_path: f/workflows/product_collection
+    asset_kind: flow
+    timeout_seconds: 120
+    max_data_bytes: 8388608
+    skip_reason: Three-source fixture E2E, partial failure, total failure, and safe retry run in test_product_collection_workflow.py against disposable PostgreSQL.
+  - id: live/product-collection-approved
+    capability_paths: [f/workflows/product_collection]
+    type: live_integration
+    mode: scheduled
+    script_path: f/workflows/product_collection
+    asset_kind: flow
+    timeout_seconds: 30
+    max_data_bytes: 1048576
+    args:
+      sources:
+        - source_id: example-approved
+          label: Approved example site
+          url: https://example.com/
+          allowed_domains: [example.com]
+      db: "$res:f/collection/collection_db"
+      enable_ai_fallback: false
+      max_concurrency: 1
+      timeout_seconds: 10
+      max_size_bytes: 1048576
+      max_retries: 1
+      max_products_per_source: 10
+    skip_reason: Enable explicitly only in an environment approving outbound example.com access and disposable collection snapshots.

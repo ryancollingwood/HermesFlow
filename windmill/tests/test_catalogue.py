@@ -249,9 +249,15 @@ def test_real_capability_index_every_path_exists_under_windmill_f():
     missing = [
         entry.metadata.path
         for entry in catalogue.entries
-        if not (WINDMILL_ROOT / f"{entry.metadata.path}.py").exists()
+        if not (
+            (WINDMILL_ROOT / f"{entry.metadata.path}.py").exists()
+            or (WINDMILL_ROOT / f"{entry.metadata.path}.flow" / "flow.yaml").exists()
+        )
     ]
-    assert not missing, f"catalogue entries reference paths with no matching .py file: {missing}"
+    assert not missing, (
+        "catalogue entries reference paths with no matching .py or .flow/flow.yaml "
+        f"asset: {missing}"
+    )
 
 
 def test_real_capability_index_no_duplicate_paths():

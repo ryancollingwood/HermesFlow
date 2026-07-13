@@ -1,0 +1,128 @@
+summary: Collect, persist, compare, and report products from bounded sources
+description: HF-027 end-to-end deterministic-first product collection with
+  explicit AI fallback, isolated source failures, retained artifacts, snapshot
+  persistence, comparison, and a Windmill-backed result envelope.
+value:
+  modules:
+    - id: run_product_collection
+      summary: Run bounded product collection inside the Windmill worker
+      value:
+        type: rawscript
+        content: '!inline run_product_collection.inline_script.py'
+        input_transforms:
+          db:
+            type: javascript
+            expr: flow_input.db
+          enable_ai_fallback:
+            type: javascript
+            expr: flow_input.enable_ai_fallback
+          hermes_conn:
+            type: javascript
+            expr: flow_input.hermes_conn
+          max_concurrency:
+            type: javascript
+            expr: flow_input.max_concurrency
+          max_products_per_source:
+            type: javascript
+            expr: flow_input.max_products_per_source
+          max_retries:
+            type: javascript
+            expr: flow_input.max_retries
+          max_size_bytes:
+            type: javascript
+            expr: flow_input.max_size_bytes
+          sources:
+            type: javascript
+            expr: flow_input.sources
+          timeout_seconds:
+            type: javascript
+            expr: flow_input.timeout_seconds
+        lock: '!inline run_product_collection.inline_script.lock'
+        is_trigger: false
+        language: python3
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    db:
+      type: object
+      format: resource-postgresql
+    enable_ai_fallback:
+      type: boolean
+      default: false
+    hermes_conn:
+      type: object
+      default: {}
+      format: resource-hermes_endpoint
+    max_concurrency:
+      type: integer
+      default: 4
+      maximum: 8
+      minimum: 1
+    max_products_per_source:
+      type: integer
+      default: 100
+      maximum: 1000
+      minimum: 1
+    max_retries:
+      type: integer
+      default: 2
+      maximum: 10
+      minimum: 0
+    max_size_bytes:
+      type: integer
+      default: 5000000
+      maximum: 100000000
+      minimum: 1
+    sources:
+      type: array
+      items:
+        type: object
+        additionalProperties: false
+        properties:
+          allowed_domains:
+            type: array
+            items:
+              type: string
+            maxItems: 20
+            minItems: 1
+          enable_ai_fallback:
+            type:
+              - boolean
+              - 'null'
+            default: null
+          headers:
+            type: object
+            additionalProperties:
+              type: string
+            default: {}
+          label:
+            type: string
+            maxLength: 200
+            minLength: 1
+          source_id:
+            type: string
+            maxLength: 100
+            minLength: 1
+          source_type:
+            type:
+              - string
+              - 'null'
+          url:
+            type: string
+            minLength: 1
+        required:
+          - source_id
+          - label
+          - url
+          - allowed_domains
+      maxItems: 20
+      minItems: 1
+    timeout_seconds:
+      type: number
+      default: 30
+      exclusiveMinimum: 0
+      maximum: 300
+  required:
+    - sources
+    - db
