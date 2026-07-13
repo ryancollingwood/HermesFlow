@@ -51,11 +51,39 @@
       "title": "Derived From",
       "type": "array"
     },
+    "media_type": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "IANA media type of the stored content. HF-017 adapters always populate it; optional for backward compatibility with pre-HF-017 references.",
+      "title": "Media Type"
+    },
     "schema_version": {
       "default": "1.0",
       "description": "Schema MAJOR.MINOR this record was written against.",
       "title": "Schema Version",
       "type": "string"
+    },
+    "size_bytes": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Artifact content size in bytes. HF-017 storage adapters always populate it; optional for backward compatibility with pre-HF-017 references.",
+      "title": "Size Bytes"
     },
     "stage": {
       "$ref": "#/$defs/ArtifactStage",

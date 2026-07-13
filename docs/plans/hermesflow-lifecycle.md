@@ -109,7 +109,7 @@ See the ADR's Consequences section and
 | Task | Work in this repo | Notes |
 |---|---|---|
 | HF-015 Test conventions & runner (done) | `windmill/tests/{fixtures,contracts,workflow_cases}/` manifests + `f/hermes_flow/testing/runner.py`; metadata IDs resolve to typed tests; bounded Windmill execution returns pass/fail/skip evidence | Promotion-gating and scheduled modes are distinct; example manifests plus 8 discovery/execution/bounds tests |
-| HF-017 Artifact adapter | Content-addressed store over the HF-000A mount; SHA-256; traversal-safe paths | `f/libraries/storage/` |
+| HF-017 Artifact adapter (done) | `f/libraries/storage/artifacts.py`: SHA-256 content-addressed objects over the HF-000A mount, separate lineage-event metadata, bounded atomic writes, integrity-checked reads, traversal/symlink defence | `ArtifactRef` additively records size/media type; 14 unit/load/persistence tests |
 | HF-018 Lineage helpers | Context propagation + derivation links through flow steps | `f/libraries/lineage/` |
 | HF-019 Hermes structured-invocation wrapper | Extend `f/hermes/client.py` pattern: new `f/libraries/ai/invoke_hermes_structured` capability — schema-validated output, prompt/conversation/raw-response artifacts, model metadata, retries; marked nondeterministic | Reuses `hermes_endpoint` resource; verify secrets never land in retained artifacts |
 | HF-021 Web fetch capability | `f/capabilities/collection/` or `f/libraries/web/`; allowed-domain policy, size/timeout bounds, raw artifact retention | SSRF tests: disallowed domains, local-network addresses — matters because Windmill workers sit on the internal Docker networks |
