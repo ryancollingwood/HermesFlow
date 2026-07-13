@@ -23,6 +23,11 @@ class TestMode(str, Enum):
     scheduled = "scheduled"
 
 
+class ExecutionAssetKind(str, Enum):
+    script = "script"
+    flow = "flow"
+
+
 class TestStatus(str, Enum):
     passed = "passed"
     failed = "failed"
@@ -35,6 +40,7 @@ class TestSpec(BaseModel):
     type: TestType
     mode: TestMode
     script_path: str = Field(..., min_length=1)
+    asset_kind: ExecutionAssetKind = ExecutionAssetKind.script
     args: dict[str, Any] = Field(default_factory=dict)
     timeout_seconds: int = Field(default=60, ge=1, le=3600)
     max_data_bytes: int = Field(default=1_000_000, ge=1, le=100_000_000)
@@ -84,7 +90,10 @@ class WindmillTestExecutor:
         self.client = client or wmill.Windmill()
 
     def run(self, spec: TestSpec) -> tuple[str, Any]:
-        job_id = self.client.run_script_by_path_async(spec.script_path, args=spec.args)
+        if spec.asset_kind is ExecutionAssetKind.flow:
+            job_id = self.client.run_flow_async(spec.script_path, args=spec.args)
+        else:
+            job_id = self.client.run_script_by_path_async(spec.script_path, args=spec.args)
         try:
             result = self.client.wait_job(job_id, timeout=spec.timeout_seconds, cleanup=False)
         except TimeoutError:

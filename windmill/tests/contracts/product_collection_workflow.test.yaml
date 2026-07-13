@@ -1,0 +1,11 @@
+schema_version: "1.0"
+tests:
+  - id: contracts/product-collection-workflow-result
+    capability_paths: [f/workflows/product_collection]
+    type: contract
+    mode: promotion_gating
+    script_path: f/workflows/product_collection
+    asset_kind: flow
+    timeout_seconds: 120
+    max_data_bytes: 8388608
+    skip_reason: Output schema, flow metadata, and result envelope are validated directly by test_product_collection_workflow.py.

@@ -44,13 +44,13 @@ by folder boundaries. It is deliberately narrow:
 | `f/capabilities/**` | versioned active capabilities, beginning with HF-021's policy-bounded web fetch | ✅ yes | ✅ yes |
 | `f/data_platform/{folder.meta,data_platform_db.resource,db_password.variable,dbt_run.*,extract_hn_stories.*}` | dlt/dbt pipeline scripts + their resource/secret | ✅ yes | ✅ yes (named explicitly, not wildcarded) |
 | `f/hermes_flow/{folder.meta.yaml,catalogue/models.*,catalogue/search.*,policies/evaluator.*,candidate_ops/models.*,candidate_ops/create.*,candidate_ops/diff.*,candidate_ops/promote.*,candidate_ops/prepare_promotion.*,candidate_ops/promotion.flow/**,candidate_ops/lifecycle.*,testing/runner.*,testing/example_test.*,testing/regression.*,testing/scheduled_health.*}` | HermesFlow's own control-plane: capability catalogue/search/policy (HF-008–010), candidate lifecycle (HF-011–014), and testing/regression/health scheduling (HF-015–016, HF-020) | ✅ yes | ✅ yes (named explicitly, not wildcarded — see below) |
+| `f/workflows/{folder.meta.yaml,product_collection.flow/**}` | composed, versioned workflows beginning with HF-027's bounded product collection flow | ✅ yes | ✅ yes (named explicitly, not wildcarded) |
 | `capability-index.yaml` (top level, not under `f/`) | the version-controlled capability index itself, validated/loaded by `f/hermes_flow/catalogue/models.py` | ✅ yes | ❌ no — repo-only, like `wmill.yaml` itself; not a Windmill script/flow/resource asset, so there's nothing for `wmill sync` to push. Read directly from the checked-out repo by CI and by whatever eventually calls `load_catalogue()` |
 | `hermes_endpoint` resource-type | the shared endpoint type | ✅ yes | ✅ yes |
 | `f/hermes_state/**` | **runtime state** (timestamps, cursors, non-secret vars) | ❌ no | ❌ **no** |
 | `f/hermes_flow_state/**` | **lifecycle runtime state** (deprecation, rollback, and scheduled-health records) | ❌ no | ❌ **no** |
 | **`f/hermes_flow/candidates/**`** | **candidate capabilities** (HF-011) — proposed, not-yet-promoted code | ❌ no | ❌ **no**, explicitly excluded (see below) |
-| any other item dropped into `f/data_platform/` or `f/hermes_flow/` not named above | unenumerated pipeline/catalogue assets | n/a | ❌ **no** |
-| `f/workflows/**` | **reserved namespace, no content yet** — composed flows begin at HF-027 | ❌ no | ❌ no *(added to `includes` wholesale when it gains real content — see "Adding a new tracked Windmill folder" in `AGENTS.md`)* |
+| any other item dropped into `f/data_platform/`, `f/hermes_flow/`, or `f/workflows/` not named above | unenumerated pipeline/catalogue/workflow assets | n/a | ❌ **no** |
 | any other `f/*` folder | unrelated projects | ❌ no | ❌ no |
 | all `u/*` (incl. a future `u/hermes`) | user namespaces | ❌ no | ❌ no |
 | inherited resource-types (the ~250 from `admins`, incl. the built-in `postgresql` type used by `f/collection/collection_db`) | Windmill built-ins | ❌ no | ❌ no |
@@ -65,7 +65,7 @@ Two settings enforce this:
   no runtime-state or candidate subfolder living alongside it, so a wildcard
   is safe.
 
-  `f/data_platform/` and `f/hermes_flow/` are different: their entries name
+  `f/data_platform/`, `f/hermes_flow/`, and `f/workflows/` are different: their entries name
   each file/pattern explicitly instead of a `**` wildcard, for two distinct
   reasons —
   - `f/data_platform/` (`f/data_platform/dbt_run.*`, `f/data_platform/extract_hn_stories.*`,
@@ -97,6 +97,10 @@ Two settings enforce this:
     syncable without colliding with the excluded data it manages. Add each
     new script here to `includes` by name — never widen this entry to a
     wildcard.
+  - `f/workflows/` is likewise enumerated. HF-027 adds only the folder metadata
+    and `product_collection.flow/**`; future composed workflows must add their
+    own specific flow path and documentation instead of silently widening the
+    mirror blast radius.
 - **`skipSecrets: true`** — secret variables are invisible to sync in both
   directions. Pull writes a placeholder, never the real value.
 
@@ -113,12 +117,13 @@ The repo is the source of truth; the server is made to match it, **within scope*
 | `f/data_platform/` or `f/hermes_flow/` item **named in `includes`**, in repo, **not** on server | **created** on server |
 | `f/data_platform/` or `f/hermes_flow/` item **named in `includes`**, on server, **not** in repo | **removed** (archived/hard-deleted per type) — dry-run guard applies, same as above |
 | `f/data_platform/` or `f/hermes_flow/` item **not named in `includes`** (server or local) | **untouched** — out of scope regardless of which side it's on |
+| `f/workflows/` item **named in `includes`** | created / overwritten / removed to mirror the repo; the dry-run deletion guard applies |
+| `f/workflows/` item **not named in `includes`** | **untouched** — out of scope |
 | **`f/hermes_flow/candidates/**`** (any candidate, server or local) | **untouched** — never in `includes`, additionally blocked by `excludes` |
 | `folder.meta.yaml` (any tracked folder) | tracked → pushed (folder perms preserved); untracked → deleted |
 | `hermes_endpoint` resource-type | created / overwritten |
 | `f/collection/collection_db` (uses the inherited `postgresql` type) | created / overwritten — no resource-type push needed |
 | **`f/hermes_state/**`** | **untouched** — out of scope |
-| `f/workflows/**` | **untouched** — reserved, not yet in `includes` |
 | any other `f/*` folder | **untouched** — out of scope |
 | `u/*` | **untouched** |
 | inherited resource-types | **untouched** |
@@ -138,10 +143,11 @@ because git is the safety net — review `git diff` before committing.
 | `f/data_platform/` or `f/hermes_flow/` item **named in `includes`**, on server, **not** in repo | **written** into `windmill/f/data_platform/` or `windmill/f/hermes_flow/` |
 | `f/data_platform/` or `f/hermes_flow/` item **named in `includes`**, in repo, **not** on server | **deleted** from working tree (`git checkout` restores) |
 | `f/data_platform/` or `f/hermes_flow/` item **not named in `includes`** (e.g. a script added on the server) | **not pulled** — stays server-only, never enters git, until you add it to `includes` |
+| `f/workflows/` item **named in `includes`** | written / overwritten / deleted locally to mirror the server |
+| `f/workflows/` item **not named in `includes`** | **not pulled** — stays out of the repo |
 | **any `f/hermes_flow/candidates/**` item** (e.g. HF-011 creating a candidate directly on the server) | **not pulled** — stays server-only, never enters git, by design, not by omission — this is the entire point of the exclusion; verified live: a script created at `f/hermes_flow/candidates/hf007_probe` directly via the Windmill API never appeared under `windmill/f/hermes_flow/` after a real `wmill sync pull` |
 | `hermes_endpoint` resource-type | written into `windmill/` |
 | **`f/hermes_state/**`** | **not pulled** — stays server-only, never enters git |
-| `f/workflows/**` | **not pulled** — reserved, not yet in `includes` |
 | other `f/*`, `u/*`, inherited RTs | **not pulled** |
 | secret variables under `f/hermes`, `f/collection`, `f/libraries`, `f/capabilities`, `f/data_platform`, or `f/hermes_flow` | **placeholder** only (real value never written) |
 
@@ -151,8 +157,8 @@ Non-destructive. Requires a clean `windmill/` tree, pulls into it, diffs against
 git, prints any drift, then reverts the pull. Exit code is non-zero on drift, so
 it works as a pre-push or scheduled guard. Because it is scoped to `f/hermes/**`,
 `f/collection/**`, `f/libraries/**`, `f/capabilities/**`, and the enumerated `f/data_platform/`/
-`f/hermes_flow/` items, `f/hermes_state`, `f/hermes_flow/candidates/`,
-unenumerated `f/data_platform/`/`f/hermes_flow/` items, and other folders
+`f/hermes_flow/`/`f/workflows/` items, `f/hermes_state`, `f/hermes_flow/candidates/`,
+unenumerated `f/data_platform/`/`f/hermes_flow/`/`f/workflows/` items, and other folders
 **never show as drift** — their divergence is intentional, not drift.
 Verified live for the candidate case specifically: a script created directly
 on the server at `f/hermes_flow/candidates/hf007_probe` did not appear as
@@ -212,7 +218,7 @@ This is **load-bearing** — the protection above only holds if scripts follow i
 - **Non-secret runtime state** (last-run timestamps, cursors, sync markers) →
   under a sibling `<folder>_state/` folder (e.g. `f/hermes_state/karakeep_last_run`).
   Never put it inside a tracked folder (`f/hermes/`, `f/collection/`,
-  `f/libraries/`, `f/capabilities/`, or the enumerated `f/data_platform/`/`f/hermes_flow/`
+  `f/libraries/`, `f/capabilities/`, or the enumerated `f/data_platform/`/`f/hermes_flow/`/`f/workflows/`
   items) — there it is treated as tracked config and a mirror push will
   delete it.
 - **Proposed-but-not-yet-promoted capability code** → `f/hermes_flow/candidates/`
@@ -222,7 +228,7 @@ This is **load-bearing** — the protection above only holds if scripts follow i
   landing it in git the moment it's created would erase the distinction
   between "proposed" and "active."
 - **Code/config that must be versioned** → under `f/hermes/`, `f/collection/`,
-  `f/libraries/`, `f/capabilities/`, or — for `f/data_platform/`/`f/hermes_flow/` — named
+  `f/libraries/`, `f/capabilities/`, or — for `f/data_platform/`/`f/hermes_flow/`/`f/workflows/` — named
   explicitly in `includes` (see
   [Folder layout & sync scope](#folder-layout--sync-scope) above).
 

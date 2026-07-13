@@ -136,6 +136,47 @@ entries:
       effects:
         filesystem: true
 
+  - kind: flow
+    tags: [product, collection, workflow, ecommerce, deterministic-first, bounded]
+    inputs_summary: >-
+      One to twenty explicitly allowlisted product source URLs, the collection_db
+      PostgreSQL resource, optional per-source parser metadata, and bounded fetch,
+      concurrency, retry, size, and product-count controls. Hermes AI fallback is
+      disabled unless explicitly enabled with a hermes_endpoint resource.
+    outputs_summary: >-
+      A versioned ProductCollectionWorkflowResult with isolated per-source outcomes,
+      retained raw and normalized artifacts, persistence evidence, deterministic
+      comparison data, final report, complete lineage, capability versions, and the
+      Windmill job reference.
+    input_kinds: [product_sources, resource:postgresql, resource:hermes_endpoint]
+    output_kinds: [product_collection_workflow_result, artifact_refs, execution_result]
+    metadata:
+      path: f/workflows/product_collection
+      capability_version: "1.0.0"
+      summary: Collect, extract, normalise, persist, compare, and report products from bounded sources.
+      maturity: experimental
+      deterministic: false
+      owners: [platform]
+      dependencies:
+        - f/capabilities/collection/web_fetch
+        - f/capabilities/collection/extract_products
+        - f/capabilities/collection/normalise_products
+        - f/capabilities/collection/product_snapshot_write
+        - f/capabilities/collection/compare_product_snapshots
+        - f/capabilities/collection/render_product_report
+      test_requirements:
+        - contracts/product-collection-workflow-result
+        - smoke/product-collection-fixtures
+        - live/product-collection-approved
+      limits:
+        timeout_seconds: 300
+        max_concurrency: 8
+        rate_limit_per_minute: 20
+      effects:
+        network: true
+        database: true
+        filesystem: true
+
   - kind: script
     tags: [product, extract, ecommerce, deterministic-first, ai-fallback]
     inputs_summary: >-

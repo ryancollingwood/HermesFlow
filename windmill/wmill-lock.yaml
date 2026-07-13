@@ -23,7 +23,7 @@ locks:
   f/hermes_flow/policies/evaluator: 34cf73b5e172fb80f4a160548e6c83409af732f8f73d03c04794be3e41915f1e
   f/hermes_flow/testing/example_test: f418b5d367a9c8e5bca4e6271fed31512b4ef1172cdc7b02abd09bf5ae9ea528
   f/hermes_flow/testing/regression: 85dac4a471d8bdf73d5258534359fe0b0ecc142df1eee9810a502f1898e53420
-  f/hermes_flow/testing/runner: 1205921f657a5efec74b141d90f249af3221347acfc2b2563f9e3d9557954b1a
+  f/hermes_flow/testing/runner: 97c768ad1316bca2104dac0e4978387826f08b9b43d093fbd31353a91eb68ed0
   f/hermes_flow/testing/scheduled_health: 1b44f3bf43d4b26dcdd6aa0e78f6f7251a455377973f4979b6731ea81c76b365
   f/hermes/chat: e8d58cf77c012bc4312bc1c9696e850213e8f75f6714a931ba788a9186a9b830
   f/hermes/client: 718f0db16e26856211e6fd76023ff8af80c04b3ec014deb86521e36a135f31d4
@@ -33,3 +33,5 @@ locks:
   f/libraries/lineage/models: d5def33147a5dc21de4ffd46e1471f9e843b104ed4f2a075eae40404f8ab5e70
   f/libraries/results/models: fb56e4445bb517671b3f75b5eb8cb8eed72bdf485f40dfc2fd2d05720184679a
   f/libraries/storage/artifacts: aadfa6661037a9435b4de17c2f69e257823c1878707376dac2badbdec8acad4c
+  f/workflows/product_collection.flow+__flow_hash: 5b5371ad1102e1d3eafb7bd5b6480715f15797fb5e9f7f64a60cc8d4ee14aa24
+  f/workflows/product_collection.flow+run_product_collection.inline_script.py: 337d65f2dafaff0c316806c368dc136d8cbc526ec2ceccdef920fad69501ecb4

@@ -4,8 +4,10 @@ import pathlib
 import pytest
 
 from f.hermes_flow.testing.runner import (
+    ExecutionAssetKind,
     TestMode as RunnerMode,
     TestStatus as RunnerStatus,
+    WindmillTestExecutor,
     discover_tests,
     load_test_manifests,
     run_tests,
@@ -128,13 +130,46 @@ def test_duplicate_ids_across_manifests_are_rejected():
         load_test_manifests(MANIFEST, MANIFEST)
 
 
+def test_windmill_executor_submits_flow_assets_as_flows():
+    class Client:
+        def __init__(self):
+            self.calls = []
+
+        def run_flow_async(self, path, args):
+            self.calls.append(("flow", path, args))
+            return "flow-job"
+
+        def wait_job(self, job_id, timeout, cleanup):
+            return {"status": "pass", "job_id": job_id}
+
+    client = Client()
+    flow_manifest = load_test_manifests("""
+tests:
+  - id: smoke/flow
+    capability_paths: [f/workflows/example]
+    type: smoke
+    mode: promotion_gating
+    script_path: f/workflows/example
+    asset_kind: flow
+    args: {bounded: true}
+""")
+    job_id, result = WindmillTestExecutor(client).run(flow_manifest.tests[0])
+    assert client.calls == [("flow", "f/workflows/example", {"bounded": True})]
+    assert job_id == "flow-job"
+    assert result["status"] == "pass"
+
+
 def test_checked_in_manifests_are_discoverable_and_reference_real_scripts():
     tests_root = pathlib.Path(__file__).parent
     files = sorted(tests_root.glob("**/*.test.yaml"))
     manifest = load_test_manifests(*(file.read_text() for file in files))
     assert {test.type.value for test in manifest.tests} == {
-        "fixture", "contract", "live_integration"
+        "fixture", "contract", "smoke", "live_integration"
     }
     windmill_root = tests_root.parent
     for test in manifest.tests:
-        assert (windmill_root / f"{test.script_path}.py").exists(), test.script_path
+        if test.asset_kind is ExecutionAssetKind.flow:
+            path = windmill_root / f"{test.script_path}.flow" / "flow.yaml"
+        else:
+            path = windmill_root / f"{test.script_path}.py"
+        assert path.exists(), test.script_path
