@@ -1,5 +1,6 @@
 version: v2
 locks:
+  f/capabilities/collection/extract_products: dabd19333acb3de308825e37329668c81f155c422eb088ac3ba5a73695ec2197
   f/capabilities/collection/extract_structured_markup: f3638ac8d5388988710989c17c991a2b4413a4b7e2f2d0dd11c54dd7f4ea6add
   f/capabilities/collection/web_fetch: ff8567c5f6a7346de37ccb1d92c81cde952cf02a5089a3a15f791e94eaf1f0ef
   f/collection/baserow_webhook: 8c54a09a7e42c29311e50bf1d6b2f782cdbdb5f29a544545cda4ee7aafa3feb3

@@ -121,7 +121,7 @@ See the ADR's Consequences section and
 | Task | Work in this repo | Notes |
 |---|---|---|
 | HF-022 Structured markup extraction (done) | `f/capabilities/collection/extract_structured_markup.py`: deterministic multi-block JSON-LD parsing; arrays/`@graph`; stable candidate IDs; source artifact/block/path provenance; bounded source/block/candidate counts | Malformed/absent/context-only markup returns structured warnings or empty results; checked-in output contract plus retail regression fixture; 16 focused tests |
-| HF-023 Product extraction | Deterministic → known parser → HF-019 AI fallback, with provenance | |
+| HF-023 Product extraction (done) | `f/capabilities/collection/extract_products.py`: strict JSON-LD → Shopify/Next.js/OpenGraph → HF-019 schema-validated Hermes precedence; source-form product/offer schema; stable IDs and deduplication; method/evidence/artifact provenance | Partial/malformed/no-data/AI-failure warnings stay visible; checked-in output contract and four source structures; 14 focused tests |
 | HF-024 Product normalisation | Deterministic, versioned schema; table-driven price/currency tests | |
 | HF-025 Snapshot persistence | Versioned migration in `collection_db/`; idempotent upserts keyed by execution/source/product; rows carry trace + artifact refs | Integration-test against a disposable Postgres, not the live `collection_db` |
 | HF-026 Comparison & report | Golden-file tests; report stored as artifact | |
