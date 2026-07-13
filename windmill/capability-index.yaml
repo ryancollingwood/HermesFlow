@@ -31,7 +31,16 @@ entries:
       summary: Connectivity check against the Hermes gateway; lists the models it serves.
       maturity: stable
       owners: [platform]
-      test_requirements: [contracts/hermes-client-response]
+      test_requirements: [contracts/hermes-client-response, smoke/hermes-client-live]
+      scheduled_health:
+        enabled: true
+        cron: "0 17 * * * *"
+        timezone: UTC
+        max_samples_per_run: 1
+        max_data_bytes: 65536
+        max_timeout_seconds: 30
+        rate_limit_per_minute: 1
+        escalate_after_failures: 3
       effects:
         network: true
 

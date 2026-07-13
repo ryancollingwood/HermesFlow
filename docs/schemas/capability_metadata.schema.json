@@ -127,6 +127,65 @@
       ],
       "title": "CapabilityMaturity",
       "type": "string"
+    },
+    "ScheduledHealthPolicy": {
+      "description": "Opt-in bounds for metadata-driven live capability health checks.",
+      "properties": {
+        "cron": {
+          "default": "0 0 * * * *",
+          "minLength": 1,
+          "title": "Cron",
+          "type": "string"
+        },
+        "enabled": {
+          "default": false,
+          "title": "Enabled",
+          "type": "boolean"
+        },
+        "escalate_after_failures": {
+          "default": 3,
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Escalate After Failures",
+          "type": "integer"
+        },
+        "max_data_bytes": {
+          "default": 1000000,
+          "maximum": 100000000,
+          "minimum": 1,
+          "title": "Max Data Bytes",
+          "type": "integer"
+        },
+        "max_samples_per_run": {
+          "default": 1,
+          "maximum": 100,
+          "minimum": 1,
+          "title": "Max Samples Per Run",
+          "type": "integer"
+        },
+        "max_timeout_seconds": {
+          "default": 300,
+          "maximum": 3600,
+          "minimum": 1,
+          "title": "Max Timeout Seconds",
+          "type": "integer"
+        },
+        "rate_limit_per_minute": {
+          "default": 1,
+          "maximum": 1000,
+          "minimum": 1,
+          "title": "Rate Limit Per Minute",
+          "type": "integer"
+        },
+        "timezone": {
+          "default": "UTC",
+          "minLength": 1,
+          "title": "Timezone",
+          "type": "string"
+        }
+      },
+      "title": "ScheduledHealthPolicy",
+      "type": "object"
     }
   },
   "description": "Agent-selection metadata for one discoverable capability.",
@@ -147,6 +206,12 @@
       "title": "Dependencies",
       "type": "array"
     },
+    "deterministic": {
+      "default": true,
+      "description": "Whether identical inputs are expected to produce identical outputs. AI/model-backed capabilities must set this false.",
+      "title": "Deterministic",
+      "type": "boolean"
+    },
     "effects": {
       "$ref": "#/$defs/CapabilityEffects"
     },
@@ -155,12 +220,6 @@
     },
     "maturity": {
       "$ref": "#/$defs/CapabilityMaturity"
-    },
-    "deterministic": {
-      "default": true,
-      "description": "Whether identical inputs are expected to produce identical outputs. AI/model-backed capabilities must set this false.",
-      "title": "Deterministic",
-      "type": "boolean"
     },
     "owners": {
       "items": {
@@ -175,6 +234,9 @@
       "minLength": 1,
       "title": "Path",
       "type": "string"
+    },
+    "scheduled_health": {
+      "$ref": "#/$defs/ScheduledHealthPolicy"
     },
     "schema_version": {
       "default": "1.0",

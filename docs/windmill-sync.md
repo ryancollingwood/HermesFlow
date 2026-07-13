@@ -42,11 +42,11 @@ by folder boundaries. It is deliberately narrow:
 | `f/collection/**` | collection_db Postgres resource + Baserow webhook receiver | ✅ yes | ✅ yes |
 | `f/libraries/**` | shared, importable Pydantic-model modules (`f.libraries.lineage.models`, `f.libraries.capability.models`, `f.libraries.results.models`, …) | ✅ yes | ✅ yes |
 | `f/data_platform/{folder.meta,data_platform_db.resource,db_password.variable,dbt_run.*,extract_hn_stories.*}` | dlt/dbt pipeline scripts + their resource/secret | ✅ yes | ✅ yes (named explicitly, not wildcarded) |
-| `f/hermes_flow/{folder.meta.yaml,catalogue/models.*,catalogue/search.*,policies/evaluator.*,candidate_ops/models.*,candidate_ops/create.*,candidate_ops/diff.*,candidate_ops/promote.*,candidate_ops/prepare_promotion.*,candidate_ops/promotion.flow/**,candidate_ops/lifecycle.*,testing/runner.*,testing/example_test.*,testing/regression.*}` | HermesFlow's own control-plane: capability catalogue/search/policy (HF-008–010), candidate lifecycle (HF-011–014), and testing/regression selection (HF-015–016) | ✅ yes | ✅ yes (named explicitly, not wildcarded — see below) |
+| `f/hermes_flow/{folder.meta.yaml,catalogue/models.*,catalogue/search.*,policies/evaluator.*,candidate_ops/models.*,candidate_ops/create.*,candidate_ops/diff.*,candidate_ops/promote.*,candidate_ops/prepare_promotion.*,candidate_ops/promotion.flow/**,candidate_ops/lifecycle.*,testing/runner.*,testing/example_test.*,testing/regression.*,testing/scheduled_health.*}` | HermesFlow's own control-plane: capability catalogue/search/policy (HF-008–010), candidate lifecycle (HF-011–014), and testing/regression/health scheduling (HF-015–016, HF-020) | ✅ yes | ✅ yes (named explicitly, not wildcarded — see below) |
 | `capability-index.yaml` (top level, not under `f/`) | the version-controlled capability index itself, validated/loaded by `f/hermes_flow/catalogue/models.py` | ✅ yes | ❌ no — repo-only, like `wmill.yaml` itself; not a Windmill script/flow/resource asset, so there's nothing for `wmill sync` to push. Read directly from the checked-out repo by CI and by whatever eventually calls `load_catalogue()` |
 | `hermes_endpoint` resource-type | the shared endpoint type | ✅ yes | ✅ yes |
 | `f/hermes_state/**` | **runtime state** (timestamps, cursors, non-secret vars) | ❌ no | ❌ **no** |
-| `f/hermes_flow_state/**` | **lifecycle runtime state** (deprecation and rollback audit records) | ❌ no | ❌ **no** |
+| `f/hermes_flow_state/**` | **lifecycle runtime state** (deprecation, rollback, and scheduled-health records) | ❌ no | ❌ **no** |
 | **`f/hermes_flow/candidates/**`** | **candidate capabilities** (HF-011) — proposed, not-yet-promoted code | ❌ no | ❌ **no**, explicitly excluded (see below) |
 | any other item dropped into `f/data_platform/` or `f/hermes_flow/` not named above | unenumerated pipeline/catalogue assets | n/a | ❌ **no** |
 | `f/capabilities/**`, `f/workflows/**` | **reserved namespaces, no content yet** — individual promoted capabilities (HF-021+) and composed flows (HF-027+) | ❌ no | ❌ no *(not yet — added to `includes` wholesale, same as `f/hermes`/`f/collection`/`f/libraries`, the day either gains real content — see "Adding a new tracked Windmill folder" in `AGENTS.md`)* |
@@ -78,8 +78,9 @@ Two settings enforce this:
   - `f/hermes_flow/` (currently `f/hermes_flow/folder.meta.yaml`,
     `f/hermes_flow/catalogue/models.*`, `f/hermes_flow/catalogue/search.*`,
     `f/hermes_flow/policies/evaluator.*`, and
-    `f/hermes_flow/candidate_ops/{models,create,diff,promote,prepare_promotion,lifecycle}.*`
-    plus `f/hermes_flow/candidate_ops/promotion.flow/**`) has a harder
+    `f/hermes_flow/candidate_ops/{models,create,diff,promote,prepare_promotion,lifecycle}.*`,
+    `f/hermes_flow/testing/{runner,example_test,regression,scheduled_health}.*`, plus
+    `f/hermes_flow/candidate_ops/promotion.flow/**`) has a harder
     requirement: `f/hermes_flow/candidates/` (HF-011's candidate namespace —
     proposed capabilities awaiting promotion, deliberately Windmill-only)
     shares that same root. A `f/hermes_flow/**` wildcard would sweep

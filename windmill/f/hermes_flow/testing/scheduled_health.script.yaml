@@ -1,0 +1,27 @@
+summary: ''
+description: ''
+lock: '!inline f/hermes_flow/testing/scheduled_health.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    capability_path:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    catalogue_yaml:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    manifest_yaml:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+  required:
+    - catalogue_yaml
+    - manifest_yaml
+    - capability_path
