@@ -1,0 +1,155 @@
+{
+  "comparison_version": "1.0.0",
+  "products": [
+    {
+      "display_name": "Desk Lamp",
+      "match_key": "brand_sku:example|sku 3",
+      "observations": [
+        {
+          "brand": "Example",
+          "canonical_url": null,
+          "execution_trace_id": "10000000-0000-0000-0000-000000000001",
+          "gtin": null,
+          "mpn": null,
+          "name": "Desk Lamp",
+          "normalized_product_id": "0000000000000000000000000000000000000000000000000000000000000067",
+          "prices": {},
+          "sku": "SKU-3",
+          "snapshot_id": 3,
+          "source_artifact_id": "30000000-0000-0000-0000-000000000001",
+          "source_product_id": "0000000000000000000000000000000000000000000000000000000000000003"
+        }
+      ],
+      "price_differences": []
+    },
+    {
+      "display_name": "Canvas Tote",
+      "match_key": "gtin:123456789012",
+      "observations": [
+        {
+          "brand": "Example",
+          "canonical_url": null,
+          "execution_trace_id": "10000000-0000-0000-0000-000000000001",
+          "gtin": "123456789012",
+          "mpn": null,
+          "name": "Canvas Tote",
+          "normalized_product_id": "0000000000000000000000000000000000000000000000000000000000000065",
+          "prices": {
+            "AUD": "10"
+          },
+          "sku": "SKU-1",
+          "snapshot_id": 1,
+          "source_artifact_id": "30000000-0000-0000-0000-000000000001",
+          "source_product_id": "0000000000000000000000000000000000000000000000000000000000000001"
+        },
+        {
+          "brand": "Example",
+          "canonical_url": null,
+          "execution_trace_id": "10000000-0000-0000-0000-000000000002",
+          "gtin": "123456789012",
+          "mpn": null,
+          "name": "Canvas Tote",
+          "normalized_product_id": "0000000000000000000000000000000000000000000000000000000000000068",
+          "prices": {
+            "AUD": "12.5"
+          },
+          "sku": "SKU-4",
+          "snapshot_id": 4,
+          "source_artifact_id": "30000000-0000-0000-0000-000000000002",
+          "source_product_id": "0000000000000000000000000000000000000000000000000000000000000004"
+        }
+      ],
+      "price_differences": [
+        {
+          "absolute_difference": "2.5",
+          "currency": "AUD",
+          "maximum": "12.5",
+          "minimum": "10",
+          "percentage_difference": "25",
+          "values": [
+            {
+              "amount": "10",
+              "normalized_product_id": "0000000000000000000000000000000000000000000000000000000000000065",
+              "source_artifact_id": "30000000-0000-0000-0000-000000000001"
+            },
+            {
+              "amount": "12.5",
+              "normalized_product_id": "0000000000000000000000000000000000000000000000000000000000000068",
+              "source_artifact_id": "30000000-0000-0000-0000-000000000002"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "schema_version": "1.0",
+  "sources": [
+    {
+      "duplicate_product_count": 1,
+      "execution_trace_id": "10000000-0000-0000-0000-000000000001",
+      "label": "Store A",
+      "priced_product_count": 1,
+      "product_count": 3,
+      "source_artifact_id": "30000000-0000-0000-0000-000000000001",
+      "source_content_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "source_trace_id": "20000000-0000-0000-0000-000000000001",
+      "unique_product_count": 2
+    },
+    {
+      "duplicate_product_count": 0,
+      "execution_trace_id": "10000000-0000-0000-0000-000000000002",
+      "label": "Store B",
+      "priced_product_count": 1,
+      "product_count": 1,
+      "source_artifact_id": "30000000-0000-0000-0000-000000000002",
+      "source_content_hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "source_trace_id": "20000000-0000-0000-0000-000000000002",
+      "unique_product_count": 1
+    },
+    {
+      "duplicate_product_count": 0,
+      "execution_trace_id": "10000000-0000-0000-0000-000000000003",
+      "label": "Empty store",
+      "priced_product_count": 0,
+      "product_count": 0,
+      "source_artifact_id": null,
+      "source_content_hash": null,
+      "source_trace_id": null,
+      "unique_product_count": 0
+    }
+  ],
+  "summary": {
+    "comparable_price_count": 1,
+    "covered_source_count": 2,
+    "duplicate_product_count": 1,
+    "empty_source_count": 1,
+    "priced_product_count": 2,
+    "requested_source_count": 3,
+    "snapshot_count": 4,
+    "unique_product_count": 2,
+    "warning_count": 3
+  },
+  "warnings": [
+    {
+      "code": "duplicate_product",
+      "execution_trace_id": "10000000-0000-0000-0000-000000000001",
+      "message": "duplicate match key gtin:123456789012 ignored within source",
+      "normalized_product_id": "0000000000000000000000000000000000000000000000000000000000000066",
+      "source_artifact_id": "30000000-0000-0000-0000-000000000001"
+    },
+    {
+      "code": "empty_source",
+      "execution_trace_id": "10000000-0000-0000-0000-000000000003",
+      "message": "requested execution has no persisted product snapshots",
+      "normalized_product_id": null,
+      "source_artifact_id": null
+    },
+    {
+      "code": "missing_comparable_price",
+      "execution_trace_id": "10000000-0000-0000-0000-000000000001",
+      "message": "product has no offer with both a valid amount and currency",
+      "normalized_product_id": "0000000000000000000000000000000000000000000000000000000000000067",
+      "source_artifact_id": "30000000-0000-0000-0000-000000000001"
+    }
+  ]
+}

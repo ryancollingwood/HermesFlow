@@ -1,0 +1,18 @@
+schema_version: "1.0"
+tests:
+  - id: contracts/product-comparison-result
+    capability_paths: [f/capabilities/collection/compare_product_snapshots]
+    type: contract
+    mode: promotion_gating
+    script_path: f/capabilities/collection/compare_product_snapshots
+    timeout_seconds: 60
+    max_data_bytes: 2097152
+    skip_reason: Output schema and golden dataset are validated directly by test_product_comparison_report.py.
+  - id: contracts/product-report-result
+    capability_paths: [f/capabilities/collection/render_product_report]
+    type: contract
+    mode: promotion_gating
+    script_path: f/capabilities/collection/render_product_report
+    timeout_seconds: 60
+    max_data_bytes: 4194304
+    skip_reason: Output schema, golden Markdown and artifact lineage are validated directly by test_product_comparison_report.py.
