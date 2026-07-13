@@ -162,3 +162,25 @@ entries:
       effects:
         network: true
         filesystem: true
+
+  - kind: script
+    tags: [product, normalise, ecommerce, deterministic, schema]
+    inputs_summary: >-
+      A validated HF-023 ProductExtractionResult containing source-form product
+      and offer records, or an already-normalised HF-024 result for idempotent validation.
+    outputs_summary: >-
+      Versioned common product records with canonical text and identifiers,
+      locale-aware decimal amounts, explicit currency/availability/missing-value
+      statuses, retained originals, and extraction provenance.
+    input_kinds: [extracted_products]
+    output_kinds: [normalized_products]
+    metadata:
+      path: f/capabilities/collection/normalise_products
+      capability_version: "1.0.0"
+      summary: Deterministically normalise extracted commerce records into a versioned common schema.
+      maturity: experimental
+      deterministic: true
+      owners: [platform]
+      dependencies: [f/capabilities/collection/extract_products]
+      test_requirements: [contracts/product-normalization-result]
+      effects: {}
