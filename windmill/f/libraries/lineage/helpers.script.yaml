@@ -1,0 +1,21 @@
+summary: ''
+description: ''
+lock: '!inline f/libraries/lineage/helpers.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    action:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    payload_json:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+  required:
+    - action
+    - payload_json
