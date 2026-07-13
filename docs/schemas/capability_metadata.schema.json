@@ -156,6 +156,12 @@
     "maturity": {
       "$ref": "#/$defs/CapabilityMaturity"
     },
+    "deterministic": {
+      "default": true,
+      "description": "Whether identical inputs are expected to produce identical outputs. AI/model-backed capabilities must set this false.",
+      "title": "Deterministic",
+      "type": "boolean"
+    },
     "owners": {
       "items": {
         "type": "string"

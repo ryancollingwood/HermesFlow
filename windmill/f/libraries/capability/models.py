@@ -155,6 +155,11 @@ class CapabilityMetadata(BaseModel):
         description="One-line, agent-facing description used for discovery/search.",
     )
     maturity: CapabilityMaturity
+    deterministic: bool = Field(
+        default=True,
+        description="Whether identical inputs are expected to produce identical outputs. "
+        "AI/model-backed capabilities must set this false.",
+    )
     owners: list[str] = Field(..., min_length=1)
     effects: CapabilityEffects = Field(default_factory=CapabilityEffects)
     autonomy: AutonomyPolicy = Field(default_factory=AutonomyPolicy)

@@ -55,3 +55,28 @@ entries:
       effects:
         network: true
         filesystem: true
+
+  - kind: script
+    tags: [ai, hermes, structured-output, nondeterministic]
+    inputs_summary: >-
+      conn: a hermes_endpoint resource; task_prompt: required instructions;
+      conversation: prior messages; input_payload: JSON-compatible task data;
+      output_schema: a valid JSON Schema; optional model, sampling, token and
+      retry bounds.
+    outputs_summary: >-
+      A StructuredInvocationResult containing schema-validated parsed output,
+      model parameters and usage, visible per-attempt failures, retained
+      artifact references, and lineage state.
+    input_kinds: [resource:hermes_endpoint, json, json_schema]
+    output_kinds: [structured_invocation_result, artifact_refs]
+    metadata:
+      path: f/libraries/ai/invoke_hermes_structured
+      capability_version: "1.0.0"
+      summary: Invoke Hermes with a JSON Schema contract and retain redacted lineage artifacts.
+      maturity: experimental
+      deterministic: false
+      owners: [platform]
+      dependencies: [f/hermes/client]
+      effects:
+        network: true
+        filesystem: true
