@@ -523,20 +523,20 @@ def setup_windmill() -> None:
         else:
             say(f"{WARN} couldn't create the Windmill 'main' workspace — create it in the UI before 'wmill sync push'.")
 
-    # Ensure the runtime-state folder exists (create-or-no-op). Scripts store
-    # NON-secret Hermes state here (e.g. last-run timestamps). It is deliberately
-    # OUTSIDE wmill.yaml's sync scope, so a mirror push never deletes it and it
-    # is never versioned in the repo. See docs/windmill-sync.md.
-    fst, _ = wm_http("GET", "/api/w/main/folders/get/hermes_state", bearer=token)
-    if fst == 200:
-        say(f"{OK} Windmill folder f/hermes_state already exists")
-    else:
-        cst, _ = wm_http("POST", "/api/w/main/folders/create", bearer=token,
-                         json_body={"name": "hermes_state"})
-        if cst in (200, 201):
-            say(f"{OK} created Windmill folder f/hermes_state (runtime state; not synced)")
+    # Ensure runtime-state folders exist (create-or-no-op). Both stay outside
+    # sync scope: hermes_state holds Hermes cursors; hermes_flow_state holds
+    # lifecycle deprecation/rollback audit records.
+    for state_folder in ("hermes_state", "hermes_flow_state"):
+        fst, _ = wm_http("GET", f"/api/w/main/folders/get/{state_folder}", bearer=token)
+        if fst == 200:
+            say(f"{OK} Windmill folder f/{state_folder} already exists")
         else:
-            say(f"{WARN} couldn't create f/hermes_state — create it in the UI (Folders → New) so scripts can store state.")
+            cst, _ = wm_http("POST", "/api/w/main/folders/create", bearer=token,
+                             json_body={"name": state_folder})
+            if cst in (200, 201):
+                say(f"{OK} created Windmill folder f/{state_folder} (runtime state; not synced)")
+            else:
+                say(f"{WARN} couldn't create f/{state_folder} — create it in the UI (Folders → New) so scripts can store state.")
 
     # Push the tracked windmill/ assets now that the workspace exists.
     push_windmill_assets(token)

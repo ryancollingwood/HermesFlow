@@ -376,19 +376,20 @@ setup_windmill() {
     echo "⚠ couldn't create the Windmill 'main' workspace — create it in the UI before 'wmill sync push'."
   fi
 
-  # Ensure the runtime-state folder exists (create-or-no-op). Scripts store
-  # NON-secret Hermes state here (e.g. last-run timestamps). It is deliberately
-  # OUTSIDE wmill.yaml's sync scope, so a mirror push never deletes it and it is
-  # never versioned in the repo. See docs/windmill-sync.md.
-  if curl -fsS -o /dev/null -H "Host: $hh" -H "Authorization: Bearer $token" \
-       "$base/api/w/main/folders/get/hermes_state" 2>/dev/null; then
-    echo "✓ Windmill folder f/hermes_state already exists"
-  elif curl -fsS -H "Host: $hh" -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
-         -X POST "$base/api/w/main/folders/create" -d '{"name":"hermes_state"}' >/dev/null 2>&1; then
-    echo "✓ created Windmill folder f/hermes_state (runtime state; not synced)"
-  else
-    echo "⚠ couldn't create f/hermes_state — create it in the UI (Folders → New) so scripts can store state."
-  fi
+  # Ensure runtime-state folders exist (create-or-no-op). Both stay outside
+  # sync scope: hermes_state holds Hermes cursors; hermes_flow_state holds
+  # lifecycle deprecation/rollback audit records.
+  for state_folder in hermes_state hermes_flow_state; do
+    if curl -fsS -o /dev/null -H "Host: $hh" -H "Authorization: Bearer $token" \
+         "$base/api/w/main/folders/get/$state_folder" 2>/dev/null; then
+      echo "✓ Windmill folder f/$state_folder already exists"
+    elif curl -fsS -H "Host: $hh" -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
+           -X POST "$base/api/w/main/folders/create" -d "{\"name\":\"$state_folder\"}" >/dev/null 2>&1; then
+      echo "✓ created Windmill folder f/$state_folder (runtime state; not synced)"
+    else
+      echo "⚠ couldn't create f/$state_folder — create it in the UI (Folders → New) so scripts can store state."
+    fi
+  done
 
   # Push the tracked windmill/ assets now that the workspace exists.
   push_windmill_assets "$token" "$base" "$hh"

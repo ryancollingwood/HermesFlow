@@ -205,6 +205,8 @@ end-to-end verification that the provider, key, and model all work.
   `docker compose up` — not just at install time.
 - **Creates the `main` workspace** (a fresh Windmill CE has none; `wmill
   workspace add` only registers it locally).
+- **Creates the unsynced runtime-state folders** `f/hermes_state` and
+  `f/hermes_flow_state` for cursors and lifecycle audit records.
 - **Registers Windmill with Hermes over MCP** — mints an `mcp:all`-scoped token
   and adds it via `hermes mcp add`, so Windmill scripts/flows and its management
   API become callable tools in Hermes sessions.
