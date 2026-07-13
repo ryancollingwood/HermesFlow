@@ -135,3 +135,30 @@ entries:
       test_requirements: [contracts/structured-markup-result]
       effects:
         filesystem: true
+
+  - kind: script
+    tags: [product, extract, ecommerce, deterministic-first, ai-fallback]
+    inputs_summary: >-
+      A retained raw HTTP ArtifactRef plus optional source metadata and lineage;
+      an optional hermes_endpoint enables schema-validated fallback after
+      structured-markup and known deterministic parsers find no product.
+    outputs_summary: >-
+      Validated, deduplicated product records preserving source-form commerce
+      fields, extraction/evidence provenance, attempted methods, and partial warnings.
+    input_kinds: [raw_http_artifact, resource:hermes_endpoint]
+    output_kinds: [extracted_products, extraction_provenance]
+    metadata:
+      path: f/capabilities/collection/extract_products
+      capability_version: "1.0.0"
+      summary: Extract products through JSON-LD, known page parsers, then schema-validated Hermes fallback.
+      maturity: experimental
+      deterministic: false
+      owners: [platform]
+      dependencies:
+        - f/capabilities/collection/web_fetch
+        - f/capabilities/collection/extract_structured_markup
+        - f/libraries/ai/invoke_hermes_structured
+      test_requirements: [contracts/product-extraction-result]
+      effects:
+        network: true
+        filesystem: true

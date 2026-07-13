@@ -1,0 +1,47 @@
+summary: ''
+description: ''
+lock: '!inline f/capabilities/collection/extract_products.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    enable_ai_fallback:
+      type: boolean
+      description: ''
+      default: false
+    hermes_conn:
+      type: object
+      description: ''
+      default: {}
+      format: resource-hermes_endpoint
+      properties: {}
+    lineage_json:
+      type: string
+      description: ''
+      default: ''
+      originalType: string
+    max_ai_input_bytes:
+      type: integer
+      description: ''
+      default: 200000
+    max_html_bytes:
+      type: integer
+      description: ''
+      default: 10000000
+    max_products:
+      type: integer
+      description: ''
+      default: 100
+    raw_artifact:
+      type: object
+      description: ''
+      default: null
+      properties: {}
+    source_metadata:
+      type: object
+      description: ''
+      default: {}
+      properties: {}
+  required:
+    - raw_artifact

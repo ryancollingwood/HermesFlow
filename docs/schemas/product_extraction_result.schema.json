@@ -1,0 +1,465 @@
+{
+  "$defs": {
+    "ArtifactRef": {
+      "description": "Points at one stored artifact and how it fits into a run's lineage.",
+      "properties": {
+        "artifact_id": {
+          "description": "Unique ID for this artifact reference.",
+          "format": "uuid",
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "content_hash": {
+          "description": "Lowercase 64-character hex SHA-256 digest of the artifact's content.",
+          "title": "Content Hash",
+          "type": "string"
+        },
+        "created_at": {
+          "description": "When this artifact was written (UTC).",
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "creator_capability": {
+          "description": "Capability path that produced this artifact.",
+          "minLength": 1,
+          "title": "Creator Capability",
+          "type": "string"
+        },
+        "creator_capability_version": {
+          "description": "Version of that capability at the time it produced this artifact.",
+          "minLength": 1,
+          "title": "Creator Capability Version",
+          "type": "string"
+        },
+        "derived_from": {
+          "description": "artifact_id of each artifact this one was derived from. Empty for a raw artifact with no upstream input captured by this store.",
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "title": "Derived From",
+          "type": "array"
+        },
+        "media_type": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "IANA media type of the stored content. HF-017 adapters always populate it; optional for backward compatibility with pre-HF-017 references.",
+          "title": "Media Type"
+        },
+        "schema_version": {
+          "default": "1.0",
+          "description": "Schema MAJOR.MINOR this record was written against.",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "size_bytes": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Artifact content size in bytes. HF-017 storage adapters always populate it; optional for backward compatibility with pre-HF-017 references.",
+          "title": "Size Bytes"
+        },
+        "stage": {
+          "$ref": "#/$defs/ArtifactStage",
+          "description": "raw (untransformed input), intermediate (a transformation step's output), or final (a run's end result)."
+        },
+        "storage_uri": {
+          "description": "Where the content lives, e.g. file:///shared/artifacts/<hash[:2]>/<hash>.",
+          "minLength": 1,
+          "title": "Storage Uri",
+          "type": "string"
+        },
+        "trace_id": {
+          "description": "trace_id of the ExecutionContext that produced this artifact.",
+          "format": "uuid",
+          "title": "Trace Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "trace_id",
+        "stage",
+        "content_hash",
+        "storage_uri",
+        "creator_capability",
+        "creator_capability_version"
+      ],
+      "title": "ArtifactRef",
+      "type": "object"
+    },
+    "ArtifactStage": {
+      "description": "Where an artifact sits in a run's raw -> intermediate -> final pipeline.",
+      "enum": [
+        "raw",
+        "intermediate",
+        "final"
+      ],
+      "title": "ArtifactStage",
+      "type": "string"
+    },
+    "ExtractedOffer": {
+      "additionalProperties": false,
+      "properties": {
+        "availability": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Availability"
+        },
+        "currency": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Currency"
+        },
+        "price": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Price"
+        },
+        "seller": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Seller"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "title": "Url"
+        }
+      },
+      "required": [
+        "price",
+        "currency",
+        "availability",
+        "seller",
+        "url"
+      ],
+      "title": "ExtractedOffer",
+      "type": "object"
+    },
+    "ProductExtractionWarning": {
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "evidence_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evidence Path"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "ProductExtractionWarning",
+      "type": "object"
+    },
+    "ProductProvenance": {
+      "properties": {
+        "ai_artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Ai Artifact Ids",
+          "type": "array"
+        },
+        "evidence_paths": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Paths",
+          "type": "array"
+        },
+        "extraction_method": {
+          "title": "Extraction Method",
+          "type": "string"
+        },
+        "extractor_version": {
+          "default": "1.0.0",
+          "title": "Extractor Version",
+          "type": "string"
+        },
+        "source_artifact_id": {
+          "title": "Source Artifact Id",
+          "type": "string"
+        },
+        "source_content_hash": {
+          "title": "Source Content Hash",
+          "type": "string"
+        },
+        "source_type": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Type"
+        },
+        "source_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Url"
+        },
+        "structured_candidate_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Structured Candidate Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "extraction_method",
+        "source_artifact_id",
+        "source_content_hash"
+      ],
+      "title": "ProductProvenance",
+      "type": "object"
+    },
+    "ProductRecord": {
+      "properties": {
+        "attributes": {
+          "additionalProperties": true,
+          "title": "Attributes",
+          "type": "object"
+        },
+        "brand": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Brand"
+        },
+        "canonical_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Canonical Url"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "gtin": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Gtin"
+        },
+        "images": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Images",
+          "type": "array"
+        },
+        "mpn": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mpn"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "offers": {
+          "items": {
+            "$ref": "#/$defs/ExtractedOffer"
+          },
+          "title": "Offers",
+          "type": "array"
+        },
+        "product_id": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Product Id",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/ProductProvenance"
+        },
+        "sku": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sku"
+        },
+        "warnings": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Warnings",
+          "type": "array"
+        }
+      },
+      "required": [
+        "product_id",
+        "name",
+        "provenance"
+      ],
+      "title": "ProductRecord",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "attempted_methods": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Attempted Methods",
+      "type": "array"
+    },
+    "method": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Method"
+    },
+    "products": {
+      "items": {
+        "$ref": "#/$defs/ProductRecord"
+      },
+      "title": "Products",
+      "type": "array"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_artifact": {
+      "$ref": "#/$defs/ArtifactRef"
+    },
+    "status": {
+      "title": "Status",
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "$ref": "#/$defs/ProductExtractionWarning"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "status",
+    "source_artifact",
+    "products"
+  ],
+  "title": "ProductExtractionResult",
+  "type": "object"
+}
