@@ -134,6 +134,26 @@ class CapabilityLimits(BaseModel):
     rate_limit_per_minute: Optional[int] = Field(default=None, gt=0)
 
 
+class ScheduledHealthPolicy(BaseModel):
+    """Opt-in bounds for metadata-driven live capability health checks."""
+
+    enabled: bool = False
+    cron: str = Field(default="0 0 * * * *", min_length=1)
+    timezone: str = Field(default="UTC", min_length=1)
+    max_samples_per_run: int = Field(default=1, ge=1, le=100)
+    max_data_bytes: int = Field(default=1_000_000, ge=1, le=100_000_000)
+    max_timeout_seconds: int = Field(default=300, ge=1, le=3600)
+    rate_limit_per_minute: int = Field(default=1, ge=1, le=1000)
+    escalate_after_failures: int = Field(default=3, ge=1, le=100)
+
+    @field_validator("cron")
+    @classmethod
+    def _six_field_windmill_cron(cls, value: str) -> str:
+        if len(value.split()) != 6:
+            raise ValueError("scheduled health cron must use Windmill's six-field syntax")
+        return value
+
+
 class CapabilityMetadata(BaseModel):
     """Agent-selection metadata for one discoverable capability."""
 
@@ -164,6 +184,7 @@ class CapabilityMetadata(BaseModel):
     effects: CapabilityEffects = Field(default_factory=CapabilityEffects)
     autonomy: AutonomyPolicy = Field(default_factory=AutonomyPolicy)
     limits: CapabilityLimits = Field(default_factory=CapabilityLimits)
+    scheduled_health: ScheduledHealthPolicy = Field(default_factory=ScheduledHealthPolicy)
     test_requirements: list[str] = Field(
         default_factory=list,
         description="Paths/ids of promotion-gating tests this capability must pass, "
