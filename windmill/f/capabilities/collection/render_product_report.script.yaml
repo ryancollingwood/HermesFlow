@@ -1,0 +1,37 @@
+summary: ''
+description: ''
+lock: '!inline f/capabilities/collection/render_product_report.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    comparison:
+      type: object
+      description: ''
+      default: null
+      properties: {}
+    duration_seconds:
+      type: number
+      description: ''
+      default: 0
+    execution_context:
+      type: object
+      description: ''
+      default: null
+      properties: {}
+    job:
+      type: object
+      description: ''
+      default: null
+      properties: {}
+    lineage_json:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+  required:
+    - comparison
+    - lineage_json
+    - execution_context
+    - job

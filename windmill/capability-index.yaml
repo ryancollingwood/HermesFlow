@@ -211,3 +211,55 @@ entries:
         max_concurrency: 4
       effects:
         database: true
+
+  - kind: script
+    tags: [product, snapshot, compare, postgres, deterministic-rules]
+    inputs_summary: >-
+      The collection_db PostgreSQL resource plus labelled HF-025 execution
+      trace selections whose persisted product snapshots should be compared.
+    outputs_summary: >-
+      A versioned comparison dataset with source coverage, deduplicated product
+      groups, same-currency price differences, counts, and structured warnings.
+    input_kinds: [resource:postgresql, execution_trace_ids]
+    output_kinds: [product_comparison_dataset]
+    metadata:
+      path: f/capabilities/collection/compare_product_snapshots
+      capability_version: "1.0.0"
+      summary: Load selected persisted snapshots and apply documented deterministic product and price comparison rules.
+      maturity: experimental
+      deterministic: false
+      owners: [platform]
+      dependencies:
+        - f/capabilities/collection/product_snapshot_write
+        - f/capabilities/collection/normalise_products
+      test_requirements: [contracts/product-comparison-result]
+      limits:
+        timeout_seconds: 60
+      effects:
+        database: true
+
+  - kind: script
+    tags: [product, report, markdown, artifacts, result-envelope]
+    inputs_summary: >-
+      An HF-026 comparison dataset, HF-018 lineage and execution context,
+      and the Windmill job reference proving the reporting run.
+    outputs_summary: >-
+      A machine-readable dataset artifact, final Markdown report artifact,
+      updated lineage state, and standard ExecutionResult linking both artifacts and the job.
+    input_kinds: [product_comparison_dataset, execution_context, artifact_lineage, windmill_job_ref]
+    output_kinds: [product_report_result, artifact_refs, execution_result]
+    metadata:
+      path: f/capabilities/collection/render_product_report
+      capability_version: "1.0.0"
+      summary: Render and retain a human-readable product comparison report with raw-source lineage and job evidence.
+      maturity: experimental
+      deterministic: false
+      owners: [platform]
+      dependencies:
+        - f/capabilities/collection/compare_product_snapshots
+        - f/libraries/lineage/helpers
+        - f/libraries/results/models
+        - f/libraries/storage/artifacts
+      test_requirements: [contracts/product-report-result]
+      effects:
+        filesystem: true

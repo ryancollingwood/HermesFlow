@@ -1,0 +1,475 @@
+{
+  "$defs": {
+    "ComparisonSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "comparable_price_count": {
+          "minimum": 0,
+          "title": "Comparable Price Count",
+          "type": "integer"
+        },
+        "covered_source_count": {
+          "minimum": 0,
+          "title": "Covered Source Count",
+          "type": "integer"
+        },
+        "duplicate_product_count": {
+          "minimum": 0,
+          "title": "Duplicate Product Count",
+          "type": "integer"
+        },
+        "empty_source_count": {
+          "minimum": 0,
+          "title": "Empty Source Count",
+          "type": "integer"
+        },
+        "priced_product_count": {
+          "minimum": 0,
+          "title": "Priced Product Count",
+          "type": "integer"
+        },
+        "requested_source_count": {
+          "minimum": 0,
+          "title": "Requested Source Count",
+          "type": "integer"
+        },
+        "snapshot_count": {
+          "minimum": 0,
+          "title": "Snapshot Count",
+          "type": "integer"
+        },
+        "unique_product_count": {
+          "minimum": 0,
+          "title": "Unique Product Count",
+          "type": "integer"
+        },
+        "warning_count": {
+          "minimum": 0,
+          "title": "Warning Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "requested_source_count",
+        "covered_source_count",
+        "empty_source_count",
+        "snapshot_count",
+        "unique_product_count",
+        "duplicate_product_count",
+        "priced_product_count",
+        "comparable_price_count",
+        "warning_count"
+      ],
+      "title": "ComparisonSummary",
+      "type": "object"
+    },
+    "ComparisonWarning": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "execution_trace_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Execution Trace Id"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        },
+        "normalized_product_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Normalized Product Id"
+        },
+        "source_artifact_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Artifact Id"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "ComparisonWarning",
+      "type": "object"
+    },
+    "PriceDifference": {
+      "additionalProperties": false,
+      "properties": {
+        "absolute_difference": {
+          "title": "Absolute Difference",
+          "type": "string"
+        },
+        "currency": {
+          "pattern": "^[A-Z]{3}$",
+          "title": "Currency",
+          "type": "string"
+        },
+        "maximum": {
+          "title": "Maximum",
+          "type": "string"
+        },
+        "minimum": {
+          "title": "Minimum",
+          "type": "string"
+        },
+        "percentage_difference": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Percentage Difference"
+        },
+        "values": {
+          "items": {
+            "$ref": "#/$defs/SourcePrice"
+          },
+          "title": "Values",
+          "type": "array"
+        }
+      },
+      "required": [
+        "currency",
+        "values",
+        "minimum",
+        "maximum",
+        "absolute_difference"
+      ],
+      "title": "PriceDifference",
+      "type": "object"
+    },
+    "ProductComparisonGroup": {
+      "additionalProperties": false,
+      "properties": {
+        "display_name": {
+          "title": "Display Name",
+          "type": "string"
+        },
+        "match_key": {
+          "title": "Match Key",
+          "type": "string"
+        },
+        "observations": {
+          "items": {
+            "$ref": "#/$defs/ProductObservation"
+          },
+          "title": "Observations",
+          "type": "array"
+        },
+        "price_differences": {
+          "items": {
+            "$ref": "#/$defs/PriceDifference"
+          },
+          "title": "Price Differences",
+          "type": "array"
+        }
+      },
+      "required": [
+        "match_key",
+        "display_name",
+        "observations"
+      ],
+      "title": "ProductComparisonGroup",
+      "type": "object"
+    },
+    "ProductObservation": {
+      "additionalProperties": false,
+      "properties": {
+        "brand": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Brand"
+        },
+        "canonical_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Canonical Url"
+        },
+        "execution_trace_id": {
+          "format": "uuid",
+          "title": "Execution Trace Id",
+          "type": "string"
+        },
+        "gtin": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Gtin"
+        },
+        "mpn": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Mpn"
+        },
+        "name": {
+          "title": "Name",
+          "type": "string"
+        },
+        "normalized_product_id": {
+          "title": "Normalized Product Id",
+          "type": "string"
+        },
+        "prices": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Prices",
+          "type": "object"
+        },
+        "sku": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sku"
+        },
+        "snapshot_id": {
+          "title": "Snapshot Id",
+          "type": "integer"
+        },
+        "source_artifact_id": {
+          "format": "uuid",
+          "title": "Source Artifact Id",
+          "type": "string"
+        },
+        "source_product_id": {
+          "title": "Source Product Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "snapshot_id",
+        "execution_trace_id",
+        "source_artifact_id",
+        "normalized_product_id",
+        "source_product_id",
+        "name"
+      ],
+      "title": "ProductObservation",
+      "type": "object"
+    },
+    "SourceCoverage": {
+      "additionalProperties": false,
+      "properties": {
+        "duplicate_product_count": {
+          "minimum": 0,
+          "title": "Duplicate Product Count",
+          "type": "integer"
+        },
+        "execution_trace_id": {
+          "format": "uuid",
+          "title": "Execution Trace Id",
+          "type": "string"
+        },
+        "label": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Label"
+        },
+        "priced_product_count": {
+          "minimum": 0,
+          "title": "Priced Product Count",
+          "type": "integer"
+        },
+        "product_count": {
+          "minimum": 0,
+          "title": "Product Count",
+          "type": "integer"
+        },
+        "source_artifact_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Artifact Id"
+        },
+        "source_content_hash": {
+          "anyOf": [
+            {
+              "pattern": "^[0-9a-f]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Content Hash"
+        },
+        "source_trace_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Trace Id"
+        },
+        "unique_product_count": {
+          "minimum": 0,
+          "title": "Unique Product Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "execution_trace_id",
+        "product_count",
+        "unique_product_count",
+        "priced_product_count",
+        "duplicate_product_count"
+      ],
+      "title": "SourceCoverage",
+      "type": "object"
+    },
+    "SourcePrice": {
+      "additionalProperties": false,
+      "properties": {
+        "amount": {
+          "title": "Amount",
+          "type": "string"
+        },
+        "normalized_product_id": {
+          "title": "Normalized Product Id",
+          "type": "string"
+        },
+        "source_artifact_id": {
+          "format": "uuid",
+          "title": "Source Artifact Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "source_artifact_id",
+        "normalized_product_id",
+        "amount"
+      ],
+      "title": "SourcePrice",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "comparison_version": {
+      "default": "1.0.0",
+      "title": "Comparison Version",
+      "type": "string"
+    },
+    "products": {
+      "items": {
+        "$ref": "#/$defs/ProductComparisonGroup"
+      },
+      "title": "Products",
+      "type": "array"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "sources": {
+      "items": {
+        "$ref": "#/$defs/SourceCoverage"
+      },
+      "title": "Sources",
+      "type": "array"
+    },
+    "summary": {
+      "$ref": "#/$defs/ComparisonSummary"
+    },
+    "warnings": {
+      "items": {
+        "$ref": "#/$defs/ComparisonWarning"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "summary",
+    "sources",
+    "products"
+  ],
+  "title": "ProductComparisonResult",
+  "type": "object"
+}
