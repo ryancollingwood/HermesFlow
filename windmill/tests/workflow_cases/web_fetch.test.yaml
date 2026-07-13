@@ -1,0 +1,17 @@
+schema_version: "1.0"
+tests:
+  - id: smoke/web-fetch-live
+    capability_paths: [f/capabilities/collection/web_fetch]
+    type: live_integration
+    mode: scheduled
+    script_path: f/capabilities/collection/web_fetch
+    timeout_seconds: 15
+    max_data_bytes: 1048576
+    args:
+      url: https://example.com/
+      allowed_domains: [example.com]
+      timeout_seconds: 10
+      max_size_bytes: 1048576
+      max_retries: 1
+      max_redirects: 3
+    skip_reason: Enable explicitly when outbound network integration tests are approved.

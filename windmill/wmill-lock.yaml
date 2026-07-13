@@ -1,5 +1,6 @@
 version: v2
 locks:
+  f/capabilities/collection/web_fetch: ff8567c5f6a7346de37ccb1d92c81cde952cf02a5089a3a15f791e94eaf1f0ef
   f/collection/baserow_webhook: 8c54a09a7e42c29311e50bf1d6b2f782cdbdb5f29a544545cda4ee7aafa3feb3
   f/data_platform/dbt_run: be748a82045ce31e96fdfa1d7cfba8e83d8ce96c71ca343fd296c86225f32524
   f/data_platform/extract_hn_stories: 1f5ade62733cfb40962b1732ef2720cd6f4e8599ebb4f274cad6a66ea599036e
