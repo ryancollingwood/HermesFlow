@@ -131,6 +131,18 @@ class ArtifactRef(BaseModel):
         description="Where the content lives, e.g. "
         "file:///shared/artifacts/<hash[:2]>/<hash>.",
     )
+    size_bytes: Optional[int] = Field(
+        default=None,
+        ge=0,
+        description="Artifact content size in bytes. HF-017 storage adapters always populate it; "
+        "optional for backward compatibility with pre-HF-017 references.",
+    )
+    media_type: Optional[str] = Field(
+        default=None,
+        min_length=1,
+        description="IANA media type of the stored content. HF-017 adapters always populate it; "
+        "optional for backward compatibility with pre-HF-017 references.",
+    )
     creator_capability: str = Field(
         ...,
         min_length=1,

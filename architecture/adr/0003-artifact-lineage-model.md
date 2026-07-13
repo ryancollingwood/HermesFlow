@@ -76,17 +76,26 @@ new `f/libraries/` namespace, added to `wmill.yaml`'s `includes:` wholesale
   resolves those relative imports. `make test` / `make ci` run them locally;
   CI runs them in the `python` job.
 
-Still open for HF-017/HF-018: the storage adapter's exact path scheme under
-`${SHARED_DIR}/artifacts/`, retention policy, and the context-propagation
-helpers that stitch a flow's steps into one lineage graph.
+**Storage adapter implemented (HF-017).**
+`f/libraries/storage/artifacts.py` stores immutable content at
+`/shared/artifacts/<sha256[:2]>/<sha256>` and per-lineage-event envelopes at
+`/shared/artifacts/metadata/<artifact_id>.json`. Duplicate bytes reuse the
+same object while retaining separate ArtifactRefs and metadata. Writes are
+bounded and atomic; reads verify canonical containment, SHA-256, size, and
+reject traversal and symlink escapes. `ArtifactRef` gained additive optional
+`size_bytes` and `media_type` fields for backward compatibility; the adapter
+always populates both.
+
+Still open for HF-018: context-propagation helpers that stitch a flow's steps
+into one lineage graph. Retention policy remains a hardening concern.
 
 ## Status
 
 Schemas implemented ([HF-002](https://github.com/ryancollingwood/HermesFlow/issues/40),
 done) and the artifact mount provisioned
 ([HF-000A](https://github.com/ryancollingwood/HermesFlow/issues/37), done).
-Still pending the storage adapter
-([HF-017](https://github.com/ryancollingwood/HermesFlow/issues/55)) and
-lineage/context-propagation helpers
+The storage adapter is implemented
+([HF-017](https://github.com/ryancollingwood/HermesFlow/issues/55), done).
+Still pending lineage/context-propagation helpers
 ([HF-018](https://github.com/ryancollingwood/HermesFlow/issues/56)) before
 this ADR can be marked Accepted.
