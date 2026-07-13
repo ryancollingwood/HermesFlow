@@ -1,0 +1,36 @@
+summary: ''
+description: ''
+lock: '!inline f/capabilities/collection/extract_structured_markup.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    lineage_json:
+      type: string
+      description: ''
+      default: ''
+      originalType: string
+    max_blocks:
+      type: integer
+      description: ''
+      default: 100
+    max_candidates:
+      type: integer
+      description: ''
+      default: 1000
+    max_html_bytes:
+      type: integer
+      description: ''
+      default: 10000000
+    max_json_bytes:
+      type: integer
+      description: ''
+      default: 1000000
+    raw_artifact:
+      type: object
+      description: ''
+      default: null
+      properties: {}
+  required:
+    - raw_artifact

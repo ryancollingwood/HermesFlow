@@ -113,3 +113,25 @@ entries:
       effects:
         network: true
         filesystem: true
+
+  - kind: script
+    tags: [web, extract, json-ld, schema-org, deterministic]
+    inputs_summary: >-
+      A retained raw HTTP ArtifactRef, with optional lineage verification and
+      explicit bounds for source bytes, JSON-LD block bytes, blocks, and candidates.
+    outputs_summary: >-
+      Deterministically ordered, validated structured candidates with stable IDs,
+      source artifact/block/path provenance, counts, and isolated parse warnings.
+    input_kinds: [raw_http_artifact]
+    output_kinds: [structured_candidates, extraction_provenance]
+    metadata:
+      path: f/capabilities/collection/extract_structured_markup
+      capability_version: "1.0.0"
+      summary: Deterministically extract validated JSON-LD candidates from retained web resources.
+      maturity: experimental
+      deterministic: true
+      owners: [platform]
+      dependencies: [f/capabilities/collection/web_fetch]
+      test_requirements: [contracts/structured-markup-result]
+      effects:
+        filesystem: true
