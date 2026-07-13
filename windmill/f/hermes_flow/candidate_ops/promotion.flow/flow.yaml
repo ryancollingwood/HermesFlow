@@ -1,0 +1,78 @@
+summary: Promote a tested HermesFlow candidate
+description: HF-013 policy, test, diff/impact, native approval, optimistic
+  write, and provenance workflow. Rejection/cancellation at the suspend step
+  prevents the privileged finalizer from running.
+value:
+  modules:
+    - id: prepare
+      summary: Validate policy, tests, and promotion evidence
+      value:
+        type: script
+        input_transforms:
+          candidate_capability_metadata:
+            type: javascript
+            expr: flow_input.candidate_capability_metadata
+          candidate_id:
+            type: javascript
+            expr: flow_input.candidate_id
+          catalogue_yaml:
+            type: javascript
+            expr: flow_input.catalogue_yaml
+          test_results_json:
+            type: javascript
+            expr: flow_input.test_results_json
+        is_trigger: false
+        path: f/hermes_flow/candidate_ops/prepare_promotion
+    - id: approval
+      summary: Review diff, impact, and affected tests
+      value:
+        type: rawscript
+        content: '!inline review_diff,_impact,_and_affected_tests.inline_script.py'
+        input_transforms:
+          evidence:
+            type: javascript
+            expr: results.prepare
+        lock: '!inline review_diff,_impact,_and_affected_tests.inline_script.lock'
+        is_trigger: false
+        language: python3
+      skip_if:
+        expr: results.prepare.policy.outcome !== "approval_required"
+      suspend:
+        hide_cancel: false
+        required_events: 1
+        self_approval_disabled: true
+        user_auth_required: true
+    - id: finalize
+      summary: Version active script and persist promotion provenance
+      value:
+        type: script
+        input_transforms:
+          approval_granted:
+            type: static
+            value: true
+          approved_by:
+            type: javascript
+            expr: 'typeof approvers !== "undefined" && approvers.length ? approvers[0] : ""'
+          prepared_json:
+            type: javascript
+            expr: JSON.stringify(results.prepare)
+        is_trigger: false
+        path: f/hermes_flow/candidate_ops/promote
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    candidate_capability_metadata:
+      type: object
+      default: null
+    candidate_id:
+      type: string
+    catalogue_yaml:
+      type: string
+    test_results_json:
+      type: string
+      description: JSON array of {test, passed, job_id?, details?} results.
+  required:
+    - candidate_id
+    - catalogue_yaml
+    - test_results_json

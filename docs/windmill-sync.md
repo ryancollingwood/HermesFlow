@@ -42,7 +42,7 @@ by folder boundaries. It is deliberately narrow:
 | `f/collection/**` | collection_db Postgres resource + Baserow webhook receiver | ✅ yes | ✅ yes |
 | `f/libraries/**` | shared, importable Pydantic-model modules (`f.libraries.lineage.models`, `f.libraries.capability.models`, `f.libraries.results.models`, …) | ✅ yes | ✅ yes |
 | `f/data_platform/{folder.meta,data_platform_db.resource,db_password.variable,dbt_run.*,extract_hn_stories.*}` | dlt/dbt pipeline scripts + their resource/secret | ✅ yes | ✅ yes (named explicitly, not wildcarded) |
-| `f/hermes_flow/{folder.meta.yaml,catalogue/models.*,catalogue/search.*,policies/evaluator.*,candidate_ops/models.*,candidate_ops/create.*,candidate_ops/diff.*}` | HermesFlow's own control-plane: capability catalogue (HF-008), search/ranking (HF-009), policy evaluator (HF-010), candidate creation (HF-011), and diff/impact analysis (HF-012) — all done | ✅ yes | ✅ yes (named explicitly, not wildcarded — see below) |
+| `f/hermes_flow/{folder.meta.yaml,catalogue/models.*,catalogue/search.*,policies/evaluator.*,candidate_ops/models.*,candidate_ops/create.*,candidate_ops/diff.*,candidate_ops/promote.*,candidate_ops/prepare_promotion.*,candidate_ops/promotion.flow/**}` | HermesFlow's own control-plane: capability catalogue/search/policy (HF-008–010), candidate creation/diff (HF-011–012), and promotion workflow (HF-013) | ✅ yes | ✅ yes (named explicitly, not wildcarded — see below) |
 | `capability-index.yaml` (top level, not under `f/`) | the version-controlled capability index itself, validated/loaded by `f/hermes_flow/catalogue/models.py` | ✅ yes | ❌ no — repo-only, like `wmill.yaml` itself; not a Windmill script/flow/resource asset, so there's nothing for `wmill sync` to push. Read directly from the checked-out repo by CI and by whatever eventually calls `load_catalogue()` |
 | `hermes_endpoint` resource-type | the shared endpoint type | ✅ yes | ✅ yes |
 | `f/hermes_state/**` | **runtime state** (timestamps, cursors, non-secret vars) | ❌ no | ❌ **no** |
@@ -77,7 +77,8 @@ Two settings enforce this:
   - `f/hermes_flow/` (currently `f/hermes_flow/folder.meta.yaml`,
     `f/hermes_flow/catalogue/models.*`, `f/hermes_flow/catalogue/search.*`,
     `f/hermes_flow/policies/evaluator.*`, and
-    `f/hermes_flow/candidate_ops/{models,create,diff}.*`) has a harder
+    `f/hermes_flow/candidate_ops/{models,create,diff,promote,prepare_promotion}.*`
+    plus `f/hermes_flow/candidate_ops/promotion.flow/**`) has a harder
     requirement: `f/hermes_flow/candidates/` (HF-011's candidate namespace —
     proposed capabilities awaiting promotion, deliberately Windmill-only)
     shares that same root. A `f/hermes_flow/**` wildcard would sweep
