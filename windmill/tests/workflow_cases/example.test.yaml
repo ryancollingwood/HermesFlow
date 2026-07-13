@@ -1,0 +1,11 @@
+schema_version: "1.0"
+tests:
+  - id: smoke/hermes-client-live
+    capability_paths: [f/hermes/client]
+    type: live_integration
+    mode: scheduled
+    script_path: f/hermes_flow/testing/example_test
+    timeout_seconds: 30
+    max_data_bytes: 65536
+    args: {outcome: skip}
+    skip_reason: Example only; enable when a disposable endpoint is configured.

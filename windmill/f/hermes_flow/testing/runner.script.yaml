@@ -1,0 +1,42 @@
+summary: ''
+description: ''
+lock: '!inline f/hermes_flow/testing/runner.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    capability_path:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    manifest_yaml:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    max_data_bytes:
+      type: integer
+      description: ''
+      default: 5000000
+    max_timeout_seconds:
+      type: integer
+      description: ''
+      default: 300
+    mode:
+      type: string
+      description: ''
+      default: ''
+      originalType: string
+    required_test_ids:
+      type: array
+      description: ''
+      default: null
+      items:
+        type: string
+      originalType: string[]
+  required:
+    - manifest_yaml
+    - capability_path
+    - required_test_ids

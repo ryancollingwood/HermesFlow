@@ -1,0 +1,14 @@
+summary: ''
+description: ''
+lock: '!inline f/hermes_flow/testing/example_test.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    outcome:
+      type: string
+      description: ''
+      default: pass
+      originalType: string
+  required: []
