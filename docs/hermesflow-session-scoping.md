@@ -60,12 +60,18 @@ shell). Scope the session, not the installation.
 ## HermesFlow-mode invocation
 
 ```sh
-hermes chat -t windmill,memory,todo,clarify,session_search -s hermesflow
+hermes chat -t windmill,hermesflow,memory,todo,clarify,session_search -s hermesflow
 # non-interactive:
-hermes chat -Q -t windmill,memory,todo,clarify,session_search -s hermesflow -q "..."
+hermes chat -Q -t windmill,hermesflow,memory,todo,clarify,session_search -s hermesflow -q "..."
 ```
 
 - `windmill` — the only execution transport (ADR 0001/0005).
+- `hermesflow` — the narrow HF-028 MCP server registered by
+  `make hermesflow-mcp`; its sole tool can submit the fixed product-collection
+  flow with validated arguments because Windmill's native MCP run tools cannot
+  pass them. Its dedicated `jobs:run`/`jobs:read` token is available only inside
+  that fixed-flow server; the model cannot select arbitrary code, schedule work,
+  or enable AI through its schema.
 - `memory`, `session_search` — recall context across sessions; read-only,
   no task side effects.
 - `todo` — task tracking; bookkeeping only.

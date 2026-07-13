@@ -23,20 +23,31 @@ generate "to be safe."
 
 ## How to search, today
 
-The searchable capability catalogue
-([HF-008](https://github.com/ryancollingwood/HermesFlow/issues/46) /
-[HF-009](https://github.com/ryancollingwood/HermesFlow/issues/47)) doesn't
-exist yet — there is no `windmill/capability-index.yaml` and no ranked
-search operation to call. Until it lands, search means:
+The versioned catalogue now lives at `windmill/capability-index.yaml`, with
+validated entries from HF-008 and deterministic ranking in
+`f/hermes_flow/catalogue/search` from HF-009. The ranked operation accepts the
+catalogue YAML as input because Windmill jobs cannot read the checked-out repo.
+When that input is available in the calling context, use the ranked operation
+and preserve its rationale.
 
-- `listScripts` / `listFlows` via the `windmill` MCP toolset, scanning
-  paths and summaries directly.
+A restricted HermesFlow conversation deliberately has no filesystem tool, so
+its MCP discovery path is:
+
+- Call `listScripts` / `listFlows` via the `windmill` MCP toolset. Calling at
+  least one of these is required before selection; recalling a path from an
+  earlier turn is not a search.
+- Use task keywords, expected input/output shape, and summaries to shortlist
+  assets in primitives → workflows order. For an end-to-end product collection
+  result, `output_kinds=product_collection_workflow_result` identifies the
+  catalogue match even though the MCP list surface exposes summary rather than
+  the repo-only catalogue record.
+- Inspect every shortlisted asset with `getScriptByPath` / `getFlowByPath`.
+  The returned schema is authoritative for arguments and bounds.
 - `searchDocs` (Windmill's own doc search, exposed as an MCP tool) if you
   need to understand a Windmill feature rather than find a capability.
-- Reading a candidate script's own `CapabilityMetadata` where one exists
-  (see below) — most existing scripts (`f/hermes/*`, `f/collection/*`,
-  `f/data_platform/*`) predate this schema and don't carry one yet; treat
-  their `summary`/docstring as the discovery text instead.
+- Read the selected catalogue entry's `CapabilityMetadata` where it is present;
+  for legacy assets without an entry, treat their summary/docstring only as
+  discovery text and fail closed for execution policy.
 - Asking the user directly when the above doesn't turn up a clear answer,
   rather than guessing and generating something that duplicates an
   existing but hard-to-find capability.

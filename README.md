@@ -1071,6 +1071,7 @@ Gotchas (all enforced by Windmill):
 | `make headroom` / `headroom-revert` | Route Hermes through / off the Headroom context-compression proxy |
 | `make hermes-skills-push` | Copy `hermes/skills/` into the Hermes-bound `DATA_DIR/skills/` (additive — never deletes a skill there that isn't tracked in this repo). Run by both installers automatically. |
 | `make hermes-skills-pull` | Pull tracked skills back from `DATA_DIR/skills/` into `hermes/skills/` for review — scoped only to skills already tracked here. See [docs/hermes-skills.md](docs/hermes-skills.md). |
+| `make hermesflow-mcp` | Push the tracked skill, mint/reuse its dedicated Windmill job token, and register HF-028's narrow, validated product-collection execution tool with Hermes. |
 
 ## Security notes
 

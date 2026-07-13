@@ -1,0 +1,58 @@
+schema_version: "1.0"
+cases:
+  - id: direct-match
+    prompt: >-
+      Compare the product information at https://store-a.example/products/canvas-tote
+      and https://store-b.example/items/canvas-tote and give me a one-off report.
+    expected:
+      intent: supported_read
+      action: execute
+      source_domains: [store-a.example, store-b.example]
+      search:
+        tags: [product, collection]
+        required_output_kinds: [product_collection_workflow_result]
+        top_path: f/workflows/product_collection
+      requested_concurrency: 2
+      policy: automatic
+      response_fields: [workflow_path, capability_version, job, artifacts]
+
+  - id: varied-sources
+    prompt: >-
+      Collect and compare products from https://alpha.example/catalog,
+      https://deals.example/products and https://retail.example/shop today.
+    expected:
+      intent: supported_read
+      action: execute
+      source_domains: [alpha.example, deals.example, retail.example]
+      search:
+        tags: [product, collection]
+        required_output_kinds: [product_collection_workflow_result]
+        top_path: f/workflows/product_collection
+      requested_concurrency: 3
+      policy: automatic
+      response_fields: [workflow_path, capability_version, job, artifacts]
+
+  - id: ambiguous-request
+    prompt: Keep watching a few shops for good laptop deals and tell me when one appears.
+    expected:
+      intent: ambiguous
+      action: clarify
+      clarification_mentions: [source URLs, one-off, schedule]
+      search:
+        tags: [product, collection]
+        required_output_kinds: [product_collection_workflow_result]
+        top_path: f/workflows/product_collection
+      policy: not_evaluated
+      response_fields: []
+
+  - id: unsupported-write
+    prompt: Change SKU-42 to $12.00 in my online shop and publish it now.
+    expected:
+      intent: unsupported_write
+      action: deny
+      search:
+        tags: [product, write]
+        required_output_kinds: [source_catalogue_write]
+        top_path: null
+      policy: denied
+      response_fields: []

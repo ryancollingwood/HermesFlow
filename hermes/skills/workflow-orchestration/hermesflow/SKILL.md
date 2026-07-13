@@ -1,7 +1,7 @@
 ---
 name: hermesflow
-description: Orchestrate HermesFlow tasks — select or generate a capability, run it exclusively through Windmill, and present the result. Use for any task that needs code to run, not just conversation.
-version: 0.2.0
+description: Orchestrate HermesFlow tasks — search for or generate a capability, run it exclusively through Windmill, and present the result. Use for any task that needs code to run, including natural-language product collection, comparison, price research, or multi-source shopping requests.
+version: 0.3.0
 author: Ryan Philip Collingwood
 license: MIT
 metadata:
@@ -80,9 +80,9 @@ despite this rule). **A HermesFlow session must be started with a
 restricted toolset, not just this skill preloaded:**
 
 ```sh
-hermes chat -t windmill,memory,todo,clarify,session_search -s hermesflow
+hermes chat -t windmill,hermesflow,memory,todo,clarify,session_search -s hermesflow
 # or, non-interactively:
-hermes chat -Q -t windmill,memory,todo,clarify,session_search -s hermesflow -q "..."
+hermes chat -Q -t windmill,hermesflow,memory,todo,clarify,session_search -s hermesflow -q "..."
 ```
 
 `-t` is a session-scoped **allowlist**, not additive to whatever's globally
@@ -115,15 +115,18 @@ tool available to fall back to.
 **Transport:** talk to Windmill through the `windmill` MCP server (native
 Streamable-HTTP/SSE, decided in
 [`architecture/adr/0005-hermes-windmill-transport.md`](../../../../architecture/adr/0005-hermes-windmill-transport.md)) —
-`listScripts`/`getScriptByPath` to inspect a capability, `runScriptByPath`
-to execute one, `getJob`/`getJobLogs` to inspect what happened. Known
-constraint: `runScriptByPath`'s MCP schema doesn't pass resource-typed
-arguments (e.g. a `conn: hermes_endpoint` parameter) — a capability that
-needs one will fail with the resource unresolved. Don't route around this
-by trying a different execution path; it's a capability-design constraint
-(design the capability's signature to avoid resource-typed args, or use a
-direct Windmill job-run REST call for that specific case) documented in
-ADR 0005's Consequences.
+`listScripts`/`listFlows` to search, `getScriptByPath`/`getFlowByPath` to
+inspect a capability, `runScriptByPath`/`runFlowByPath` to execute an
+argument-free one, and
+`getJob`/`getJobLogs` to inspect what happened. Always inspect a flow before
+running it so its schema—not a guessed argument shape—is authoritative. Known
+constraint: the native `runScriptByPath`/`runFlowByPath` MCP schemas do not
+accept job arguments. Do not pretend an argumented capability ran by submitting
+it empty. HF-028's product flow uses the separately registered, one-purpose
+`hermesflow` MCP tool `run_product_collection`; it validates and fixes the
+target, resource, bounds, and read-only settings before calling Windmill. Other
+argumented capabilities need an equally narrow approved transport or a signature
+that avoids inputs, as documented in ADR 0005's Consequences.
 
 ## Rule 2 — Primitives before workflows before generation
 
@@ -139,11 +142,45 @@ first thing that covers it:
 
 Reaching for generation before ruling out reuse produces duplicate,
 undertested capabilities and is the failure mode this ordering exists to
-prevent. See `references/capability-selection.md` for how to search given
-what's actually built today (the full searchable catalogue is
-[HF-008](https://github.com/ryancollingwood/HermesFlow/issues/46)/[HF-009](https://github.com/ryancollingwood/HermesFlow/issues/47),
-not yet implemented) and how to read a candidate's `CapabilityMetadata`
-before deciding to reuse it.
+prevent. See `references/capability-selection.md` for the live catalogue/search
+surface and how to read `CapabilityMetadata` before deciding to reuse an asset.
+
+### Product-collection exemplar
+
+For natural-language product research, collection, price comparison, or
+multi-source shopping requests, read
+`references/product-collection-exemplar.md` and follow its contract:
+
+> The canonical human guide is
+> [`docs/hermesflow-conversational-exemplar.md`](../../../../docs/hermesflow-conversational-exemplar.md).
+> If it conflicts with the bundled reference, the repo doc wins and the drift
+> must be flagged.
+
+1. Classify the requested outcome before selecting anything. A one-off read,
+   comparison, or report is supported; purchasing, changing prices, deleting
+   products, or mutating a source system is not.
+2. **Always search Windmill** (`listFlows`, and `listScripts` only if a
+   primitive might satisfy the whole request) before naming a capability.
+   Inspect the selected asset with `getFlowByPath`. A remembered path is not a
+   substitute for search, even when the likely match is
+   `f/workflows/product_collection`.
+3. Ask one focused clarification and do not execute if source URLs or whether
+   the user wants a one-off run versus a schedule are ambiguous. An explicit
+   HTTP(S) URL makes its exact hostname allowlist unambiguous: derive that
+   hostname without asking. Ask only when the user requests a broader parent or
+   redirect domain without naming it. Scheduling remains approval-required.
+4. Evaluate the selected capability's execute policy and bounds. The active
+   product collection flow may execute automatically for a non-destructive,
+   one-off request within its limits; its internal snapshot persistence does
+   not turn the user's read-only intent into permission to mutate a source.
+5. Run the inspected flow with the `hermesflow` MCP tool
+   `run_product_collection`, then retrieve the completed job with Windmill's
+   `getJob`. Never use native `runFlowByPath` for this argumented flow, and never
+   replace it with direct fetching or local code.
+6. Explain the selected workflow in one user-facing sentence. Do not recite all
+   internal primitives unless asked. Report the flow path/version, Windmill job
+   reference, outcome/warnings, and artifact references from the returned
+   result.
 
 ## Rule 3 — Candidate before mutation
 
@@ -192,3 +229,6 @@ reference behind a "show details" toggle).
 - `references/result-presentation.md` — mirrors
   [`docs/result-envelope-rendering.md`](../../../../docs/result-envelope-rendering.md)
   (canonical) for MCP-driven use.
+- `references/product-collection-exemplar.md` — exact intent classification,
+  search, clarification, policy, execution arguments, and response contract for
+  HF-028's natural-language product collection exemplar.
