@@ -1,0 +1,35 @@
+summary: ''
+description: ''
+lock: '!inline f/hermes_flow/testing/regression.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    catalogue_yaml:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    changed_capability:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    manifest_yaml:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    max_data_bytes:
+      type: integer
+      description: ''
+      default: 5000000
+    max_timeout_seconds:
+      type: integer
+      description: ''
+      default: 300
+  required:
+    - catalogue_yaml
+    - manifest_yaml
+    - changed_capability

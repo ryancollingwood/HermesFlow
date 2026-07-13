@@ -113,7 +113,7 @@ See the ADR's Consequences section and
 | HF-018 Lineage helpers | Context propagation + derivation links through flow steps | `f/libraries/lineage/` |
 | HF-019 Hermes structured-invocation wrapper | Extend `f/hermes/client.py` pattern: new `f/libraries/ai/invoke_hermes_structured` capability — schema-validated output, prompt/conversation/raw-response artifacts, model metadata, retries; marked nondeterministic | Reuses `hermes_endpoint` resource; verify secrets never land in retained artifacts |
 | HF-021 Web fetch capability | `f/capabilities/collection/` or `f/libraries/web/`; allowed-domain policy, size/timeout bounds, raw artifact retention | SSRF tests: disallowed domains, local-network addresses — matters because Windmill workers sit on the internal Docker networks |
-| HF-016 Dependency-aware regression selection | Test selection from the catalogue dependency graph; cycle-safe traversal with per-test inclusion rationale | Pulled forward from hardening so HF-020 can run in this sprint |
+| HF-016 Dependency-aware regression selection (done) | `f/hermes_flow/testing/regression.py`: changed-capability tests plus direct/transitive consumer contract/smoke tests, deduplicated with per-test reasons, then executed through HF-015 | Cycle-safe chains/branches/cycles; shared-normalisation exemplar selects both consumer workflows; 7 focused tests |
 | HF-020 Scheduled health tests | Scheduled flows generated from capability metadata; bounded samples, rate limits, consecutive-failure counts | Pulled forward from hardening — catches source drift during exemplar development |
 
 ## Sprint 4 — Product-collection exemplar (Phase 4)
