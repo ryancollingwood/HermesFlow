@@ -38,6 +38,7 @@ includes:
   - "f/hermes_flow/candidate_ops/lifecycle.*"
   - "f/hermes_flow/testing/runner.*"
   - "f/hermes_flow/testing/example_test.*"
+  - "f/hermes_flow/testing/regression.*"
   - "f/data_platform/folder.meta.yaml"
   - "f/data_platform/data_platform_db.resource.yaml"
   - "f/data_platform/db_password.variable.yaml"

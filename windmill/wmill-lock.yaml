@@ -15,6 +15,7 @@ locks:
   f/hermes_flow/catalogue/search: 992a61e0b836d51df24747baf18796117410ee4ef8e6551221ddf517f461dec0
   f/hermes_flow/policies/evaluator: 34cf73b5e172fb80f4a160548e6c83409af732f8f73d03c04794be3e41915f1e
   f/hermes_flow/testing/example_test: f418b5d367a9c8e5bca4e6271fed31512b4ef1172cdc7b02abd09bf5ae9ea528
+  f/hermes_flow/testing/regression: 85dac4a471d8bdf73d5258534359fe0b0ecc142df1eee9810a502f1898e53420
   f/hermes_flow/testing/runner: 1205921f657a5efec74b141d90f249af3221347acfc2b2563f9e3d9557954b1a
   f/hermes/chat: e8d58cf77c012bc4312bc1c9696e850213e8f75f6714a931ba788a9186a9b830
   f/hermes/client: 718f0db16e26856211e6fd76023ff8af80c04b3ec014deb86521e36a135f31d4
