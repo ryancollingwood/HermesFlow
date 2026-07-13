@@ -1,6 +1,6 @@
 # 0003 — Artifact lineage model
 
-**Status:** Proposed
+**Status:** Accepted
 **Related:** [HF-000A](https://github.com/ryancollingwood/HermesFlow/issues/37), [HF-002](https://github.com/ryancollingwood/HermesFlow/issues/40), [HF-017](https://github.com/ryancollingwood/HermesFlow/issues/55), [HF-018](https://github.com/ryancollingwood/HermesFlow/issues/56), `docs/plans/hermesflow-lifecycle.md`
 
 ## Context
@@ -86,8 +86,14 @@ reject traversal and symlink escapes. `ArtifactRef` gained additive optional
 `size_bytes` and `media_type` fields for backward compatibility; the adapter
 always populates both.
 
-Still open for HF-018: context-propagation helpers that stitch a flow's steps
-into one lineage graph. Retention policy remains a hardening concern.
+**Lineage helpers implemented (HF-018).**
+`f/libraries/lineage/helpers.py` creates missing execution context only at a
+workflow boundary, propagates correlation fields into registered child jobs,
+and rejects context-free steps. Its serializable `LineageState` carries only
+contexts and ArtifactRefs between Windmill steps. Artifact recording requires
+the producing context and every input reference to belong to the same run;
+cycle-safe traversal returns a deduplicated inputs-before-outputs chain.
+Retention policy remains a hardening concern.
 
 ## Status
 
@@ -96,6 +102,7 @@ done) and the artifact mount provisioned
 ([HF-000A](https://github.com/ryancollingwood/HermesFlow/issues/37), done).
 The storage adapter is implemented
 ([HF-017](https://github.com/ryancollingwood/HermesFlow/issues/55), done).
-Still pending lineage/context-propagation helpers
-([HF-018](https://github.com/ryancollingwood/HermesFlow/issues/56)) before
-this ADR can be marked Accepted.
+Lineage/context-propagation helpers are implemented
+([HF-018](https://github.com/ryancollingwood/HermesFlow/issues/56), done), so
+the context, reference, storage, and propagation decisions in this ADR are now
+accepted.
