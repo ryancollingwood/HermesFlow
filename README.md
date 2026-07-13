@@ -901,7 +901,8 @@ windmill/
 > items under `f/data_platform/` are **versioned code/config** and are the
 > *only* things sync touches. Non-secret **runtime state** (last-run
 > timestamps, cursors, …) belongs in a sibling `<folder>_state/` folder (e.g.
-> `f/hermes_state/`) — created by the installer but **deliberately outside
+> `f/hermes_state/`; lifecycle audit records use `f/hermes_flow_state/`) —
+> created by the installer but **deliberately outside
 > sync scope**, so a mirror push never deletes it and it never lands in git.
 > `f/data_platform/` is scoped item-by-item in `includes` (each file/pattern
 > named explicitly) rather than a blanket `f/data_platform/**`, so any extra

@@ -102,7 +102,7 @@ See the ADR's Consequences section and
 | HF-011 Candidate creation (done) | `create_candidate()` in `f/hermes_flow/candidate_ops/create.py`; deterministic `compute_candidate_id(request_key)` makes creation idempotent without a separate ledger — the candidate's own existence at its deterministic path *is* the check; `CandidateRecord` (`candidate_ops/models.py`) records reason, provenance (`source_path`/`base_version`, auto-resolved from the source's live Windmill hash when deriving), conversation/request references; 20 unit tests against an in-memory fake client | **Privileged-gateway pattern discovered live**: Windmill jobs run with the *script owner's* permissions (`WM_PERMISSIONED_AS`), not the caller's token scope — confirmed empirically (a job triggered by a token scoped to only `scripts:read`/`jobs:run:scripts` still created a script successfully). So Hermes's narrowly-scoped `windmill-mcp` token never needs `scripts:write`; it only needs to call *this one script*, whose own elevated identity does the write. Safety is enforced by this module's own path-escape check, not by token scopes. Live-verified all four testing-guidance points (new candidate, idempotent duplicate, derived candidate with auto-resolved `base_version`, active asset byte-for-byte unchanged) against the real server using a deliberately narrow-scoped token, not admin |
 | HF-012 Diff & impact analysis (done) | `candidate_ops/diff.py`: machine-readable code/schema/metadata/dependency diff, human promotion summary, catalogue reverse-dependency traversal and affected tests | Pure core + Windmill entrypoint; cycle-safe, explicit no-change result; 7 focused tests |
 | HF-013 Promotion workflow (done) | `candidate_ops/promotion.flow/flow.yaml`: policy check → required tests → diff/impact evidence → native approval → optimistic active-version write + provenance | Failed/missing tests and denied policy fail closed; stale bases conflict; deployment history and a machine-readable record retain candidate/base/promoted/rollback provenance |
-| HF-014 Deprecation & rollback | Deferred to hardening sprint per §15 | |
+| HF-014 Deprecation & rollback (done) | `candidate_ops/lifecycle.py`: catalogue deprecation output + audit record; history-preserving rollback through a new active version; consumer/schedule impact and smoke-test enforcement | Default search already excludes deprecated entries; rollback records reason, initiating job, failed/restored/new versions, schedules, consumers, and rerun test jobs |
 
 ## Sprint 3 — Testing, lineage, artifacts, first capability (Phase 3 + start of 4)
 
@@ -137,7 +137,7 @@ Sprint 2/3 pieces. The demo scenario is a deliberately changed retail fixture.
 
 ## Sprint 6+ — Hardening (Phase 6 + deferred Phase 2 items)
 
-HF-014 rollback, HF-033 health dashboard (Grafana — observability stack
+HF-033 health dashboard (Grafana — observability stack
 already optional in compose), HF-034 rollback recommendation, HF-035
 retention/privacy/cost, HF-036 documentation and clean-install walkthrough.
 
