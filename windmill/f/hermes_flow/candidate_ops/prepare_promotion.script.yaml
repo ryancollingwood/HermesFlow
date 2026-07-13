@@ -1,0 +1,32 @@
+summary: ''
+description: ''
+lock: '!inline f/hermes_flow/candidate_ops/prepare_promotion.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    candidate_capability_metadata:
+      type: object
+      description: ''
+      default: null
+      properties: {}
+    candidate_id:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    catalogue_yaml:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    test_results_json:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+  required:
+    - candidate_id
+    - catalogue_yaml
+    - test_results_json

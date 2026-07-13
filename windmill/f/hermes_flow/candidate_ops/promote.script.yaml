@@ -1,0 +1,25 @@
+summary: ''
+description: ''
+lock: '!inline f/hermes_flow/candidate_ops/promote.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    approval_granted:
+      type: boolean
+      description: ''
+      default: null
+    approved_by:
+      type: string
+      description: ''
+      default: ''
+      originalType: string
+    prepared_json:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+  required:
+    - prepared_json
+    - approval_granted
