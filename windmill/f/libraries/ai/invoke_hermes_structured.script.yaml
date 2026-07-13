@@ -1,0 +1,58 @@
+summary: ''
+description: ''
+lock: '!inline f/libraries/ai/invoke_hermes_structured.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    conn:
+      type: object
+      description: ''
+      default: null
+      format: resource-hermes_endpoint
+    conversation:
+      type: array
+      description: ''
+      default: null
+      items:
+        type: object
+      originalType: record[]
+    input_payload:
+      type: object
+      description: ''
+      default: null
+      format: resource-Any
+    max_retries:
+      type: integer
+      description: ''
+      default: 2
+    max_tokens:
+      type: integer
+      description: ''
+      default: 2048
+    model:
+      type: string
+      description: ''
+      default: hermes
+      originalType: string
+    output_schema:
+      type: object
+      description: ''
+      default: null
+      properties: {}
+    task_prompt:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    temperature:
+      type: number
+      description: ''
+      default: 0.2
+  required:
+    - conn
+    - task_prompt
+    - conversation
+    - input_payload
+    - output_schema
