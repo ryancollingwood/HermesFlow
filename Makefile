@@ -27,7 +27,7 @@ else
   ON_WINDOWS :=
 endif
 
-.PHONY: help check init apikey secrets wizard secure fix-permissions pull build up down restart logs ps health backup backup-schedule backup-schedule-revert bootstrap hermes-heal hermes-workspace hermes-secure hermes-skills-push hermes-skills-pull lint validate test ci headroom headroom-revert mlx mlx-revert mlx-status memory memory-revert hindsight-mlx hindsight-mlx-revert aux-cloud aux-local aux-hindsight aux-status collection-db-migrate windmill-push windmill-pull windmill-check windmill-mcp baserow baserow-revert baserow-mcp directus directus-revert observability observability-revert ollama ollama-revert
+.PHONY: help check init apikey secrets wizard secure fix-permissions pull build up down restart logs ps health backup backup-schedule backup-schedule-revert bootstrap hermes-heal hermes-workspace hermes-secure hermes-skills-push hermes-skills-pull hermesflow-mcp lint validate test ci headroom headroom-revert mlx mlx-revert mlx-status memory memory-revert hindsight-mlx hindsight-mlx-revert aux-cloud aux-local aux-hindsight aux-status collection-db-migrate windmill-push windmill-pull windmill-check windmill-mcp baserow baserow-revert baserow-mcp directus directus-revert observability observability-revert ollama ollama-revert
 
 # Fill an .env variable with a generated value when it is empty OR still set to a
 # known-weak default. Usage: $(call ensure_secret,VAR,GENERATOR,WEAK_DEFAULT)
@@ -205,6 +205,37 @@ hermes-skills-pull: ## Pull tracked skills FROM the Hermes-bound DATA_DIR/skills
 	  done; \
 	  if [ "$$found" = 1 ]; then echo "✓ pulled tracked skills from $$src — review 'git diff' before committing"; \
 	  else echo "→ none of the tracked skills under hermes/skills/ exist in $$src"; fi
+
+hermesflow-mcp: hermes-skills-push ## Register the narrow HF-028 product-collection execution tool with Hermes
+	@if ! docker inspect -f '{{.State.Running}}' hermes 2>/dev/null | grep -qx true; then \
+	  echo "✗ Hermes container is not running — run 'make up' first"; exit 1; fi
+	@docker exec hermes test -f /opt/data/skills/workflow-orchestration/hermesflow/scripts/product_collection_mcp.py
+	@set -a; . ./$(ENV_FILE) 2>/dev/null; set +a; \
+	  ENVF="$(ENV_FILE)"; \
+	  envput() { if grep -qE "^$$1=" "$$ENVF"; then sed -i.bak "s|^$$1=.*|$$1=$$2|" "$$ENVF" && rm -f "$$ENVF.bak"; else { [ -s "$$ENVF" ] && [ -n "$$(tail -c1 "$$ENVF")" ] && printf '\n' >> "$$ENVF"; }; printf '%s=%s\n' "$$1" "$$2" >> "$$ENVF"; fi; }; \
+	  base="http://127.0.0.1:$${CADDY_HTTP_PORT:-80}"; hh="windmill.localhost"; \
+	  token="$${HF_PRODUCT_MCP_TOKEN:-}"; \
+	  if [ -n "$$token" ] && curl -fsS -H "Host: $$hh" -H "Authorization: Bearer $$token" "$$base/api/w/main/jobs/list?per_page=1" >/dev/null 2>&1; then \
+	    echo "→ reusing dedicated HF_PRODUCT_MCP_TOKEN from $$ENVF"; \
+	  else \
+	    admin=$$(curl -fsS -H "Host: $$hh" -H 'Content-Type: application/json' -X POST "$$base/api/auth/login" \
+	      -d '{"email":"admin@windmill.dev","password":"changeme"}' 2>/dev/null | tr -d '"'); \
+	    [ -n "$$admin" ] || { echo "✗ couldn't mint the dedicated HermesFlow token — set HF_PRODUCT_MCP_TOKEN in $$ENVF"; exit 1; }; \
+	    token=$$(curl -fsS -H "Host: $$hh" -H "Authorization: Bearer $$admin" -H 'Content-Type: application/json' \
+	      -X POST "$$base/api/users/tokens/create" \
+	      -d '{"label":"hermesflow-product-collection","scopes":["jobs:run","jobs:read"]}' 2>/dev/null | tr -d '"'); \
+	    [ -n "$$token" ] || { echo "✗ dedicated HermesFlow token creation failed"; exit 1; }; \
+	    envput HF_PRODUCT_MCP_TOKEN "$$token"; \
+	    echo "→ minted dedicated Windmill token (jobs:run + jobs:read; available only to the fixed-flow MCP server)"; \
+	  fi; \
+	  docker exec hermes hermes mcp remove hermesflow >/dev/null 2>&1 || true; \
+	  echo y | docker exec -i hermes hermes mcp add hermesflow \
+	    --command /opt/hermes/.venv/bin/python \
+	    --env "WINDMILL_MCP_TOKEN=$$token" \
+	    --args /opt/data/skills/workflow-orchestration/hermesflow/scripts/product_collection_mcp.py >/dev/null; \
+	  docker exec hermes hermes mcp test hermesflow 2>&1 | grep -qi "Tools discovered" \
+	    || { echo "✗ HermesFlow MCP registration could not be verified"; exit 1; }
+	@echo "✓ registered HermesFlow product-collection MCP server (stdio, one bounded execution tool)"
 
 up: ## Start the stack (detached)
 	@$(COMPOSE) up -d
