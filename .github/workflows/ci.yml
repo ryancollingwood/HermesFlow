@@ -73,6 +73,11 @@ jobs:
           root = pathlib.Path("windmill/f")
           errs = []
           for py in sorted(root.rglob("*.py")):
+              # Flow raw-script modules are generated as *.inline_script.py and
+              # are owned by their enclosing flow.yaml; they are not standalone
+              # Windmill scripts and therefore have no *.script.yaml sibling.
+              if py.name.endswith(".inline_script.py"):
+                  continue
               meta = py.with_name(py.stem + ".script.yaml")
               if not meta.exists():
                   errs.append(f"{py}: missing {meta.name} — run 'wmill generate-metadata' and commit it")
@@ -81,9 +86,16 @@ jobs:
               py = meta.with_name(base + ".py")
               if not py.exists():
                   errs.append(f"{meta}: references script {py.name} which is missing")
-              m = re.search(r"""!inline\s+([^'"\s]+)""", meta.read_text())
-              if m and not (pathlib.Path("windmill") / m.group(1)).exists():
-                  errs.append(f"{meta}: inline lock {m.group(1)} is missing")
+          # Validate inline code/lock references in both standalone script
+          # metadata and flow YAML. Script references are windmill-root-relative;
+          # generated flow references are relative to the flow directory.
+          for yaml_file in sorted(root.rglob("*.yaml")):
+              for ref in re.findall(r"""!inline\s+([^'"\s]+)""", yaml_file.read_text()):
+                  if not (
+                      (pathlib.Path("windmill") / ref).exists()
+                      or (yaml_file.parent / ref).exists()
+                  ):
+                      errs.append(f"{yaml_file}: inline file {ref} is missing")
           if errs:
               print("✗ windmill/ consistency errors:"); [print("  -", e) for e in errs]; sys.exit(1)
           print("✓ windmill/ scripts, metadata, and lockfiles are consistent")
