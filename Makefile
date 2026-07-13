@@ -27,7 +27,7 @@ else
   ON_WINDOWS :=
 endif
 
-.PHONY: help check init apikey secrets wizard secure fix-permissions pull build up down restart logs ps health backup backup-schedule backup-schedule-revert bootstrap hermes-heal hermes-workspace hermes-secure hermes-skills-push hermes-skills-pull lint validate test ci headroom headroom-revert mlx mlx-revert mlx-status memory memory-revert hindsight-mlx hindsight-mlx-revert aux-cloud aux-local aux-hindsight aux-status windmill-push windmill-pull windmill-check windmill-mcp baserow baserow-revert baserow-mcp directus directus-revert observability observability-revert ollama ollama-revert
+.PHONY: help check init apikey secrets wizard secure fix-permissions pull build up down restart logs ps health backup backup-schedule backup-schedule-revert bootstrap hermes-heal hermes-workspace hermes-secure hermes-skills-push hermes-skills-pull lint validate test ci headroom headroom-revert mlx mlx-revert mlx-status memory memory-revert hindsight-mlx hindsight-mlx-revert aux-cloud aux-local aux-hindsight aux-status collection-db-migrate windmill-push windmill-pull windmill-check windmill-mcp baserow baserow-revert baserow-mcp directus directus-revert observability observability-revert ollama ollama-revert
 
 # Fill an .env variable with a generated value when it is empty OR still set to a
 # known-weak default. Usage: $(call ensure_secret,VAR,GENERATOR,WEAK_DEFAULT)
@@ -557,6 +557,18 @@ test: ## Run windmill/tests/ (pip install -r windmill/tests/requirements.txt fir
 	  || echo "(install windmill/tests/requirements.txt for tests: pip install -r windmill/tests/requirements.txt)"
 
 ci: validate lint test ## Run the same checks as GitHub Actions
+
+collection-db-migrate: ## Apply pending version-controlled migrations to the running collection database
+	@$(COMPOSE) ps --status running --services | grep -qx collection_db || { echo "✗ collection_db is not running"; exit 1; }
+	@set -a; . ./$(ENV_FILE) 2>/dev/null; set +a; \
+	  for migration in collection_db/migrations/*.up.sql; do \
+	    [ -f "$$migration" ] || continue; \
+	    echo "→ applying $$migration"; \
+	    $(COMPOSE) exec -T collection_db psql -v ON_ERROR_STOP=1 \
+	      -U "$${COLLECTION_DB_ADMIN_USER:-collection_admin}" \
+	      -d "$${COLLECTION_DB_NAME:-collection}" < "$$migration"; \
+	  done; \
+	  echo "✓ collection database migrations applied"
 
 windmill-push: ## Push windmill/ assets (resource type, resource, scripts) to the server — needs the wmill CLI
 	@command -v wmill >/dev/null || { echo "✗ 'wmill' CLI not found — npm install -g windmill-cli"; exit 1; }

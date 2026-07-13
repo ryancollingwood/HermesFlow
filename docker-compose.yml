@@ -372,6 +372,7 @@ services:
     volumes:
       - ${COLLECTION_DB_DATA_DIR:-./data/collection/db}:/var/lib/postgresql/data
       - ./collection_db/initdb:/docker-entrypoint-initdb.d:ro
+      - ./collection_db/migrations:/collection-migrations:ro
     environment:
       POSTGRES_USER: ${COLLECTION_DB_ADMIN_USER:-collection_admin}
       POSTGRES_PASSWORD: ${COLLECTION_DB_ADMIN_PASSWORD:-collection}
