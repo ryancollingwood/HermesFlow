@@ -135,6 +135,10 @@ HF-031 drift fixture promotion → HF-032 orchestrated repair/retry with attempt
 limits. All as specified in the document; no repo deltas beyond building on
 Sprint 2/3 pieces. The demo scenario is a deliberately changed retail fixture.
 
+| Task | Implementation | Evidence |
+|---|---|---|
+| HF-029 Failure inspection package (done) | `f/hermes_flow/repair/inspection`: retrieves a failed job, active asset, bounded/redacted inputs and logs, artifact references, reverse-dependency impact, and capability-scoped recent tests; returns a versioned `RepairContext` linking the original job with deterministic input/source-drift/code/dependency/policy/infrastructure classification | Exact 128 KiB default envelope bound with section hashes and explicit omissions; conversation-field exclusion; credential redaction across inputs/logs/code/errors/tests; parser, unavailable endpoint, database dependency, missing active asset, and unavailable-job adapter tests; checked-in JSON Schema |
+
 ## Sprint 6+ — Hardening (Phase 6 + deferred Phase 2 items)
 
 HF-033 health dashboard (Grafana — observability stack

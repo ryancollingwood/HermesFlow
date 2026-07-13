@@ -6,19 +6,24 @@ following
 `... -> EXECUTE -> SUCCEEDED/FAILED -> INSPECT -> PATCH -> TEST ->
 PROMOTE` tail.
 
-**Status note:** the automated repair orchestration this describes the
-manual shape of —
-[HF-029](https://github.com/ryancollingwood/HermesFlow/issues/67) through
-[HF-032](https://github.com/ryancollingwood/HermesFlow/issues/70)
-(failure-inspection package, repair-candidate generation, drift fixtures,
-orchestrated retry with attempt limits) — isn't built yet. Until it is,
-every step below is something *you* do deliberately in the conversation,
-not something a repair loop does for you. Don't invent retry-loop behavior
-that doesn't exist yet; follow the steps once, then stop and report.
+**Status note:** HF-029's read-only failure-inspection package now exists at
+`f/hermes_flow/repair/inspection`; it returns the bounded, redacted repair
+context documented in
+[`docs/failure-inspection.md`](../../../../../docs/failure-inspection.md).
+HF-030 through HF-032 (repair-candidate generation, drift fixtures, and
+orchestrated retry with attempt limits) are not built yet. Inspection therefore
+does not authorize a patch or retry loop. Run it once when repair evidence is
+needed, then make the deliberate retry/patch/stop decision below.
 
 ## 1. INSPECT — read what actually happened before acting
 
 Start from the `ExecutionResult`:
+
+- **Structured inspection** — for a submitted failed Windmill job, run
+  `f/hermes_flow/repair/inspection` with the job ID and versioned catalogue.
+  Treat its classification as advisory evidence, preserve its original-job
+  link, and surface any truncation or collection warnings before proposing a
+  repair.
 
 - **`failure_summary`** — read it as written; don't paraphrase it away
   (SKILL.md Rule 4 / `result-presentation.md`). It should already be

@@ -21,6 +21,8 @@ locks:
   f/hermes_flow/catalogue/models: 1554e3e8302ec054a2a90dbcf9a6df004bed04c84c6970482a70d5499183f412
   f/hermes_flow/catalogue/search: 992a61e0b836d51df24747baf18796117410ee4ef8e6551221ddf517f461dec0
   f/hermes_flow/policies/evaluator: 34cf73b5e172fb80f4a160548e6c83409af732f8f73d03c04794be3e41915f1e
+  f/hermes_flow/repair/inspection: 2b9e0cf6456d67bfae28437098b8d90b795daca72de86a295590e088ce9c9ef7
+  f/hermes_flow/repair/models: bb5806b6f94393c5aaaa9fb14da4f237bc0b2014e94f5ccb123f6f0b631491f4
   f/hermes_flow/testing/example_test: f418b5d367a9c8e5bca4e6271fed31512b4ef1172cdc7b02abd09bf5ae9ea528
   f/hermes_flow/testing/regression: 85dac4a471d8bdf73d5258534359fe0b0ecc142df1eee9810a502f1898e53420
   f/hermes_flow/testing/runner: 97c768ad1316bca2104dac0e4978387826f08b9b43d093fbd31353a91eb68ed0

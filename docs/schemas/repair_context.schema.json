@@ -1,0 +1,513 @@
+{
+  "$defs": {
+    "ActiveCapabilityEvidence": {
+      "properties": {
+        "asset_kind": {
+          "default": "script",
+          "maxLength": 20,
+          "title": "Asset Kind",
+          "type": "string"
+        },
+        "capability_version": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Capability Version"
+        },
+        "code": {
+          "$ref": "#/$defs/BoundedDocument"
+        },
+        "path": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        }
+      },
+      "required": [
+        "path",
+        "code"
+      ],
+      "title": "ActiveCapabilityEvidence",
+      "type": "object"
+    },
+    "ArtifactEvidence": {
+      "properties": {
+        "artifact_id": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Artifact Id"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "maxLength": 1000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        },
+        "stage": {
+          "anyOf": [
+            {
+              "maxLength": 100,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stage"
+        },
+        "storage_uri": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Storage Uri"
+        }
+      },
+      "title": "ArtifactEvidence",
+      "type": "object"
+    },
+    "BoundedDocument": {
+      "properties": {
+        "content": {
+          "title": "Content",
+          "type": "string"
+        },
+        "original_bytes": {
+          "minimum": 0,
+          "title": "Original Bytes",
+          "type": "integer"
+        },
+        "retained_bytes": {
+          "minimum": 0,
+          "title": "Retained Bytes",
+          "type": "integer"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "truncated": {
+          "default": false,
+          "title": "Truncated",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "content",
+        "original_bytes",
+        "retained_bytes",
+        "sha256"
+      ],
+      "title": "BoundedDocument",
+      "type": "object"
+    },
+    "DependencyEvidence": {
+      "properties": {
+        "distance": {
+          "minimum": 1,
+          "title": "Distance",
+          "type": "integer"
+        },
+        "path": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "relationship": {
+          "maxLength": 50,
+          "minLength": 1,
+          "title": "Relationship",
+          "type": "string"
+        },
+        "tests": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Tests",
+          "type": "array"
+        },
+        "via": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Via"
+        }
+      },
+      "required": [
+        "path",
+        "relationship",
+        "distance"
+      ],
+      "title": "DependencyEvidence",
+      "type": "object"
+    },
+    "FailureCategory": {
+      "enum": [
+        "input",
+        "source_drift",
+        "code_defect",
+        "dependency",
+        "policy",
+        "infrastructure",
+        "unknown"
+      ],
+      "title": "FailureCategory",
+      "type": "string"
+    },
+    "FailureClassification": {
+      "properties": {
+        "category": {
+          "$ref": "#/$defs/FailureCategory"
+        },
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "reasons": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 10,
+          "title": "Reasons",
+          "type": "array"
+        }
+      },
+      "required": [
+        "category",
+        "confidence"
+      ],
+      "title": "FailureClassification",
+      "type": "object"
+    },
+    "OriginalJob": {
+      "properties": {
+        "api_url": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Api Url",
+          "type": "string"
+        },
+        "job_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Job Id",
+          "type": "string"
+        },
+        "path": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "workspace": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Workspace",
+          "type": "string"
+        }
+      },
+      "required": [
+        "job_id",
+        "workspace",
+        "path",
+        "api_url"
+      ],
+      "title": "OriginalJob",
+      "type": "object"
+    },
+    "RecentTestEvidence": {
+      "properties": {
+        "details": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Details"
+        },
+        "job_id": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Job Id"
+        },
+        "recorded_at": {
+          "anyOf": [
+            {
+              "maxLength": 100,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Recorded At"
+        },
+        "status": {
+          "maxLength": 50,
+          "minLength": 1,
+          "title": "Status",
+          "type": "string"
+        },
+        "test": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Test",
+          "type": "string"
+        }
+      },
+      "required": [
+        "test",
+        "status"
+      ],
+      "title": "RecentTestEvidence",
+      "type": "object"
+    },
+    "RedactionSummary": {
+      "properties": {
+        "excluded_fields": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Excluded Fields",
+          "type": "array"
+        },
+        "replacement_count": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Replacement Count",
+          "type": "integer"
+        }
+      },
+      "title": "RedactionSummary",
+      "type": "object"
+    },
+    "RepairContextLimits": {
+      "properties": {
+        "max_artifacts": {
+          "default": 20,
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Max Artifacts",
+          "type": "integer"
+        },
+        "max_code_bytes": {
+          "default": 48000,
+          "maximum": 500000,
+          "minimum": 256,
+          "title": "Max Code Bytes",
+          "type": "integer"
+        },
+        "max_dependencies": {
+          "default": 50,
+          "maximum": 250,
+          "minimum": 0,
+          "title": "Max Dependencies",
+          "type": "integer"
+        },
+        "max_input_bytes": {
+          "default": 16000,
+          "maximum": 250000,
+          "minimum": 256,
+          "title": "Max Input Bytes",
+          "type": "integer"
+        },
+        "max_log_bytes": {
+          "default": 32000,
+          "maximum": 500000,
+          "minimum": 256,
+          "title": "Max Log Bytes",
+          "type": "integer"
+        },
+        "max_test_evidence": {
+          "default": 20,
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Max Test Evidence",
+          "type": "integer"
+        },
+        "max_total_bytes": {
+          "default": 131072,
+          "maximum": 2000000,
+          "minimum": 16384,
+          "title": "Max Total Bytes",
+          "type": "integer"
+        }
+      },
+      "title": "RepairContextLimits",
+      "type": "object"
+    },
+    "TruncationSummary": {
+      "properties": {
+        "omitted_artifacts": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Omitted Artifacts",
+          "type": "integer"
+        },
+        "omitted_dependencies": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Omitted Dependencies",
+          "type": "integer"
+        },
+        "omitted_test_evidence": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Omitted Test Evidence",
+          "type": "integer"
+        },
+        "truncated_sections": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Truncated Sections",
+          "type": "array"
+        }
+      },
+      "title": "TruncationSummary",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "active_capability": {
+      "$ref": "#/$defs/ActiveCapabilityEvidence"
+    },
+    "artifacts": {
+      "items": {
+        "$ref": "#/$defs/ArtifactEvidence"
+      },
+      "title": "Artifacts",
+      "type": "array"
+    },
+    "classification": {
+      "$ref": "#/$defs/FailureClassification"
+    },
+    "collection_warnings": {
+      "items": {
+        "type": "string"
+      },
+      "maxItems": 20,
+      "title": "Collection Warnings",
+      "type": "array"
+    },
+    "dependency_impact": {
+      "items": {
+        "$ref": "#/$defs/DependencyEvidence"
+      },
+      "title": "Dependency Impact",
+      "type": "array"
+    },
+    "failure_summary": {
+      "maxLength": 4000,
+      "minLength": 1,
+      "title": "Failure Summary",
+      "type": "string"
+    },
+    "inputs": {
+      "$ref": "#/$defs/BoundedDocument"
+    },
+    "limits": {
+      "$ref": "#/$defs/RepairContextLimits"
+    },
+    "logs": {
+      "$ref": "#/$defs/BoundedDocument"
+    },
+    "original_job": {
+      "$ref": "#/$defs/OriginalJob"
+    },
+    "recent_test_evidence": {
+      "items": {
+        "$ref": "#/$defs/RecentTestEvidence"
+      },
+      "title": "Recent Test Evidence",
+      "type": "array"
+    },
+    "redaction": {
+      "$ref": "#/$defs/RedactionSummary"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "total_bytes": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Total Bytes",
+      "type": "integer"
+    },
+    "truncation": {
+      "$ref": "#/$defs/TruncationSummary"
+    }
+  },
+  "required": [
+    "original_job",
+    "failure_summary",
+    "classification",
+    "active_capability",
+    "inputs",
+    "logs",
+    "redaction",
+    "truncation",
+    "limits"
+  ],
+  "title": "RepairContext",
+  "type": "object"
+}

@@ -1,0 +1,10 @@
+summary: HF-029 repair-context models and JSON Schema export
+description: Versioned bounded evidence, classification, redaction, and
+  truncation contracts.
+lock: '!inline f/hermes_flow/repair/models.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties: {}
+  required: []
