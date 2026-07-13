@@ -108,7 +108,7 @@ See the ADR's Consequences section and
 
 | Task | Work in this repo | Notes |
 |---|---|---|
-| HF-015 Test conventions & runner | `windmill/tests/{fixtures,contracts,workflow_cases}/`; runner distinguishes promotion-gating vs scheduled tests | |
+| HF-015 Test conventions & runner (done) | `windmill/tests/{fixtures,contracts,workflow_cases}/` manifests + `f/hermes_flow/testing/runner.py`; metadata IDs resolve to typed tests; bounded Windmill execution returns pass/fail/skip evidence | Promotion-gating and scheduled modes are distinct; example manifests plus 8 discovery/execution/bounds tests |
 | HF-017 Artifact adapter | Content-addressed store over the HF-000A mount; SHA-256; traversal-safe paths | `f/libraries/storage/` |
 | HF-018 Lineage helpers | Context propagation + derivation links through flow steps | `f/libraries/lineage/` |
 | HF-019 Hermes structured-invocation wrapper | Extend `f/hermes/client.py` pattern: new `f/libraries/ai/invoke_hermes_structured` capability — schema-validated output, prompt/conversation/raw-response artifacts, model metadata, retries; marked nondeterministic | Reuses `hermes_endpoint` resource; verify secrets never land in retained artifacts |
