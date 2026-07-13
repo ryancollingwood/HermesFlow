@@ -1,0 +1,39 @@
+summary: Gather a bounded and redacted repair context for a failed Windmill job
+description: Fetches the original job, active asset, logs, artifacts, dependency
+  impact, and supplied recent test evidence; classifies the failure without
+  retaining conversation data or credentials.
+lock: '!inline f/hermes_flow/repair/inspection.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    catalogue_yaml:
+      type: string
+      description: Versioned HermesFlow capability catalogue YAML.
+      default: null
+      originalType: string
+    job_id:
+      type: string
+      description: Failed Windmill job to inspect.
+      default: null
+      originalType: string
+    max_total_bytes:
+      type: integer
+      description: Hard serialized-size bound for the returned repair context.
+      default: 131072
+    recent_test_evidence:
+      type: array
+      description: Recent test evidence records; unrelated capability records are excluded.
+      default: null
+      items:
+        type: object
+      originalType: record[]
+    windmill_base_url:
+      type: string
+      description: Public Windmill base URL used to link the original job.
+      default: http://windmill.localhost
+      originalType: string
+  required:
+    - job_id
+    - catalogue_yaml

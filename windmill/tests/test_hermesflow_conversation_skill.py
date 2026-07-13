@@ -64,7 +64,7 @@ def search_case(case: dict):
 def test_skill_metadata_routes_product_collection_requests():
     metadata = frontmatter(SKILL)
     assert metadata["name"] == "hermesflow"
-    assert metadata["version"] == "0.3.0"
+    assert metadata["version"] == "0.3.1"
     description = metadata["description"].lower()
     assert all(term in description for term in ("product collection", "comparison", "windmill"))
 

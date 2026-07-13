@@ -304,3 +304,34 @@ entries:
       test_requirements: [contracts/product-report-result]
       effects:
         filesystem: true
+
+  - kind: script
+    tags: [repair, failure, inspection, diagnostics, redaction, bounded]
+    inputs_summary: >-
+      A failed Windmill job ID, the versioned capability catalogue, optional
+      recent test evidence, public Windmill base URL, and a serialized-size bound.
+    outputs_summary: >-
+      A versioned RepairContext linking the original job and containing bounded,
+      redacted active code, inputs, logs, artifact references, dependency impact,
+      relevant recent tests, deterministic failure classification, and explicit
+      redaction/truncation evidence.
+    input_kinds: [windmill_job_ref, capability_catalogue, test_evidence]
+    output_kinds: [repair_context]
+    metadata:
+      path: f/hermes_flow/repair/inspection
+      capability_version: "1.0.0"
+      summary: Gather and classify a bounded, credential-safe repair context for a failed Windmill job.
+      maturity: experimental
+      deterministic: true
+      owners: [platform]
+      dependencies:
+        - f/hermes_flow/catalogue/models
+        - f/hermes_flow/candidate_ops/diff
+        - f/hermes_flow/repair/models
+      test_requirements: [contracts/failure-inspection-context]
+      limits:
+        timeout_seconds: 60
+        max_concurrency: 4
+        rate_limit_per_minute: 30
+      effects:
+        network: true
