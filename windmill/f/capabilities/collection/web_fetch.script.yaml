@@ -1,0 +1,44 @@
+summary: ''
+description: ''
+lock: '!inline f/capabilities/collection/web_fetch.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    allowed_domains:
+      type: array
+      description: ''
+      default: null
+      items:
+        type: string
+      originalType: string[]
+    headers:
+      type: object
+      description: ''
+      default: {}
+      properties: {}
+    max_redirects:
+      type: integer
+      description: ''
+      default: 5
+    max_retries:
+      type: integer
+      description: ''
+      default: 2
+    max_size_bytes:
+      type: integer
+      description: ''
+      default: 5000000
+    timeout_seconds:
+      type: number
+      description: ''
+      default: 30
+    url:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+  required:
+    - url
+    - allowed_domains

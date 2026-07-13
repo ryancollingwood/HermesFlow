@@ -89,3 +89,27 @@ entries:
       effects:
         network: true
         filesystem: true
+
+  - kind: script
+    tags: [web, fetch, http, html, json, ssrf-safe]
+    inputs_summary: >-
+      url and allowed_domains are required; optional request headers, timeout,
+      response-size limit, retry count, and redirect limit bound the fetch.
+    outputs_summary: >-
+      Structured HTTP status, safe response-header summary, retry/redirect
+      evidence, and a lineage-linked raw response artifact reference.
+    input_kinds: [url, domain_allowlist]
+    output_kinds: [raw_http_artifact, http_response_metadata]
+    metadata:
+      path: f/capabilities/collection/web_fetch
+      capability_version: "1.0.0"
+      summary: Fetch an allowed public HTTP(S) resource with SSRF, retry, timeout, and size controls.
+      maturity: experimental
+      owners: [platform]
+      test_requirements: [smoke/web-fetch-live]
+      limits:
+        timeout_seconds: 300
+        rate_limit_per_minute: 60
+      effects:
+        network: true
+        filesystem: true
