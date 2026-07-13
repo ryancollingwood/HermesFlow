@@ -1,0 +1,315 @@
+{
+  "$defs": {
+    "ArtifactRef": {
+      "description": "Points at one stored artifact and how it fits into a run's lineage.",
+      "properties": {
+        "artifact_id": {
+          "description": "Unique ID for this artifact reference.",
+          "format": "uuid",
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "content_hash": {
+          "description": "Lowercase 64-character hex SHA-256 digest of the artifact's content.",
+          "title": "Content Hash",
+          "type": "string"
+        },
+        "created_at": {
+          "description": "When this artifact was written (UTC).",
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "creator_capability": {
+          "description": "Capability path that produced this artifact.",
+          "minLength": 1,
+          "title": "Creator Capability",
+          "type": "string"
+        },
+        "creator_capability_version": {
+          "description": "Version of that capability at the time it produced this artifact.",
+          "minLength": 1,
+          "title": "Creator Capability Version",
+          "type": "string"
+        },
+        "derived_from": {
+          "description": "artifact_id of each artifact this one was derived from. Empty for a raw artifact with no upstream input captured by this store.",
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "title": "Derived From",
+          "type": "array"
+        },
+        "media_type": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "IANA media type of the stored content. HF-017 adapters always populate it; optional for backward compatibility with pre-HF-017 references.",
+          "title": "Media Type"
+        },
+        "schema_version": {
+          "default": "1.0",
+          "description": "Schema MAJOR.MINOR this record was written against.",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "size_bytes": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Artifact content size in bytes. HF-017 storage adapters always populate it; optional for backward compatibility with pre-HF-017 references.",
+          "title": "Size Bytes"
+        },
+        "stage": {
+          "$ref": "#/$defs/ArtifactStage",
+          "description": "raw (untransformed input), intermediate (a transformation step's output), or final (a run's end result)."
+        },
+        "storage_uri": {
+          "description": "Where the content lives, e.g. file:///shared/artifacts/<hash[:2]>/<hash>.",
+          "minLength": 1,
+          "title": "Storage Uri",
+          "type": "string"
+        },
+        "trace_id": {
+          "description": "trace_id of the ExecutionContext that produced this artifact.",
+          "format": "uuid",
+          "title": "Trace Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "trace_id",
+        "stage",
+        "content_hash",
+        "storage_uri",
+        "creator_capability",
+        "creator_capability_version"
+      ],
+      "title": "ArtifactRef",
+      "type": "object"
+    },
+    "ArtifactStage": {
+      "description": "Where an artifact sits in a run's raw -> intermediate -> final pipeline.",
+      "enum": [
+        "raw",
+        "intermediate",
+        "final"
+      ],
+      "title": "ArtifactStage",
+      "type": "string"
+    },
+    "ExtractionProvenance": {
+      "properties": {
+        "block_index": {
+          "minimum": 0,
+          "title": "Block Index",
+          "type": "integer"
+        },
+        "parser": {
+          "default": "json-ld",
+          "title": "Parser",
+          "type": "string"
+        },
+        "parser_version": {
+          "default": "1.0.0",
+          "title": "Parser Version",
+          "type": "string"
+        },
+        "source_artifact_id": {
+          "title": "Source Artifact Id",
+          "type": "string"
+        },
+        "source_content_hash": {
+          "title": "Source Content Hash",
+          "type": "string"
+        },
+        "source_path": {
+          "title": "Source Path",
+          "type": "string"
+        },
+        "source_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source Url"
+        }
+      },
+      "required": [
+        "source_artifact_id",
+        "source_content_hash",
+        "block_index",
+        "source_path"
+      ],
+      "title": "ExtractionProvenance",
+      "type": "object"
+    },
+    "ExtractionWarning": {
+      "properties": {
+        "block_index": {
+          "anyOf": [
+            {
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Block Index"
+        },
+        "code": {
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "ExtractionWarning",
+      "type": "object"
+    },
+    "StructuredCandidate": {
+      "properties": {
+        "candidate_id": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Candidate Id",
+          "type": "string"
+        },
+        "data": {
+          "additionalProperties": true,
+          "title": "Data",
+          "type": "object"
+        },
+        "identifier": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Identifier"
+        },
+        "name": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Name"
+        },
+        "provenance": {
+          "$ref": "#/$defs/ExtractionProvenance"
+        },
+        "types": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Types",
+          "type": "array"
+        },
+        "url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Url"
+        }
+      },
+      "required": [
+        "candidate_id",
+        "data",
+        "provenance"
+      ],
+      "title": "StructuredCandidate",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "blocks_found": {
+      "title": "Blocks Found",
+      "type": "integer"
+    },
+    "blocks_parsed": {
+      "title": "Blocks Parsed",
+      "type": "integer"
+    },
+    "candidates": {
+      "items": {
+        "$ref": "#/$defs/StructuredCandidate"
+      },
+      "title": "Candidates",
+      "type": "array"
+    },
+    "parser_version": {
+      "default": "1.0.0",
+      "title": "Parser Version",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_artifact": {
+      "$ref": "#/$defs/ArtifactRef"
+    },
+    "status": {
+      "title": "Status",
+      "type": "string"
+    },
+    "warnings": {
+      "items": {
+        "$ref": "#/$defs/ExtractionWarning"
+      },
+      "title": "Warnings",
+      "type": "array"
+    }
+  },
+  "required": [
+    "status",
+    "source_artifact",
+    "blocks_found",
+    "blocks_parsed",
+    "candidates"
+  ],
+  "title": "StructuredMarkupResult",
+  "type": "object"
+}
