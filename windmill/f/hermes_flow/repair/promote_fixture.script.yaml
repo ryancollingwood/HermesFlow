@@ -1,0 +1,53 @@
+summary: Promote a failed source artifact into a sanitised regression fixture
+description: Reads an HF-017 HTML or JSON source artifact, removes configured
+  sensitive and volatile fields, stores immutable content-addressed fixture
+  bytes, and returns failure-linked expected-behaviour metadata.
+lock: '!inline f/hermes_flow/repair/promote_fixture.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    binding:
+      type: object
+      description: Candidate argument name, payload mode, bounded execution, and
+        non-secret static args.
+      default: null
+      properties: {}
+    capability_path:
+      type: string
+      description: Active capability affected by the source drift.
+      default: null
+      originalType: string
+    expected_behavior:
+      type: object
+      description: Description and machine-checkable output assertions for a repaired
+        candidate.
+      default: null
+      properties: {}
+    failed_job_id:
+      type: string
+      description: Windmill job whose failure or source drift motivated this fixture.
+      default: null
+      originalType: string
+    fixture_format:
+      type: string
+      description: Optional html or json override; otherwise inferred from ArtifactRef
+        media_type.
+      default: ''
+      originalType: string
+    sanitization_rules:
+      type: object
+      description: Optional additive field-redaction/removal and HTML-comment policy.
+      default: null
+      properties: {}
+    source_artifact:
+      type: object
+      description: HF-017 ArtifactRef for the failed or changed source payload.
+      default: null
+      properties: {}
+  required:
+    - source_artifact
+    - failed_job_id
+    - capability_path
+    - expected_behavior

@@ -79,6 +79,65 @@ entries:
         filesystem: true
 
   - kind: script
+    tags: [repair, source-drift, fixture, sanitisation, content-addressed]
+    inputs_summary: >-
+      An HF-017 HTML or JSON source ArtifactRef, failed job ID, affected
+      capability, expected candidate behaviour, binding, and sanitisation rules.
+    outputs_summary: >-
+      An immutable SourceDriftFixture record linking sanitised content-addressed
+      bytes to the failed job, original artifact, expected behaviour, and rules.
+    input_kinds: [raw_http_artifact, windmill_job_ref, fixture_expectations]
+    output_kinds: [source_drift_fixture, artifact_ref]
+    metadata:
+      path: f/hermes_flow/repair/promote_fixture
+      capability_version: "1.0.0"
+      summary: Promote a failed HTML or JSON source artifact into a sanitised regression fixture.
+      maturity: experimental
+      deterministic: false
+      owners: [platform]
+      dependencies:
+        - f/libraries/storage/artifacts
+        - f/libraries/lineage/models
+      test_requirements: [contracts/source-drift-fixture]
+      limits:
+        timeout_seconds: 60
+        max_concurrency: 4
+        rate_limit_per_minute: 30
+      effects:
+        filesystem: true
+
+  - kind: script
+    tags: [testing, repair, source-drift, fixture, candidate, regression]
+    inputs_summary: >-
+      A SourceDriftFixture record and isolated candidate path selected by the
+      dependency-aware regression runner.
+    outputs_summary: >-
+      Pass/fail evidence with the nested candidate job ID and per-path expected
+      behaviour assertions.
+    input_kinds: [source_drift_fixture, candidate_ref]
+    output_kinds: [fixture_test_evidence, windmill_job_ref]
+    metadata:
+      path: f/hermes_flow/testing/source_drift_fixture
+      capability_version: "1.0.0"
+      summary: Execute an isolated repair candidate against a sanitised source-drift fixture.
+      maturity: experimental
+      deterministic: false
+      owners: [platform]
+      dependencies:
+        - f/hermes_flow/repair/promote_fixture
+        - f/hermes_flow/candidate_ops/models
+        - f/libraries/storage/artifacts
+      test_requirements: [contracts/source-drift-fixture-runner]
+      limits:
+        timeout_seconds: 300
+        max_concurrency: 4
+        rate_limit_per_minute: 30
+      effects:
+        network: true
+        filesystem: true
+        external: true
+
+  - kind: script
     tags: [data-platform, extract, hacker-news, dlt]
     inputs_summary: >-
       limit: optional integer, number of top stories to fetch (default 20).

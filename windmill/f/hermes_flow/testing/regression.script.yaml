@@ -6,6 +6,11 @@ schema:
   $schema: https://json-schema.org/draft/2020-12/schema
   type: object
   properties:
+    candidate_path:
+      type: string
+      description: ''
+      default: ''
+      originalType: string
     catalogue_yaml:
       type: string
       description: ''
@@ -29,6 +34,13 @@ schema:
       type: integer
       description: ''
       default: 300
+    promoted_fixtures:
+      type: array
+      description: ''
+      default: null
+      items:
+        type: object
+      originalType: record[]
   required:
     - catalogue_yaml
     - manifest_yaml

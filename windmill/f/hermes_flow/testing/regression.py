@@ -5,8 +5,10 @@ from typing import Optional
 
 from pydantic import BaseModel
 
+from f.hermes_flow.candidate_ops.models import is_candidate_path
 from f.hermes_flow.candidate_ops.diff import _consumer_impact
 from f.hermes_flow.catalogue.models import Catalogue, load_catalogue
+from f.hermes_flow.repair.promote_fixture import SourceDriftFixture
 from f.hermes_flow.testing.runner import (
     TestEvidence,
     TestExecutor,
@@ -44,6 +46,8 @@ def select_regression_tests(
     catalogue: Catalogue,
     manifest: TestManifest,
     changed_capability: str,
+    promoted_fixtures: Optional[list[SourceDriftFixture | dict]] = None,
+    candidate_path: Optional[str] = None,
 ) -> list[SelectedRegressionTest]:
     changed = catalogue.get(changed_capability)
     if changed is None:
@@ -99,6 +103,45 @@ def select_regression_tests(
                 ),
                 consumer_only=True,
             )
+
+    fixtures = [
+        item if isinstance(item, SourceDriftFixture) else SourceDriftFixture.model_validate(item)
+        for item in (promoted_fixtures or [])
+    ]
+    matching = [item for item in fixtures if item.capability_path == changed_capability]
+    if matching and not candidate_path:
+        raise ValueError("candidate_path is required when selecting promoted source-drift fixtures")
+    if matching and not is_candidate_path(candidate_path):
+        raise ValueError("promoted source-drift fixtures may target only isolated candidates")
+    for fixture in matching:
+        test = TestSpec(
+            id=fixture.fixture_id,
+            capability_paths=[changed_capability],
+            type=TestType.fixture,
+            mode="promotion_gating",
+            script_path="f/hermes_flow/testing/source_drift_fixture",
+            args={
+                "fixture_record": fixture.model_dump(mode="json"),
+                "candidate_path": candidate_path,
+            },
+            timeout_seconds=fixture.binding.timeout_seconds,
+            max_data_bytes=fixture.binding.max_data_bytes,
+        )
+        if test.id in selected:
+            raise ValueError(f"promoted fixture id {test.id!r} conflicts with a manifest test")
+        selected[test.id] = SelectedRegressionTest(
+            test=test,
+            run_for_capability=changed_capability,
+            reasons=[SelectionReason(
+                capability_path=changed_capability,
+                relationship="promoted_source_drift",
+                distance=0,
+                explanation=(
+                    f"sanitised source artifact from failed job {fixture.failed_job_id}; "
+                    "candidate fixture regression required"
+                ),
+            )],
+        )
     return [selected[test_id] for test_id in sorted(selected)]
 
 
@@ -109,12 +152,28 @@ def run_regression_tests(
     max_timeout_seconds: int = 300,
     max_data_bytes: int = 5_000_000,
     executor: Optional[TestExecutor] = None,
+    promoted_fixtures: Optional[list[SourceDriftFixture | dict]] = None,
+    candidate_path: Optional[str] = None,
 ) -> RegressionRunResult:
-    selection = select_regression_tests(catalogue, manifest, changed_capability)
+    selection = select_regression_tests(
+        catalogue,
+        manifest,
+        changed_capability,
+        promoted_fixtures=promoted_fixtures,
+        candidate_path=candidate_path,
+    )
+    manifest_ids = {test.id for test in manifest.tests}
+    execution_manifest = TestManifest(
+        schema_version=manifest.schema_version,
+        tests=[
+            *manifest.tests,
+            *(item.test for item in selection if item.test.id not in manifest_ids),
+        ],
+    )
     evidence: list[TestEvidence] = []
     for selected in selection:
         result = run_tests(
-            manifest,
+            execution_manifest,
             selected.run_for_capability,
             [selected.test.id],
             max_timeout_seconds=max_timeout_seconds,
@@ -136,6 +195,8 @@ def main(
     changed_capability: str,
     max_timeout_seconds: int = 300,
     max_data_bytes: int = 5_000_000,
+    promoted_fixtures: Optional[list[dict]] = None,
+    candidate_path: str = "",
 ) -> dict:
     result = run_regression_tests(
         load_catalogue(catalogue_yaml),
@@ -143,5 +204,7 @@ def main(
         changed_capability,
         max_timeout_seconds=max_timeout_seconds,
         max_data_bytes=max_data_bytes,
+        promoted_fixtures=promoted_fixtures,
+        candidate_path=candidate_path or None,
     )
     return result.model_dump(mode="json")

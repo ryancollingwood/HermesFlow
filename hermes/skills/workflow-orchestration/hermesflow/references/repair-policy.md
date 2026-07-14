@@ -13,9 +13,12 @@ context documented in
 HF-030's `f/hermes_flow/repair/generate_candidate` now turns a complete context
 into a policy-checked candidate with exact generation provenance; see
 [`docs/repair-candidate-generation.md`](../../../../../docs/repair-candidate-generation.md).
-HF-031 and HF-032 (drift-fixture promotion and bounded orchestrated retry) are
-not built yet. Inspection or generation therefore does not authorize promotion
-or a retry loop.
+HF-031's `f/hermes_flow/repair/promote_fixture` and
+`f/hermes_flow/testing/source_drift_fixture` promote sanitised source artifacts
+into candidate-only regressions; see
+[`docs/source-drift-regression-fixtures.md`](../../../../../docs/source-drift-regression-fixtures.md).
+HF-032's bounded orchestrated retry is not built yet. Inspection, generation,
+or fixture promotion therefore does not authorize active promotion or a retry loop.
 
 ## 1. INSPECT — read what actually happened before acting
 
@@ -62,6 +65,12 @@ Start from the `ExecutionResult`:
   **candidate**, never a direct edit to the active capability, carries its own updated
   `CapabilityMetadata`, and needs its own `TEST` pass before `PROMOTE` —
   the fact that it's "just a fix" doesn't shortcut Rule 3.
+
+  When source drift supplied the failure evidence, promote the failed source
+  artifact with `f/hermes_flow/repair/promote_fixture`, select it together with
+  any previous baseline fixture, and run both through the HF-016 regression
+  selector against the isolated candidate. Never point the fixture runner at an
+  active path or retain unsanitised source content in a manifest.
 - **Stop and ask** — appropriate whenever the failure implies something
   the task's original request didn't account for (a missing resource, an
   ambiguous requirement, a capability that doesn't do what its `summary`
