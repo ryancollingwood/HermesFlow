@@ -184,9 +184,36 @@ class ArtifactRef(BaseModel):
         return v
 
 
+class ArtifactTombstone(BaseModel):
+    """HF-035: what remains of an `ArtifactRef` after its content is deleted.
+
+    Deleting an artifact's bytes must not break `derived_from` lineage chains
+    that point at it — a downstream artifact's `derived_from` list stays
+    resolvable (the id still exists, just as a tombstone) even though the
+    content itself is gone. See
+    `f.libraries.storage.artifacts.FilesystemArtifactStore.delete`.
+    """
+
+    schema_version: str = Field(default=SCHEMA_VERSION)
+    artifact_id: UUID = Field(..., description="Same artifact_id as the deleted ArtifactRef.")
+    trace_id: UUID
+    stage: ArtifactStage
+    content_hash: str = Field(
+        ...,
+        description="The deleted content's hash, retained for lineage/audit even though the "
+        "object itself is gone.",
+    )
+    creator_capability: str = Field(..., min_length=1)
+    creator_capability_version: str = Field(..., min_length=1)
+    derived_from: list[UUID] = Field(default_factory=list)
+    reason: str = Field(..., min_length=1, description="Why this artifact was deleted.")
+    deleted_at: datetime = Field(default_factory=_utcnow)
+
+
 def main() -> dict:
-    """Self-test / demo: export both models' JSON Schemas."""
+    """Self-test / demo: export all three models' JSON Schemas."""
     return {
         "ExecutionContext": ExecutionContext.model_json_schema(),
         "ArtifactRef": ArtifactRef.model_json_schema(),
+        "ArtifactTombstone": ArtifactTombstone.model_json_schema(),
     }

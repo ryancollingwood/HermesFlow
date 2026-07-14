@@ -140,6 +140,31 @@ def test_limits_reject_non_positive_values():
         CapabilityLimits(max_concurrency=-1)
 
 
+# ── HF-035: size/record-count/cost limits alongside pre-existing duration ──
+
+
+def test_hf035_limits_default_unbounded():
+    limits = CapabilityLimits()
+    assert limits.max_response_bytes is None
+    assert limits.max_record_count is None
+    assert limits.max_cost_usd is None
+
+
+@pytest.mark.parametrize("field", ["max_response_bytes", "max_record_count", "max_cost_usd"])
+def test_hf035_limits_reject_non_positive_values(field):
+    with pytest.raises(ValidationError):
+        CapabilityLimits(**{field: 0})
+    with pytest.raises(ValidationError):
+        CapabilityLimits(**{field: -1})
+
+
+def test_hf035_limits_accept_positive_values():
+    limits = CapabilityLimits(max_response_bytes=1_000_000, max_record_count=500, max_cost_usd=2.5)
+    assert limits.max_response_bytes == 1_000_000
+    assert limits.max_record_count == 500
+    assert limits.max_cost_usd == 2.5
+
+
 # ── A low-risk label alone cannot imply promotion/scheduling permission ─────
 
 

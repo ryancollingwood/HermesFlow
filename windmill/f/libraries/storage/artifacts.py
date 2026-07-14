@@ -1,4 +1,14 @@
-"""HF-017 content-addressed filesystem artifact storage adapter."""
+"""HF-017 content-addressed filesystem artifact storage adapter.
+
+HF-035 adds `delete()`: retention-driven removal that preserves an
+`ArtifactTombstone` (see `f.libraries.lineage.models`) so that another
+artifact's `derived_from` chain stays resolvable — the id and lineage
+metadata remain, only the content bytes and their `metadata`-envelope
+sibling key are removed. `read()`/`read_text()` raise a dedicated
+`ArtifactTombstonedError` for a deleted artifact rather than the generic
+"missing object" error, so callers can distinguish "never existed"/"corrupt"
+from "deliberately retention-deleted".
+"""
 from __future__ import annotations
 
 import hashlib
@@ -10,12 +20,16 @@ from typing import Any, Optional
 from urllib.parse import unquote, urlparse
 from uuid import UUID
 
-from f.libraries.lineage.models import ArtifactRef, ArtifactStage
+from f.libraries.lineage.models import ArtifactRef, ArtifactStage, ArtifactTombstone
 
 DEFAULT_ARTIFACT_ROOT = Path("/shared/artifacts")
 
 
 class ArtifactStorageError(ValueError):
+    pass
+
+
+class ArtifactTombstonedError(ArtifactStorageError):
     pass
 
 
@@ -139,6 +153,11 @@ class FilesystemArtifactStore:
         return resolved
 
     def read(self, ref: ArtifactRef) -> bytes:
+        if self.is_tombstoned(ref.artifact_id):
+            raise ArtifactTombstonedError(
+                f"artifact {ref.artifact_id} was deleted under a retention policy; "
+                "see read_metadata() for the tombstone record"
+            )
         path = self._path_from_ref(ref)
         try:
             content = path.read_bytes()
@@ -159,6 +178,65 @@ class FilesystemArtifactStore:
             return json.loads(path.read_text())
         except FileNotFoundError as exc:
             raise ArtifactStorageError(f"artifact metadata is missing: {artifact_id}") from exc
+
+    def is_tombstoned(self, artifact_id: UUID) -> bool:
+        """False (not raised) when no metadata exists at all — that's a distinct
+        "never written here" case the pre-existing path/content checks in read()
+        already handle; only an actual tombstone record makes this True."""
+        try:
+            metadata = self.read_metadata(artifact_id)
+        except ArtifactStorageError:
+            return False
+        return "tombstone" in metadata
+
+    def delete(self, ref: ArtifactRef, reason: str) -> ArtifactTombstone:
+        """Retention-driven deletion: replace this artifact_id's metadata envelope with
+        a lineage-preserving tombstone. Idempotent — deleting an already-tombstoned
+        artifact_id returns its existing tombstone unchanged rather than erroring.
+
+        Deliberately does NOT remove the shared content-addressed object at
+        `content_hash` — this store deduplicates identical bytes across
+        artifact_ids (see `write()`), and without a reference count there is no
+        way to know another, still-retained artifact_id isn't relying on the
+        same bytes. Only the metadata this artifact_id's own lineage/retention
+        record depends on (including any caller-supplied `metadata` dict, which
+        may itself carry sensitive context) is removed.
+        """
+        if not reason or not reason.strip():
+            raise ArtifactStorageError("delete() requires a non-empty reason")
+        metadata_path = self._ensure_contained(self.root / "metadata" / f"{ref.artifact_id}.json")
+        existing = self.read_metadata(ref.artifact_id)
+        if "tombstone" in existing:
+            return ArtifactTombstone.model_validate(existing["tombstone"])
+        tombstone = ArtifactTombstone(
+            artifact_id=ref.artifact_id,
+            trace_id=ref.trace_id,
+            stage=ref.stage,
+            content_hash=ref.content_hash,
+            creator_capability=ref.creator_capability,
+            creator_capability_version=ref.creator_capability_version,
+            derived_from=ref.derived_from,
+            reason=reason,
+        )
+        envelope = {"tombstone": tombstone.model_dump(mode="json")}
+        self._atomic_overwrite(
+            metadata_path, json.dumps(envelope, sort_keys=True, separators=(",", ":")).encode()
+        )
+        return tombstone
+
+    @staticmethod
+    def _atomic_overwrite(path: Path, content: bytes) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        fd, tmp_name = tempfile.mkstemp(prefix=".write-", dir=path.parent)
+        try:
+            with os.fdopen(fd, "wb") as handle:
+                handle.write(content)
+                handle.flush()
+                os.fsync(handle.fileno())
+            os.replace(tmp_name, path)
+        finally:
+            if os.path.exists(tmp_name):
+                os.unlink(tmp_name)
 
 
 def main() -> dict:

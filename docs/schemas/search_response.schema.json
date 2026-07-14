@@ -81,7 +81,7 @@
       "type": "string"
     },
     "CapabilityLimits": {
-      "description": "Bounds enforced when this capability runs. All optional \u2014 unset means unbounded.",
+      "description": "Bounds enforced when this capability runs. All optional \u2014 unset means unbounded.\n\nHF-035 adds the size/record-count/cost triad alongside the pre-existing\n``timeout_seconds`` (duration): together these are the four retention/cost\ndimensions `f.hermes_flow.policies.evaluator.evaluate_policy` can deny a\nrequest for, the same way it already denies on `max_concurrency`/\n`rate_limit_per_minute`. Declaring a limit here does not itself measure or\nestimate anything \u2014 evaluation only compares whatever the caller reports it\nexpects (``PolicyContext.requested_*``) against the declared bound.",
       "properties": {
         "max_concurrency": {
           "anyOf": [
@@ -95,6 +95,48 @@
           ],
           "default": null,
           "title": "Max Concurrency"
+        },
+        "max_cost_usd": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Largest estimated model/inference cost, in USD, one invocation may incur. See f.libraries.retention.models.estimate_cost_usd for the caller-side estimate this is compared against.",
+          "title": "Max Cost Usd"
+        },
+        "max_record_count": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Largest number of records (rows, items, documents) one invocation may produce or process, e.g. a dataset extraction's row count.",
+          "title": "Max Record Count"
+        },
+        "max_response_bytes": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Largest response/output size this capability may return, in bytes.",
+          "title": "Max Response Bytes"
         },
         "rate_limit_per_minute": {
           "anyOf": [
