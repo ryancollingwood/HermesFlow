@@ -28,6 +28,7 @@ Schema versioning follows the same additive-only-within-a-MAJOR rule as
 `f.libraries.lineage.models` — see that module's docstring.
 """
 import hashlib
+import re
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -35,6 +36,7 @@ from pydantic import BaseModel, Field, model_validator
 
 SCHEMA_VERSION = "1.0"
 CANDIDATES_ROOT = "f/hermes_flow/candidates"
+_CANDIDATE_PATH = re.compile(rf"^{re.escape(CANDIDATES_ROOT)}/[0-9a-f]{{16}}$")
 
 
 def _utcnow() -> datetime:
@@ -50,6 +52,11 @@ def compute_candidate_id(request_key: str) -> str:
 
 def compute_candidate_path(candidate_id: str) -> str:
     return f"{CANDIDATES_ROOT}/{candidate_id}"
+
+
+def is_candidate_path(path: str) -> bool:
+    """Return true only for canonical deterministic HF-011 candidate paths."""
+    return bool(_CANDIDATE_PATH.fullmatch(path))
 
 
 def metadata_variable_path(candidate_id: str) -> str:

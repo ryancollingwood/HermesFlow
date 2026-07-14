@@ -1,0 +1,23 @@
+summary: Run an isolated candidate against a promoted source-drift fixture
+description: Loads and integrity-checks sanitised fixture bytes from HF-017,
+  invokes only an HF-011 candidate path with bounded arguments, and evaluates
+  required paths, exact values, and minimum item counts.
+lock: '!inline f/hermes_flow/testing/source_drift_fixture.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    candidate_path:
+      type: string
+      description: Isolated f/hermes_flow/candidates/* path to execute.
+      default: null
+      originalType: string
+    fixture_record:
+      type: object
+      description: HF-031 SourceDriftFixture record selected for the candidate.
+      default: null
+      properties: {}
+  required:
+    - fixture_record
+    - candidate_path

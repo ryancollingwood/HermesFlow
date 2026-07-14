@@ -1,0 +1,18 @@
+schema_version: "1.0"
+tests:
+  - id: contracts/source-drift-fixture
+    capability_paths: [f/hermes_flow/repair/promote_fixture]
+    type: contract
+    mode: promotion_gating
+    script_path: f/hermes_flow/repair/promote_fixture
+    timeout_seconds: 60
+    max_data_bytes: 1000000
+    skip_reason: Content addressing, failure linkage, HTML/JSON sanitisation, and metadata are validated directly by test_source_drift_fixture.py.
+  - id: contracts/source-drift-fixture-runner
+    capability_paths: [f/hermes_flow/testing/source_drift_fixture]
+    type: contract
+    mode: promotion_gating
+    script_path: f/hermes_flow/testing/source_drift_fixture
+    timeout_seconds: 300
+    max_data_bytes: 5000000
+    skip_reason: Candidate-only execution, expected-output assertions, selection overlay, and old/new source-selector regression are validated directly by test_source_drift_fixture.py.

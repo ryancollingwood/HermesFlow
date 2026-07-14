@@ -1,0 +1,324 @@
+{
+  "$defs": {
+    "ArtifactRef": {
+      "description": "Points at one stored artifact and how it fits into a run's lineage.",
+      "properties": {
+        "artifact_id": {
+          "description": "Unique ID for this artifact reference.",
+          "format": "uuid",
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "content_hash": {
+          "description": "Lowercase 64-character hex SHA-256 digest of the artifact's content.",
+          "title": "Content Hash",
+          "type": "string"
+        },
+        "created_at": {
+          "description": "When this artifact was written (UTC).",
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "creator_capability": {
+          "description": "Capability path that produced this artifact.",
+          "minLength": 1,
+          "title": "Creator Capability",
+          "type": "string"
+        },
+        "creator_capability_version": {
+          "description": "Version of that capability at the time it produced this artifact.",
+          "minLength": 1,
+          "title": "Creator Capability Version",
+          "type": "string"
+        },
+        "derived_from": {
+          "description": "artifact_id of each artifact this one was derived from. Empty for a raw artifact with no upstream input captured by this store.",
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "title": "Derived From",
+          "type": "array"
+        },
+        "media_type": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "IANA media type of the stored content. HF-017 adapters always populate it; optional for backward compatibility with pre-HF-017 references.",
+          "title": "Media Type"
+        },
+        "schema_version": {
+          "default": "1.0",
+          "description": "Schema MAJOR.MINOR this record was written against.",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "size_bytes": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Artifact content size in bytes. HF-017 storage adapters always populate it; optional for backward compatibility with pre-HF-017 references.",
+          "title": "Size Bytes"
+        },
+        "stage": {
+          "$ref": "#/$defs/ArtifactStage",
+          "description": "raw (untransformed input), intermediate (a transformation step's output), or final (a run's end result)."
+        },
+        "storage_uri": {
+          "description": "Where the content lives, e.g. file:///shared/artifacts/<hash[:2]>/<hash>.",
+          "minLength": 1,
+          "title": "Storage Uri",
+          "type": "string"
+        },
+        "trace_id": {
+          "description": "trace_id of the ExecutionContext that produced this artifact.",
+          "format": "uuid",
+          "title": "Trace Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "trace_id",
+        "stage",
+        "content_hash",
+        "storage_uri",
+        "creator_capability",
+        "creator_capability_version"
+      ],
+      "title": "ArtifactRef",
+      "type": "object"
+    },
+    "ArtifactStage": {
+      "description": "Where an artifact sits in a run's raw -> intermediate -> final pipeline.",
+      "enum": [
+        "raw",
+        "intermediate",
+        "final"
+      ],
+      "title": "ArtifactStage",
+      "type": "string"
+    },
+    "FixtureBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "candidate_args": {
+          "additionalProperties": true,
+          "title": "Candidate Args",
+          "type": "object"
+        },
+        "fixture_argument": {
+          "default": "fixture_content",
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Fixture Argument",
+          "type": "string"
+        },
+        "max_data_bytes": {
+          "default": 1000000,
+          "maximum": 100000000,
+          "minimum": 1,
+          "title": "Max Data Bytes",
+          "type": "integer"
+        },
+        "payload_mode": {
+          "default": "text",
+          "enum": [
+            "text",
+            "json",
+            "artifact_ref"
+          ],
+          "title": "Payload Mode",
+          "type": "string"
+        },
+        "timeout_seconds": {
+          "default": 60,
+          "maximum": 3600,
+          "minimum": 1,
+          "title": "Timeout Seconds",
+          "type": "integer"
+        }
+      },
+      "title": "FixtureBinding",
+      "type": "object"
+    },
+    "FixtureExpectedBehavior": {
+      "additionalProperties": false,
+      "properties": {
+        "description": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Description",
+          "type": "string"
+        },
+        "expected_values": {
+          "additionalProperties": true,
+          "title": "Expected Values",
+          "type": "object"
+        },
+        "minimum_item_counts": {
+          "additionalProperties": {
+            "type": "integer"
+          },
+          "title": "Minimum Item Counts",
+          "type": "object"
+        },
+        "required_paths": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 100,
+          "title": "Required Paths",
+          "type": "array"
+        }
+      },
+      "required": [
+        "description"
+      ],
+      "title": "FixtureExpectedBehavior",
+      "type": "object"
+    },
+    "SanitizationSummary": {
+      "additionalProperties": false,
+      "properties": {
+        "input_bytes": {
+          "minimum": 0,
+          "title": "Input Bytes",
+          "type": "integer"
+        },
+        "output_bytes": {
+          "minimum": 0,
+          "title": "Output Bytes",
+          "type": "integer"
+        },
+        "redacted_fields": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Redacted Fields",
+          "type": "array"
+        },
+        "redaction_count": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Redaction Count",
+          "type": "integer"
+        },
+        "removal_count": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Removal Count",
+          "type": "integer"
+        },
+        "removed_fields": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Removed Fields",
+          "type": "array"
+        },
+        "rules_sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Rules Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "input_bytes",
+        "output_bytes",
+        "rules_sha256"
+      ],
+      "title": "SanitizationSummary",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "binding": {
+      "$ref": "#/$defs/FixtureBinding"
+    },
+    "capability_path": {
+      "maxLength": 500,
+      "minLength": 1,
+      "title": "Capability Path",
+      "type": "string"
+    },
+    "expected_behavior": {
+      "$ref": "#/$defs/FixtureExpectedBehavior"
+    },
+    "failed_job_id": {
+      "maxLength": 200,
+      "minLength": 1,
+      "title": "Failed Job Id",
+      "type": "string"
+    },
+    "fixture_artifact": {
+      "$ref": "#/$defs/ArtifactRef"
+    },
+    "fixture_format": {
+      "enum": [
+        "html",
+        "json"
+      ],
+      "title": "Fixture Format",
+      "type": "string"
+    },
+    "fixture_id": {
+      "pattern": "^fixture/source-drift/[0-9a-f]{16}/[0-9a-f]{64}$",
+      "title": "Fixture Id",
+      "type": "string"
+    },
+    "promotion_trace_id": {
+      "format": "uuid",
+      "title": "Promotion Trace Id",
+      "type": "string"
+    },
+    "sanitization": {
+      "$ref": "#/$defs/SanitizationSummary"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_artifact_id": {
+      "format": "uuid",
+      "title": "Source Artifact Id",
+      "type": "string"
+    },
+    "source_content_hash": {
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Source Content Hash",
+      "type": "string"
+    }
+  },
+  "required": [
+    "fixture_id",
+    "fixture_format",
+    "capability_path",
+    "failed_job_id",
+    "source_artifact_id",
+    "source_content_hash",
+    "fixture_artifact",
+    "expected_behavior",
+    "binding",
+    "sanitization",
+    "promotion_trace_id"
+  ],
+  "title": "SourceDriftFixture",
+  "type": "object"
+}
