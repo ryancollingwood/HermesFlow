@@ -1,0 +1,44 @@
+summary: Prepare a bounded adaptive repair for approval
+description: Inspects and classifies the failed job, enforces repair policy and
+  attempt limits, generates an isolated candidate, promotes source-drift
+  fixtures, runs affected-consumer regressions, and prepares diff/impact/test
+  evidence without changing active code.
+lock: '!inline f/hermes_flow/repair/orchestrate.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    conn:
+      type: object
+      format: resource-hermes_endpoint
+    failed_job_id:
+      type: string
+    catalogue_yaml:
+      type: string
+    manifest_yaml:
+      type: string
+    original_context:
+      type: object
+    max_attempts:
+      type: integer
+      default: 2
+      minimum: 1
+      maximum: 3
+    recent_test_evidence:
+      type: array
+      items: {type: object}
+      default: null
+    source_artifact:
+      type: object
+      default: null
+    expected_behavior:
+      type: object
+      default: null
+    fixture_binding:
+      type: object
+      default: null
+    sanitization_rules:
+      type: object
+      default: null
+  required: [conn, failed_job_id, catalogue_yaml, manifest_yaml, original_context]

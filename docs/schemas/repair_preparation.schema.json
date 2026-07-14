@@ -1,0 +1,798 @@
+{
+  "$defs": {
+    "ActiveCapabilityEvidence": {
+      "properties": {
+        "path": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "capability_version": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Capability Version"
+        },
+        "windmill_hash": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Windmill's immutable active-script hash captured during inspection.",
+          "title": "Windmill Hash"
+        },
+        "asset_kind": {
+          "default": "script",
+          "maxLength": 20,
+          "title": "Asset Kind",
+          "type": "string"
+        },
+        "code": {
+          "$ref": "#/$defs/BoundedDocument"
+        }
+      },
+      "required": [
+        "path",
+        "code"
+      ],
+      "title": "ActiveCapabilityEvidence",
+      "type": "object"
+    },
+    "ArtifactEvidence": {
+      "properties": {
+        "artifact_id": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Artifact Id"
+        },
+        "stage": {
+          "anyOf": [
+            {
+              "maxLength": 100,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Stage"
+        },
+        "storage_uri": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Storage Uri"
+        },
+        "description": {
+          "anyOf": [
+            {
+              "maxLength": 1000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Description"
+        }
+      },
+      "title": "ArtifactEvidence",
+      "type": "object"
+    },
+    "AutonomyAction": {
+      "description": "The lifecycle actions a capability's autonomy policy governs.\n\nMatches the lifecycle in architecture/adr/0002-capability-lifecycle.md:\nREQUESTED -> SEARCH (discover) -> COMPOSE/REUSE/GENERATE (compose) ->\nCANDIDATE (create_candidate) -> TESTED -> ACTIVE -> EXECUTE (execute) ->\n... -> PATCH (modify_candidate) -> TEST -> PROMOTE (promote). `schedule`\ncovers turning a capability into a recurring Windmill schedule.",
+      "enum": [
+        "discover",
+        "execute",
+        "compose",
+        "create_candidate",
+        "modify_candidate",
+        "promote",
+        "schedule"
+      ],
+      "title": "AutonomyAction",
+      "type": "string"
+    },
+    "BoundedDocument": {
+      "properties": {
+        "content": {
+          "title": "Content",
+          "type": "string"
+        },
+        "original_bytes": {
+          "minimum": 0,
+          "title": "Original Bytes",
+          "type": "integer"
+        },
+        "retained_bytes": {
+          "minimum": 0,
+          "title": "Retained Bytes",
+          "type": "integer"
+        },
+        "truncated": {
+          "default": false,
+          "title": "Truncated",
+          "type": "boolean"
+        },
+        "sha256": {
+          "pattern": "^[0-9a-f]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        }
+      },
+      "required": [
+        "content",
+        "original_bytes",
+        "retained_bytes",
+        "sha256"
+      ],
+      "title": "BoundedDocument",
+      "type": "object"
+    },
+    "DependencyEvidence": {
+      "properties": {
+        "path": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "relationship": {
+          "maxLength": 50,
+          "minLength": 1,
+          "title": "Relationship",
+          "type": "string"
+        },
+        "distance": {
+          "minimum": 1,
+          "title": "Distance",
+          "type": "integer"
+        },
+        "via": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Via"
+        },
+        "tests": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Tests",
+          "type": "array"
+        }
+      },
+      "required": [
+        "path",
+        "relationship",
+        "distance"
+      ],
+      "title": "DependencyEvidence",
+      "type": "object"
+    },
+    "ExecutionContext": {
+      "description": "Identifies one workflow/capability execution and who/what initiated it.",
+      "properties": {
+        "schema_version": {
+          "default": "1.0",
+          "description": "Schema MAJOR.MINOR this record was written against.",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "trace_id": {
+          "description": "Unique ID for this execution.",
+          "format": "uuid",
+          "title": "Trace Id",
+          "type": "string"
+        },
+        "parent_trace_id": {
+          "anyOf": [
+            {
+              "format": "uuid",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "trace_id of the execution that spawned this one, if any (e.g. a flow step's sub-run). Absent for a top-level execution.",
+          "title": "Parent Trace Id"
+        },
+        "conversation_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Hermes conversation/session this execution was requested from, if any.",
+          "title": "Conversation Id"
+        },
+        "request_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Caller-supplied idempotency/correlation key for this specific request, if any.",
+          "title": "Request Id"
+        },
+        "capability": {
+          "description": "Capability path that is executing, e.g. f/capabilities/collection/web_fetch.",
+          "minLength": 1,
+          "title": "Capability",
+          "type": "string"
+        },
+        "capability_version": {
+          "description": "Version of that capability that is executing.",
+          "minLength": 1,
+          "title": "Capability Version",
+          "type": "string"
+        },
+        "initiating_actor": {
+          "description": "Who/what initiated this execution: a user id, 'hermes', a schedule name, etc.",
+          "minLength": 1,
+          "title": "Initiating Actor",
+          "type": "string"
+        },
+        "started_at": {
+          "description": "When this execution began (UTC).",
+          "format": "date-time",
+          "title": "Started At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "capability",
+        "capability_version",
+        "initiating_actor"
+      ],
+      "title": "ExecutionContext",
+      "type": "object"
+    },
+    "FailureCategory": {
+      "enum": [
+        "input",
+        "source_drift",
+        "code_defect",
+        "dependency",
+        "policy",
+        "infrastructure",
+        "unknown"
+      ],
+      "title": "FailureCategory",
+      "type": "string"
+    },
+    "FailureClassification": {
+      "properties": {
+        "category": {
+          "$ref": "#/$defs/FailureCategory"
+        },
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "reasons": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 10,
+          "title": "Reasons",
+          "type": "array"
+        }
+      },
+      "required": [
+        "category",
+        "confidence"
+      ],
+      "title": "FailureClassification",
+      "type": "object"
+    },
+    "OriginalJob": {
+      "properties": {
+        "job_id": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Job Id",
+          "type": "string"
+        },
+        "workspace": {
+          "maxLength": 200,
+          "minLength": 1,
+          "title": "Workspace",
+          "type": "string"
+        },
+        "path": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Path",
+          "type": "string"
+        },
+        "api_url": {
+          "maxLength": 2000,
+          "minLength": 1,
+          "title": "Api Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "job_id",
+        "workspace",
+        "path",
+        "api_url"
+      ],
+      "title": "OriginalJob",
+      "type": "object"
+    },
+    "PolicyDecision": {
+      "properties": {
+        "schema_version": {
+          "default": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "action": {
+          "$ref": "#/$defs/AutonomyAction"
+        },
+        "capability_path": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Capability Path"
+        },
+        "outcome": {
+          "$ref": "#/$defs/PolicyOutcome"
+        },
+        "reason": {
+          "minLength": 1,
+          "title": "Reason",
+          "type": "string"
+        }
+      },
+      "required": [
+        "action",
+        "outcome",
+        "reason"
+      ],
+      "title": "PolicyDecision",
+      "type": "object"
+    },
+    "PolicyOutcome": {
+      "enum": [
+        "automatic",
+        "approval_required",
+        "denied"
+      ],
+      "title": "PolicyOutcome",
+      "type": "string"
+    },
+    "RecentTestEvidence": {
+      "properties": {
+        "test": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Test",
+          "type": "string"
+        },
+        "status": {
+          "maxLength": 50,
+          "minLength": 1,
+          "title": "Status",
+          "type": "string"
+        },
+        "job_id": {
+          "anyOf": [
+            {
+              "maxLength": 200,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Job Id"
+        },
+        "recorded_at": {
+          "anyOf": [
+            {
+              "maxLength": 100,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Recorded At"
+        },
+        "details": {
+          "anyOf": [
+            {
+              "maxLength": 2000,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Details"
+        }
+      },
+      "required": [
+        "test",
+        "status"
+      ],
+      "title": "RecentTestEvidence",
+      "type": "object"
+    },
+    "RedactionSummary": {
+      "properties": {
+        "replacement_count": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Replacement Count",
+          "type": "integer"
+        },
+        "excluded_fields": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 50,
+          "title": "Excluded Fields",
+          "type": "array"
+        }
+      },
+      "title": "RedactionSummary",
+      "type": "object"
+    },
+    "RepairContext": {
+      "properties": {
+        "schema_version": {
+          "default": "1.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "original_job": {
+          "$ref": "#/$defs/OriginalJob"
+        },
+        "failure_summary": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Failure Summary",
+          "type": "string"
+        },
+        "classification": {
+          "$ref": "#/$defs/FailureClassification"
+        },
+        "active_capability": {
+          "$ref": "#/$defs/ActiveCapabilityEvidence"
+        },
+        "inputs": {
+          "$ref": "#/$defs/BoundedDocument"
+        },
+        "logs": {
+          "$ref": "#/$defs/BoundedDocument"
+        },
+        "artifacts": {
+          "items": {
+            "$ref": "#/$defs/ArtifactEvidence"
+          },
+          "title": "Artifacts",
+          "type": "array"
+        },
+        "dependency_impact": {
+          "items": {
+            "$ref": "#/$defs/DependencyEvidence"
+          },
+          "title": "Dependency Impact",
+          "type": "array"
+        },
+        "recent_test_evidence": {
+          "items": {
+            "$ref": "#/$defs/RecentTestEvidence"
+          },
+          "title": "Recent Test Evidence",
+          "type": "array"
+        },
+        "redaction": {
+          "$ref": "#/$defs/RedactionSummary"
+        },
+        "truncation": {
+          "$ref": "#/$defs/TruncationSummary"
+        },
+        "collection_warnings": {
+          "items": {
+            "type": "string"
+          },
+          "maxItems": 20,
+          "title": "Collection Warnings",
+          "type": "array"
+        },
+        "total_bytes": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Total Bytes",
+          "type": "integer"
+        },
+        "limits": {
+          "$ref": "#/$defs/RepairContextLimits"
+        }
+      },
+      "required": [
+        "original_job",
+        "failure_summary",
+        "classification",
+        "active_capability",
+        "inputs",
+        "logs",
+        "redaction",
+        "truncation",
+        "limits"
+      ],
+      "title": "RepairContext",
+      "type": "object"
+    },
+    "RepairContextLimits": {
+      "properties": {
+        "max_total_bytes": {
+          "default": 131072,
+          "maximum": 2000000,
+          "minimum": 16384,
+          "title": "Max Total Bytes",
+          "type": "integer"
+        },
+        "max_code_bytes": {
+          "default": 48000,
+          "maximum": 500000,
+          "minimum": 256,
+          "title": "Max Code Bytes",
+          "type": "integer"
+        },
+        "max_input_bytes": {
+          "default": 16000,
+          "maximum": 250000,
+          "minimum": 256,
+          "title": "Max Input Bytes",
+          "type": "integer"
+        },
+        "max_log_bytes": {
+          "default": 32000,
+          "maximum": 500000,
+          "minimum": 256,
+          "title": "Max Log Bytes",
+          "type": "integer"
+        },
+        "max_artifacts": {
+          "default": 20,
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Max Artifacts",
+          "type": "integer"
+        },
+        "max_dependencies": {
+          "default": 50,
+          "maximum": 250,
+          "minimum": 0,
+          "title": "Max Dependencies",
+          "type": "integer"
+        },
+        "max_test_evidence": {
+          "default": 20,
+          "maximum": 100,
+          "minimum": 0,
+          "title": "Max Test Evidence",
+          "type": "integer"
+        }
+      },
+      "title": "RepairContextLimits",
+      "type": "object"
+    },
+    "TruncationSummary": {
+      "properties": {
+        "truncated_sections": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Truncated Sections",
+          "type": "array"
+        },
+        "omitted_artifacts": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Omitted Artifacts",
+          "type": "integer"
+        },
+        "omitted_dependencies": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Omitted Dependencies",
+          "type": "integer"
+        },
+        "omitted_test_evidence": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Omitted Test Evidence",
+          "type": "integer"
+        }
+      },
+      "title": "TruncationSummary",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "policy_denied",
+        "generation_rejected",
+        "fixture_rejected",
+        "tests_failed",
+        "ready_for_approval"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "failed_job_id": {
+      "title": "Failed Job Id",
+      "type": "string"
+    },
+    "source_path": {
+      "title": "Source Path",
+      "type": "string"
+    },
+    "attempt": {
+      "title": "Attempt",
+      "type": "integer"
+    },
+    "max_attempts": {
+      "title": "Max Attempts",
+      "type": "integer"
+    },
+    "attempt_state_path": {
+      "title": "Attempt State Path",
+      "type": "string"
+    },
+    "original_context": {
+      "$ref": "#/$defs/ExecutionContext"
+    },
+    "repair_context": {
+      "$ref": "#/$defs/RepairContext"
+    },
+    "repair_policy": {
+      "$ref": "#/$defs/PolicyDecision"
+    },
+    "candidate": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Candidate"
+    },
+    "promoted_fixtures": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Promoted Fixtures",
+      "type": "array"
+    },
+    "regression": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Regression"
+    },
+    "promotion": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Promotion"
+    },
+    "stop_reason": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Stop Reason"
+    }
+  },
+  "required": [
+    "status",
+    "failed_job_id",
+    "source_path",
+    "attempt",
+    "max_attempts",
+    "attempt_state_path",
+    "original_context",
+    "repair_context",
+    "repair_policy"
+  ],
+  "title": "RepairPreparation",
+  "type": "object"
+}
