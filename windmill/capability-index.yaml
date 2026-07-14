@@ -45,6 +45,37 @@ entries:
         network: true
 
   - kind: script
+    tags: [health, dashboard, prometheus, grafana, testing, observability]
+    inputs_summary: >-
+      The versioned capability catalogue, public Windmill base URL, and a
+      freshness threshold; reads current HF-020 health state from Windmill.
+    outputs_summary: >-
+      A versioned capability health report with maturity, active/tested
+      versions, test freshness, failure counts, scheduled dependents, and
+      Windmill asset/job/schedule links; also atomically projects current-state
+      Prometheus textfile metrics for Grafana.
+    input_kinds: [capability_catalogue, health_state]
+    output_kinds: [capability_health_report, prometheus_metrics]
+    metadata:
+      path: f/hermes_flow/testing/health_report
+      capability_version: "1.0.0"
+      summary: Project authoritative capability metadata and scheduled-test state into Windmill and Grafana health reports.
+      maturity: experimental
+      deterministic: false
+      owners: [platform]
+      dependencies:
+        - f/hermes_flow/catalogue/models
+        - f/hermes_flow/testing/scheduled_health
+      test_requirements: [contracts/capability-health-report]
+      limits:
+        timeout_seconds: 60
+        max_concurrency: 1
+        rate_limit_per_minute: 12
+      effects:
+        filesystem: true
+        network: true
+
+  - kind: script
     tags: [repair, ai, candidate, provenance, policy, source-drift]
     inputs_summary: >-
       A complete HF-029 RepairContext, Hermes endpoint resource, versioned

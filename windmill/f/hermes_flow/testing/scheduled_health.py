@@ -7,7 +7,7 @@ from typing import Any, Optional, Protocol
 from urllib.parse import quote
 
 import wmill
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from f.hermes_flow.catalogue.models import Catalogue, CatalogueEntry, load_catalogue
 from f.hermes_flow.testing.runner import (
@@ -22,6 +22,7 @@ from f.hermes_flow.testing.runner import (
 )
 
 RUNNER_PATH = "f/hermes_flow/testing/scheduled_health"
+REPORT_PATH = "f/hermes_flow/testing/health_report"
 STATE_ROOT = "f/hermes_flow_state/health"
 
 
@@ -33,6 +34,9 @@ class HealthState(BaseModel):
     consecutive_failures: int = 0
     last_status: Optional[str] = None
     last_run_at: Optional[datetime] = None
+    last_test_ids: list[str] = Field(default_factory=list)
+    last_job_ids: list[str] = Field(default_factory=list)
+    recent_statuses: list[str] = Field(default_factory=list, max_length=10)
 
 
 class HealthFailureRecord(BaseModel):
@@ -165,6 +169,22 @@ def build_schedule_definitions(catalogue_yaml: str, manifest_yaml: str) -> list[
             "description": "Generated from CapabilityMetadata.scheduled_health (HF-020).",
             "labels": ["hermesflow", "capability-health"],
         })
+    definitions.append({
+        "path": "f/hermes_flow/health_dashboard_report",
+        "schedule": "0 */5 * * * *",
+        "timezone": "UTC",
+        "script_path": REPORT_PATH,
+        "is_flow": False,
+        "args": {"catalogue_yaml": catalogue_yaml},
+        "enabled": True,
+        "no_flow_overlap": True,
+        "cron_version": "v2",
+        "summary": "HermesFlow capability health dashboard projection",
+        "description": (
+            "Generated from CapabilityMetadata and HF-020 test state for HF-033."
+        ),
+        "labels": ["hermesflow", "capability-health", "grafana"],
+    })
     return definitions
 
 
@@ -238,6 +258,10 @@ def run_scheduled_health(
         state.active_version = entry.metadata.capability_version
         state.consecutive_failures = 0
         state.last_status = None
+        state.last_run_at = None
+        state.last_test_ids = []
+        state.last_job_ids = []
+        state.recent_statuses = []
     current_time = now or datetime.now(timezone.utc)
     minimum_interval = timedelta(minutes=1) / policy.rate_limit_per_minute
     if state.last_run_at and current_time - state.last_run_at < minimum_interval:
@@ -262,6 +286,8 @@ def run_scheduled_health(
     state.run_count += 1
     state.active_version = entry.metadata.capability_version
     state.last_run_at = current_time
+    state.last_test_ids = [item.test for item in test_run.evidence]
+    state.last_job_ids = [item.job_id for item in test_run.evidence if item.job_id]
     all_skipped = bool(test_run.evidence) and all(
         item.status is TestStatus.skipped for item in test_run.evidence
     )
@@ -287,6 +313,7 @@ def run_scheduled_health(
         state.consecutive_failures = 0
         escalation_required = False
     state.last_status = status
+    state.recent_statuses = [*state.recent_statuses, status][-10:]
     state_store.save(state)
     return ScheduledHealthResult(
         capability_path=capability_path,
@@ -302,6 +329,16 @@ def run_scheduled_health(
 
 
 def main(catalogue_yaml: str, manifest_yaml: str, capability_path: str) -> dict:
-    return run_scheduled_health(
-        catalogue_yaml, manifest_yaml, capability_path
-    ).model_dump(mode="json")
+    result = run_scheduled_health(catalogue_yaml, manifest_yaml, capability_path)
+    try:
+        # Lazy import avoids a module cycle: health_report reads HealthState.
+        from f.hermes_flow.testing.health_report import generate_health_report
+
+        generate_health_report(catalogue_yaml)
+    except Exception as exc:
+        projection = (
+            f"dashboard projection failed ({type(exc).__name__}); "
+            "health state remains authoritative"
+        )
+        result.details = f"{result.details}; {projection}" if result.details else projection
+    return result.model_dump(mode="json")

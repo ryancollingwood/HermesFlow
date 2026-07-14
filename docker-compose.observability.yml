@@ -120,7 +120,13 @@ services:
       - --collector.loadavg
       - --collector.meminfo
       - --collector.netdev
+      - --collector.textfile
+      - --collector.textfile.directory=/shared/metrics
       - --collector.uname
+    volumes:
+      # HF-033 writes one replace-in-place current-state snapshot here from
+      # Windmill. This is not a second log store or an append-only history.
+      - ${SHARED_DIR:-./data/shared}:/shared:ro
     deploy:
       resources:
         limits:

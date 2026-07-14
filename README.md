@@ -655,6 +655,17 @@ at `http://prometheus.localhost`, alerts at `http://alertmanager.localhost`.
 Loki has no UI of its own — query logs via Grafana's **Explore** tab with the
 `Loki` datasource (provisioned automatically).
 
+Grafana also auto-provisions **HermesFlow Capability Health**. HF-020 scheduled
+test runs retain their latest test/job identifiers, and HF-033's five-minute
+Windmill report schedule combines that state with the versioned capability
+catalogue. The dashboard exposes maturity, active and tested versions, healthy/
+warning/failed/untested status, evidence freshness, consecutive failures, and
+scheduled dependents, with links to the authoritative Windmill assets and jobs.
+It uses Node Exporter's textfile collector over a single atomically replaced
+`${SHARED_DIR}/metrics/hermesflow_capabilities.prom` snapshot; it does not add a
+service, database, or duplicate long-term log store. See
+[`docs/capability-health-dashboard.md`](docs/capability-health-dashboard.md).
+
 `make observability-revert` stops the services and removes the override from
 `COMPOSE_FILE` (data stays in `${MONITORING_DATA_DIR}`, default
 `./data/monitoring`).

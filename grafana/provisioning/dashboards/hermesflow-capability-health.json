@@ -1,0 +1,144 @@
+{
+  "annotations": {
+    "list": [
+      {
+        "builtIn": 1,
+        "datasource": {"type": "grafana", "uid": "-- Grafana --"},
+        "enable": true,
+        "hide": true,
+        "iconColor": "rgba(0, 211, 255, 1)",
+        "name": "Annotations & Alerts",
+        "type": "dashboard"
+      }
+    ]
+  },
+  "description": "HF-033 capability maturity, active version, scheduled-test health, failures, freshness, dependencies, and Windmill links from authoritative catalogue and HF-020 state.",
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": null,
+  "links": [
+    {
+      "icon": "external link",
+      "includeVars": false,
+      "keepTime": false,
+      "tags": [],
+      "targetBlank": true,
+      "title": "Open Windmill",
+      "type": "link",
+      "url": "http://windmill.localhost"
+    }
+  ],
+  "panels": [
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}]}}, "overrides": []},
+      "gridPos": {"h": 4, "w": 4, "x": 0, "y": 0},
+      "id": 1,
+      "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto", "wideLayout": true},
+      "pluginVersion": "11.0.0",
+      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "editorMode": "code", "expr": "count(hermesflow_capability_health)", "instant": true, "legendFormat": "Capabilities", "range": false, "refId": "A"}],
+      "title": "Capabilities",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"color": {"fixedColor": "red", "mode": "fixed"}}, "overrides": []},
+      "gridPos": {"h": 4, "w": 4, "x": 4, "y": 0},
+      "id": 2,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto", "wideLayout": true},
+      "pluginVersion": "11.0.0",
+      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "editorMode": "code", "expr": "count(hermesflow_capability_health == 2) or vector(0)", "instant": true, "legendFormat": "Failed", "range": false, "refId": "A"}],
+      "title": "Failed",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"color": {"fixedColor": "orange", "mode": "fixed"}}, "overrides": []},
+      "gridPos": {"h": 4, "w": 4, "x": 8, "y": 0},
+      "id": 3,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto", "wideLayout": true},
+      "pluginVersion": "11.0.0",
+      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "editorMode": "code", "expr": "count(hermesflow_capability_health == 3) or vector(0)", "instant": true, "legendFormat": "Untested", "range": false, "refId": "A"}],
+      "title": "Untested / version changed",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"color": {"fixedColor": "yellow", "mode": "fixed"}}, "overrides": []},
+      "gridPos": {"h": 4, "w": 4, "x": 12, "y": 0},
+      "id": 4,
+      "options": {"colorMode": "background", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "auto", "wideLayout": true},
+      "pluginVersion": "11.0.0",
+      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "editorMode": "code", "expr": "count(hermesflow_capability_health{freshness=\"stale\"}) or vector(0)", "instant": true, "legendFormat": "Stale", "range": false, "refId": "A"}],
+      "title": "Stale evidence",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"color": {"mode": "thresholds"}, "unit": "s", "thresholds": {"mode": "absolute", "steps": [{"color": "green", "value": null}, {"color": "yellow", "value": 300}, {"color": "red", "value": 900}]}}, "overrides": []},
+      "gridPos": {"h": 4, "w": 8, "x": 16, "y": 0},
+      "id": 5,
+      "options": {"colorMode": "value", "graphMode": "none", "justifyMode": "auto", "orientation": "auto", "reduceOptions": {"calcs": ["lastNotNull"], "fields": "", "values": false}, "textMode": "value_and_name", "wideLayout": true},
+      "pluginVersion": "11.0.0",
+      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "editorMode": "code", "expr": "time() - hermesflow_capability_report_generated_timestamp_seconds", "instant": true, "legendFormat": "Report age", "range": false, "refId": "A"}],
+      "title": "Dashboard freshness",
+      "type": "stat"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {
+        "defaults": {"custom": {"align": "auto", "cellOptions": {"type": "auto"}, "filterable": true, "inspect": false}},
+        "overrides": [
+          {"matcher": {"id": "byName", "options": "Asset"}, "properties": [{"id": "links", "value": [{"targetBlank": true, "title": "Open Windmill asset", "url": "${__value.raw}"}]}]},
+          {"matcher": {"id": "byName", "options": "Latest job"}, "properties": [{"id": "links", "value": [{"targetBlank": true, "title": "Open latest Windmill job", "url": "${__value.raw}"}]}]},
+          {"matcher": {"id": "byName", "options": "Schedule"}, "properties": [{"id": "links", "value": [{"targetBlank": true, "title": "Open Windmill schedule", "url": "${__value.raw}"}]}]},
+          {"matcher": {"id": "byName", "options": "Health"}, "properties": [{"id": "mappings", "value": [{"options": {"0": {"color": "green", "text": "healthy"}, "1": {"color": "yellow", "text": "warning"}, "2": {"color": "red", "text": "failed"}, "3": {"color": "orange", "text": "untested"}}, "type": "value"}]}, {"id": "custom.cellOptions", "value": {"mode": "basic", "type": "color-text"}}]}
+        ]
+      },
+      "gridPos": {"h": 13, "w": 24, "x": 0, "y": 4},
+      "id": 6,
+      "options": {"cellHeight": "sm", "footer": {"countRows": false, "fields": "", "reducer": ["sum"], "show": false}, "showHeader": true, "sortBy": [{"desc": true, "displayName": "Health"}]},
+      "pluginVersion": "11.0.0",
+      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "editorMode": "code", "expr": "hermesflow_capability_health", "format": "table", "instant": true, "legendFormat": "", "range": false, "refId": "A"}],
+      "title": "Capability health — filter by path, maturity, version, status, or freshness",
+      "transformations": [{"id": "labelsToFields", "options": {"mode": "columns"}}, {"id": "organize", "options": {"excludeByName": {"Time": true, "__name__": true}, "indexByName": {"path": 0, "Value": 1, "maturity": 2, "active_version": 3, "last_test_status": 4, "freshness": 5, "owners": 6, "scheduled_dependents": 7, "asset_url": 8, "last_job_url": 9, "schedule_url": 10}, "renameByName": {"Value": "Health", "active_version": "Active version", "asset_url": "Asset", "freshness": "Freshness", "last_job_url": "Latest job", "last_test_status": "Last test", "maturity": "Maturity", "owners": "Owners", "path": "Capability", "schedule_url": "Schedule", "scheduled_dependents": "Scheduled dependents"}}}],
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"custom": {"align": "auto", "cellOptions": {"type": "auto"}, "filterable": true, "inspect": false}}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 0, "y": 17},
+      "id": 7,
+      "options": {"cellHeight": "sm", "footer": {"countRows": false, "fields": "", "reducer": ["sum"], "show": false}, "showHeader": true},
+      "pluginVersion": "11.0.0",
+      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "editorMode": "code", "expr": "hermesflow_capability_recent_failures > 0", "format": "table", "instant": true, "range": false, "refId": "A"}],
+      "title": "Failures in latest 10 health runs",
+      "transformations": [{"id": "labelsToFields", "options": {"mode": "columns"}}],
+      "type": "table"
+    },
+    {
+      "datasource": {"type": "prometheus", "uid": "prometheus"},
+      "fieldConfig": {"defaults": {"custom": {"align": "auto", "cellOptions": {"type": "auto"}, "filterable": true, "inspect": false}}, "overrides": []},
+      "gridPos": {"h": 8, "w": 12, "x": 12, "y": 17},
+      "id": 8,
+      "options": {"cellHeight": "sm", "footer": {"countRows": false, "fields": "", "reducer": ["sum"], "show": false}, "showHeader": true},
+      "pluginVersion": "11.0.0",
+      "targets": [{"datasource": {"type": "prometheus", "uid": "prometheus"}, "editorMode": "code", "expr": "hermesflow_capability_scheduled_dependents > 0", "format": "table", "instant": true, "range": false, "refId": "A"}],
+      "title": "Scheduled dependents",
+      "transformations": [{"id": "labelsToFields", "options": {"mode": "columns"}}],
+      "type": "table"
+    }
+  ],
+  "refresh": "30s",
+  "schemaVersion": 39,
+  "tags": ["hermesflow", "capabilities", "health"],
+  "templating": {"list": []},
+  "time": {"from": "now-24h", "to": "now"},
+  "timepicker": {},
+  "timezone": "browser",
+  "title": "HermesFlow Capability Health",
+  "uid": "hermesflow-capability-health",
+  "version": 1,
+  "weekStart": ""
+}

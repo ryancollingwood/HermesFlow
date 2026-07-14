@@ -109,13 +109,18 @@ class FakeWindmill:
 
 def test_schedule_definition_is_generated_from_metadata():
     definitions = build_schedule_definitions(CATALOGUE, MANIFEST)
-    assert len(definitions) == 1
+    assert len(definitions) == 2
     schedule = definitions[0]
     assert schedule["schedule"] == "0 17 * * * *"
     assert schedule["timezone"] == "UTC"
     assert schedule["script_path"] == "f/hermes_flow/testing/scheduled_health"
     assert schedule["no_flow_overlap"] is True
     assert schedule["args"]["capability_path"] == "f/capabilities/example"
+    report = definitions[1]
+    assert report["path"] == "f/hermes_flow/health_dashboard_report"
+    assert report["script_path"] == "f/hermes_flow/testing/health_report"
+    assert report["schedule"] == "0 */5 * * * *"
+    assert report["args"] == {"catalogue_yaml": CATALOGUE}
 
 
 def test_schedule_reconciliation_requires_explicit_approval():
@@ -126,10 +131,11 @@ def test_schedule_reconciliation_requires_explicit_approval():
 def test_schedule_creation_in_disposable_workspace():
     client = FakeWindmill()
     changes = reconcile_schedules(CATALOGUE, MANIFEST, approved=True, client=client)
-    assert changes == [{
+    assert changes[0] == {
         "path": "f/hermes_flow/health_f_capabilities_example",
         "action": "created",
-    }]
+    }
+    assert changes[1]["path"] == "f/hermes_flow/health_dashboard_report"
     path, payload = client.posts[0]
     assert path == "/w/disposable/schedules/create"
     assert payload["enabled"] is True
@@ -157,6 +163,9 @@ def test_health_run_bounds_sample_count():
     assert result.status == "passed"
     assert result.sampled_test_ids == ["health/one"]
     assert executor.ran == ["health/one"]
+    assert store.state.last_test_ids == ["health/one"]
+    assert store.state.last_job_ids == ["job-1"]
+    assert store.state.recent_statuses == ["passed"]
 
 
 def test_three_failures_create_versioned_escalation_without_auto_disable():
@@ -193,6 +202,7 @@ def test_recovery_resets_consecutive_failure_count():
     assert recovered.status == "passed"
     assert recovered.consecutive_failures == 0
     assert store.state.last_status == "passed"
+    assert store.state.recent_statuses == ["failed", "passed"]
 
 
 def test_rate_limit_suppresses_early_repeat_without_mutating_state():
