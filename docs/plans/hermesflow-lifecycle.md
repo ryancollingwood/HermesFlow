@@ -144,12 +144,13 @@ Sprint 2/3 pieces. The demo scenario is a deliberately changed retail fixture.
 
 ## Sprint 6+ — Hardening (Phase 6 + deferred Phase 2 items)
 
-HF-034 rollback recommendation, HF-035 retention/privacy/cost, HF-036
-documentation and clean-install walkthrough.
+HF-035 retention/privacy/cost, HF-036 documentation and clean-install
+walkthrough.
 
 | Task | Implementation | Evidence |
 |---|---|---|
 | HF-033 Capability health dashboard (done) | `f/hermes_flow/testing/health_report` combines versioned catalogue metadata with HF-020 current test state, returns Windmill-readable health rows and atomically projects current-state Node Exporter textfile metrics; the optional observability override provisions the `HermesFlow Capability Health` Grafana dashboard and five-minute report schedule | Healthy/stale-warning/failed/untested and active-version cases; maturity/failure/freshness/scheduled-dependent metrics; Windmill asset/job/schedule links; atomic replace/no history; checked-in report schema and dashboard JSON |
+| HF-034 Automatic rollback recommendation (done) | `f/hermes_flow/candidate_ops/rollback_recommendation`: `recommend_rollback` compares HF-020's current failure streak against its own recent history via HF-029's deterministic classifier and only recommends once the escalation threshold is met and the streak isn't exclusively transient infrastructure noise; `execute_approved_rollback` requires the recommendation's own endorsement plus an authenticated approver, blocks silently on side-effecting/schedule-affecting capabilities until explicitly acknowledged, delegates the write to HF-014's `rollback_capability` (failed version stays in Windmill history), and reruns HF-016's impacted-consumer regression as post-rollback verification | No-evidence/healthy/below-threshold non-recommendation; transient-infrastructure-only streak withheld vs. mixed-category streak still recommended; not-recommended execution refusal; approval rejection persisted without writing; missing approver identity; silent side-effect/schedule execution refusal; successful rollback with preserved history and rerun tests; verification failure flagged for manual follow-up without undoing the rollback; no-impacted-tests short-circuit; checked-in recommendation schema |
 
 ## Standing constraints (from the document's definition of done + this repo's history)
 

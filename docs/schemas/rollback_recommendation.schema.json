@@ -1,0 +1,169 @@
+{
+  "$defs": {
+    "HealthEvidenceSnapshot": {
+      "properties": {
+        "run_count": {
+          "minimum": 1,
+          "title": "Run Count",
+          "type": "integer"
+        },
+        "consecutive_failures": {
+          "minimum": 0,
+          "title": "Consecutive Failures",
+          "type": "integer"
+        },
+        "failure_category": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Failure Category"
+        },
+        "recorded_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Recorded At"
+        },
+        "test_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Test Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "run_count",
+        "consecutive_failures"
+      ],
+      "title": "HealthEvidenceSnapshot",
+      "type": "object"
+    }
+  },
+  "properties": {
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "capability_path": {
+      "title": "Capability Path",
+      "type": "string"
+    },
+    "active_capability_version": {
+      "title": "Active Capability Version",
+      "type": "string"
+    },
+    "active_script_version": {
+      "title": "Active Script Version",
+      "type": "string"
+    },
+    "consecutive_failures": {
+      "minimum": 0,
+      "title": "Consecutive Failures",
+      "type": "integer"
+    },
+    "escalate_after_failures": {
+      "minimum": 1,
+      "title": "Escalate After Failures",
+      "type": "integer"
+    },
+    "threshold_met": {
+      "title": "Threshold Met",
+      "type": "boolean"
+    },
+    "transient_only": {
+      "title": "Transient Only",
+      "type": "boolean"
+    },
+    "recommended": {
+      "title": "Recommended",
+      "type": "boolean"
+    },
+    "reason": {
+      "title": "Reason",
+      "type": "string"
+    },
+    "current_evidence": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/HealthEvidenceSnapshot"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "previous_evidence": {
+      "items": {
+        "$ref": "#/$defs/HealthEvidenceSnapshot"
+      },
+      "title": "Previous Evidence",
+      "type": "array"
+    },
+    "required_tests": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Required Tests",
+      "type": "array"
+    },
+    "affected_workflows": {
+      "items": {
+        "type": "string"
+      },
+      "title": "Affected Workflows",
+      "type": "array"
+    },
+    "affected_schedules": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Affected Schedules",
+      "type": "array"
+    },
+    "has_side_effects": {
+      "title": "Has Side Effects",
+      "type": "boolean"
+    },
+    "requires_approval": {
+      "default": true,
+      "title": "Requires Approval",
+      "type": "boolean"
+    },
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    }
+  },
+  "required": [
+    "capability_path",
+    "active_capability_version",
+    "active_script_version",
+    "consecutive_failures",
+    "escalate_after_failures",
+    "threshold_met",
+    "transient_only",
+    "recommended",
+    "reason",
+    "has_side_effects"
+  ],
+  "title": "RollbackRecommendation",
+  "type": "object"
+}

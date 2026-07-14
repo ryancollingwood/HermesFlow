@@ -37,6 +37,7 @@ includes:
   - "f/hermes_flow/candidate_ops/prepare_promotion.*"
   - "f/hermes_flow/candidate_ops/promotion.flow/**"
   - "f/hermes_flow/candidate_ops/lifecycle.*"
+  - "f/hermes_flow/candidate_ops/rollback_recommendation.*"
   - "f/hermes_flow/testing/runner.*"
   - "f/hermes_flow/testing/example_test.*"
   - "f/hermes_flow/testing/regression.*"
