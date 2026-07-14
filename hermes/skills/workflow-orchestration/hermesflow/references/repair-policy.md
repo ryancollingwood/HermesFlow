@@ -17,8 +17,11 @@ HF-031's `f/hermes_flow/repair/promote_fixture` and
 `f/hermes_flow/testing/source_drift_fixture` promote sanitised source artifacts
 into candidate-only regressions; see
 [`docs/source-drift-regression-fixtures.md`](../../../../../docs/source-drift-regression-fixtures.md).
-HF-032's bounded orchestrated retry is not built yet. Inspection, generation,
-or fixture promotion therefore does not authorize active promotion or a retry loop.
+HF-032's `f/hermes_flow/repair/adaptive_repair` flow now composes those stages,
+the HF-016 affected-consumer suite, native approval, optimistic promotion, and
+one lineage-linked retry. Use that flow for an adaptive repair; calling an
+individual inspection, generation, or fixture operation still does not
+authorize active promotion or a retry.
 
 ## 1. INSPECT — read what actually happened before acting
 
@@ -71,13 +74,26 @@ Start from the `ExecutionResult`:
   any previous baseline fixture, and run both through the HF-016 regression
   selector against the isolated candidate. Never point the fixture runner at an
   active path or retain unsanitised source content in a manifest.
+
+  For a complete adaptive repair, submit
+  `f/hermes_flow/repair/adaptive_repair` with the failed job, original
+  `ExecutionContext`, catalogue, manifests, and (for source drift) the retained
+  source artifact plus expected behavior. The flow stops before generation for
+  input/policy/infrastructure/unknown classifications, stops before approval on
+  any failed or skipped required regression, and always suspends for an
+  authenticated reviewer before promotion. It refuses a stale active base and
+  reloads the original arguments only inside the post-approval finalizer; those
+  arguments are never returned or written to repair state. A retry receives a
+  fresh context whose `parent_trace_id` is the original trace.
 - **Stop and ask** — appropriate whenever the failure implies something
   the task's original request didn't account for (a missing resource, an
   ambiguous requirement, a capability that doesn't do what its `summary`
   claimed), or after a patch attempt doesn't resolve it. Looping silently
   on repeated failures burns time and produces noisy job history without
   getting closer to a working result; surface what you've learned and let
-  the user decide the next step.
+  the user decide the next step. HF-032 reserves at most the configured one to
+  three attempts under `f/hermes_flow_state/adaptive_repair/`; exhaustion is a
+  terminal result, never permission to recurse.
 
 ## 3. Report, even when you stop partway
 

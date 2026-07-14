@@ -1,0 +1,138 @@
+{
+  "properties": {
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "approval_rejected",
+        "stale_conflict",
+        "promotion_failed",
+        "retry_succeeded",
+        "retry_failed"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "failed_job_id": {
+      "title": "Failed Job Id",
+      "type": "string"
+    },
+    "source_path": {
+      "title": "Source Path",
+      "type": "string"
+    },
+    "candidate_id": {
+      "minLength": 1,
+      "title": "Candidate Id",
+      "type": "string"
+    },
+    "candidate_path": {
+      "minLength": 1,
+      "title": "Candidate Path",
+      "type": "string"
+    },
+    "attempt": {
+      "maximum": 3,
+      "minimum": 1,
+      "title": "Attempt",
+      "type": "integer"
+    },
+    "max_attempts": {
+      "maximum": 3,
+      "minimum": 1,
+      "title": "Max Attempts",
+      "type": "integer"
+    },
+    "parent_trace_id": {
+      "title": "Parent Trace Id",
+      "type": "string"
+    },
+    "retry_trace_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Retry Trace Id"
+    },
+    "promoted_version": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Promoted Version"
+    },
+    "retry_job_id": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Retry Job Id"
+    },
+    "retry_result_sha256": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Retry Result Sha256"
+    },
+    "approved_by": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Approved By"
+    },
+    "details": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Details"
+    }
+  },
+  "required": [
+    "status",
+    "failed_job_id",
+    "source_path",
+    "candidate_id",
+    "candidate_path",
+    "attempt",
+    "max_attempts",
+    "parent_trace_id"
+  ],
+  "title": "RetryRecord",
+  "type": "object"
+}

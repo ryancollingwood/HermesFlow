@@ -81,7 +81,7 @@ Two settings enforce this:
     `f/hermes_flow/policies/evaluator.*`, and
     `f/hermes_flow/candidate_ops/{models,create,diff,promote,prepare_promotion,lifecycle}.*`,
     `f/hermes_flow/testing/{runner,example_test,regression,scheduled_health,source_drift_fixture}.*`, plus
-    `f/hermes_flow/repair/{folder.meta.yaml,models.*,inspection.*,generate_candidate.*,promote_fixture.*}`, and
+    `f/hermes_flow/repair/{folder.meta.yaml,models.*,inspection.*,generate_candidate.*,promote_fixture.*,orchestrate.*,finalize_retry.*,adaptive_repair.flow/**}`, and
     `f/hermes_flow/candidate_ops/promotion.flow/**`) has a harder
     requirement: `f/hermes_flow/candidates/` (HF-011's candidate namespace —
     proposed capabilities awaiting promotion, deliberately Windmill-only)
@@ -118,7 +118,7 @@ The repo is the source of truth; the server is made to match it, **within scope*
 | `f/data_platform/` or `f/hermes_flow/` item **named in `includes`**, in repo, **not** on server | **created** on server |
 | `f/data_platform/` or `f/hermes_flow/` item **named in `includes`**, on server, **not** in repo | **removed** (archived/hard-deleted per type) — dry-run guard applies, same as above |
 | `f/data_platform/` or `f/hermes_flow/` item **not named in `includes`** (server or local) | **untouched** — out of scope regardless of which side it's on |
-| `f/hermes_flow/repair/` tracked metadata/models/inspection/generation/fixture-promotion assets | created / overwritten / removed with the same guarded mirror semantics; unenumerated repair assets remain untouched |
+| `f/hermes_flow/repair/` explicitly tracked inspection/generation/fixture/adaptive-repair assets | created / overwritten / removed with the same guarded mirror semantics; unenumerated repair assets and `f/hermes_flow_state/adaptive_repair/**` attempt records remain untouched |
 | `f/workflows/` item **named in `includes`** | created / overwritten / removed to mirror the repo; the dry-run deletion guard applies |
 | `f/workflows/` item **not named in `includes`** | **untouched** — out of scope |
 | **`f/hermes_flow/candidates/**`** (any candidate, server or local) | **untouched** — never in `includes`, additionally blocked by `excludes` |
@@ -145,7 +145,7 @@ because git is the safety net — review `git diff` before committing.
 | `f/data_platform/` or `f/hermes_flow/` item **named in `includes`**, on server, **not** in repo | **written** into `windmill/f/data_platform/` or `windmill/f/hermes_flow/` |
 | `f/data_platform/` or `f/hermes_flow/` item **named in `includes`**, in repo, **not** on server | **deleted** from working tree (`git checkout` restores) |
 | `f/data_platform/` or `f/hermes_flow/` item **not named in `includes`** (e.g. a script added on the server) | **not pulled** — stays server-only, never enters git, until you add it to `includes` |
-| `f/hermes_flow/repair/` tracked metadata/models/inspection/generation/fixture-promotion assets | written / overwritten / deleted locally to mirror the server; unenumerated repair assets are not pulled |
+| `f/hermes_flow/repair/` explicitly tracked inspection/generation/fixture/adaptive-repair assets | written / overwritten / deleted locally to mirror the server; unenumerated repair assets and `f/hermes_flow_state/adaptive_repair/**` attempt records are not pulled |
 | `f/workflows/` item **named in `includes`** | written / overwritten / deleted locally to mirror the server |
 | `f/workflows/` item **not named in `includes`** | **not pulled** — stays out of the repo |
 | **any `f/hermes_flow/candidates/**` item** (e.g. HF-011 creating a candidate directly on the server) | **not pulled** — stays server-only, never enters git, by design, not by omission — this is the entire point of the exclusion; verified live: a script created at `f/hermes_flow/candidates/hf007_probe` directly via the Windmill API never appeared under `windmill/f/hermes_flow/` after a real `wmill sync pull` |
@@ -164,9 +164,11 @@ it works as a pre-push or scheduled guard. Because it is scoped to `f/hermes/**`
 unenumerated `f/data_platform/`/`f/hermes_flow/`/`f/workflows/` items, and other folders
 **never show as drift** — their divergence is intentional, not drift.
 The explicitly enumerated `f/hermes_flow/repair/` metadata, models, inspection,
-candidate-generation, and fixture-promotion operations participate in drift
-checks; any other repair asset remains out of scope. Sanitised fixture bytes
-remain in `/shared/artifacts`, outside Windmill sync scope.
+candidate-generation, fixture-promotion, adaptive orchestration, finalizer, and
+approval-flow assets participate in drift checks; any other repair asset remains
+out of scope. Sanitised fixture bytes remain in `/shared/artifacts`, and bounded
+attempt records remain under `f/hermes_flow_state/adaptive_repair/`; both are
+outside Windmill sync scope.
 Verified live for the candidate case specifically: a script created directly
 on the server at `f/hermes_flow/candidates/hf007_probe` did not appear as
 drift and was not pulled — the only drift `make windmill-check` reported

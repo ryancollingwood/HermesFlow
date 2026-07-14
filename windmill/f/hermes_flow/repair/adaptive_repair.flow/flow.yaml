@@ -1,0 +1,74 @@
+summary: Inspect, repair, test, approve, promote, and retry one failed execution
+description: HF-032 bounded repair workflow. Policy denial and failed tests stop
+  before approval; native approval gates an optimistic promotion and one retry.
+value:
+  modules:
+    - id: prepare
+      summary: Prepare candidate, fixture, regressions, and promotion evidence
+      value:
+        type: script
+        input_transforms:
+          conn: {type: javascript, expr: flow_input.conn}
+          failed_job_id: {type: javascript, expr: flow_input.failed_job_id}
+          catalogue_yaml: {type: javascript, expr: flow_input.catalogue_yaml}
+          manifest_yaml: {type: javascript, expr: flow_input.manifest_yaml}
+          original_context: {type: javascript, expr: flow_input.original_context}
+          max_attempts: {type: javascript, expr: flow_input.max_attempts}
+          recent_test_evidence: {type: javascript, expr: flow_input.recent_test_evidence}
+          source_artifact: {type: javascript, expr: flow_input.source_artifact}
+          expected_behavior: {type: javascript, expr: flow_input.expected_behavior}
+          fixture_binding: {type: javascript, expr: flow_input.fixture_binding}
+          sanitization_rules: {type: javascript, expr: flow_input.sanitization_rules}
+        is_trigger: false
+        path: f/hermes_flow/repair/orchestrate
+    - id: approval
+      summary: Review repair diff, consumer impact, fixture, and test evidence
+      value:
+        type: rawscript
+        content: '!inline review_repair.inline_script.py'
+        input_transforms:
+          evidence: {type: javascript, expr: results.prepare}
+        lock: '!inline review_repair.inline_script.lock'
+        is_trigger: false
+        language: python3
+      skip_if:
+        expr: results.prepare.status !== "ready_for_approval"
+      suspend:
+        hide_cancel: false
+        required_events: 1
+        self_approval_disabled: true
+        user_auth_required: true
+    - id: finalize_retry
+      summary: Promote approved candidate and retry the original execution
+      value:
+        type: script
+        input_transforms:
+          prepared_json: {type: javascript, expr: JSON.stringify(results.prepare)}
+          approval_granted: {type: static, value: true}
+          approved_by:
+            type: javascript
+            expr: 'typeof approvers !== "undefined" && approvers.length ? approvers[0] : ""'
+          context_argument: {type: javascript, expr: flow_input.context_argument}
+          retry_timeout_seconds: {type: javascript, expr: flow_input.retry_timeout_seconds}
+        is_trigger: false
+        path: f/hermes_flow/repair/finalize_retry
+      skip_if:
+        expr: results.prepare.status !== "ready_for_approval"
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    conn: {type: object, format: resource-hermes_endpoint}
+    failed_job_id: {type: string}
+    catalogue_yaml: {type: string}
+    manifest_yaml: {type: string}
+    original_context: {type: object}
+    max_attempts: {type: integer, default: 2, minimum: 1, maximum: 3}
+    recent_test_evidence: {type: array, items: {type: object}, default: null}
+    source_artifact: {type: object, default: null}
+    expected_behavior: {type: object, default: null}
+    fixture_binding: {type: object, default: null}
+    sanitization_rules: {type: object, default: null}
+    context_argument: {type: string, default: context}
+    retry_timeout_seconds: {type: integer, default: 300, minimum: 1, maximum: 3600}
+  required: [conn, failed_job_id, catalogue_yaml, manifest_yaml, original_context]

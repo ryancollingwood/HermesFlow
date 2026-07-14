@@ -428,3 +428,35 @@ entries:
         rate_limit_per_minute: 30
       effects:
         network: true
+
+  - kind: flow
+    tags: [repair, adaptive, approval, retry, regression, lineage]
+    inputs_summary: >-
+      A failed Windmill job ID, its original ExecutionContext, versioned
+      catalogue and test manifests, Hermes endpoint, bounded attempt policy,
+      and optional retained source-drift fixture contract.
+    outputs_summary: >-
+      A terminal repair preparation or a RetryRecord linking the original
+      failure, tested candidate, approved promotion, parent trace, and retry job.
+    input_kinds: [windmill_job_ref, execution_context, capability_catalogue, test_manifest]
+    output_kinds: [repair_preparation, adaptive_retry_record]
+    metadata:
+      path: f/hermes_flow/repair/adaptive_repair
+      capability_version: "1.0.0"
+      summary: Inspect, repair, test, approve, promote, and retry one failed active script within a bounded attempt policy.
+      maturity: experimental
+      deterministic: false
+      owners: [platform]
+      dependencies:
+        - f/hermes_flow/repair/inspection
+        - f/hermes_flow/repair/generate_candidate
+        - f/hermes_flow/repair/promote_fixture
+        - f/hermes_flow/testing/regression
+        - f/hermes_flow/candidate_ops/promote
+      test_requirements: [contracts/adaptive-repair]
+      limits:
+        timeout_seconds: 3600
+        max_concurrency: 2
+        rate_limit_per_minute: 10
+      effects:
+        network: true

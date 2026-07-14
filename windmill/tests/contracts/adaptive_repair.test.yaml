@@ -1,0 +1,11 @@
+schema_version: "1.0"
+tests:
+  - id: contracts/adaptive-repair
+    capability_paths: [f/hermes_flow/repair/adaptive_repair]
+    type: contract
+    mode: promotion_gating
+    script_path: f/hermes_flow/repair/adaptive_repair
+    asset_kind: flow
+    timeout_seconds: 3600
+    max_data_bytes: 5000000
+    skip_reason: Policy denial, changed-source fixtures, affected-consumer regressions, native approval, stale-base refusal, lineage-linked retry, and attempt exhaustion are validated with injected external clients by test_adaptive_repair.py.
