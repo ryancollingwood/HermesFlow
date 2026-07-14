@@ -1,0 +1,21 @@
+summary: ''
+description: ''
+lock: '!inline f/hermes_flow/candidate_ops/rollback_recommendation.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    action:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    args_json:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+  required:
+    - action
+    - args_json

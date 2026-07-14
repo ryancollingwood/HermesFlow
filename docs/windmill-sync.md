@@ -43,12 +43,12 @@ by folder boundaries. It is deliberately narrow:
 | `f/libraries/**` | shared, importable Pydantic-model modules (`f.libraries.lineage.models`, `f.libraries.capability.models`, `f.libraries.results.models`, …) | ✅ yes | ✅ yes |
 | `f/capabilities/**` | versioned active capabilities, beginning with HF-021's policy-bounded web fetch | ✅ yes | ✅ yes |
 | `f/data_platform/{folder.meta,data_platform_db.resource,db_password.variable,dbt_run.*,extract_hn_stories.*}` | dlt/dbt pipeline scripts + their resource/secret | ✅ yes | ✅ yes (named explicitly, not wildcarded) |
-| `f/hermes_flow/{folder.meta.yaml,catalogue/models.*,catalogue/search.*,policies/evaluator.*,candidate_ops/models.*,candidate_ops/create.*,candidate_ops/diff.*,candidate_ops/promote.*,candidate_ops/prepare_promotion.*,candidate_ops/promotion.flow/**,candidate_ops/lifecycle.*,testing/runner.*,testing/example_test.*,testing/regression.*,testing/scheduled_health.*,testing/health_report.*,testing/source_drift_fixture.*,repair/folder.meta.yaml,repair/models.*,repair/inspection.*,repair/generate_candidate.*,repair/promote_fixture.*}` | HermesFlow's own control-plane: capability catalogue/search/policy (HF-008–010), candidate lifecycle (HF-011–014), testing/regression/health reporting (HF-015–016, HF-020, HF-033), and bounded adaptive repair (HF-029–032) | ✅ yes | ✅ yes (named explicitly, not wildcarded — see below) |
+| `f/hermes_flow/{folder.meta.yaml,catalogue/models.*,catalogue/search.*,policies/evaluator.*,candidate_ops/models.*,candidate_ops/create.*,candidate_ops/diff.*,candidate_ops/promote.*,candidate_ops/prepare_promotion.*,candidate_ops/promotion.flow/**,candidate_ops/lifecycle.*,candidate_ops/rollback_recommendation.*,testing/runner.*,testing/example_test.*,testing/regression.*,testing/scheduled_health.*,testing/health_report.*,testing/source_drift_fixture.*,repair/folder.meta.yaml,repair/models.*,repair/inspection.*,repair/generate_candidate.*,repair/promote_fixture.*}` | HermesFlow's own control-plane: capability catalogue/search/policy (HF-008–010), candidate lifecycle (HF-011–014), testing/regression/health reporting (HF-015–016, HF-020, HF-033), bounded adaptive repair (HF-029–032), and automatic rollback recommendation (HF-034) | ✅ yes | ✅ yes (named explicitly, not wildcarded — see below) |
 | `f/workflows/{folder.meta.yaml,product_collection.flow/**}` | composed, versioned workflows beginning with HF-027's bounded product collection flow | ✅ yes | ✅ yes (named explicitly, not wildcarded) |
 | `capability-index.yaml` (top level, not under `f/`) | the version-controlled capability index itself, validated/loaded by `f/hermes_flow/catalogue/models.py` | ✅ yes | ❌ no — repo-only, like `wmill.yaml` itself; not a Windmill script/flow/resource asset, so there's nothing for `wmill sync` to push. Read directly from the checked-out repo by CI and by whatever eventually calls `load_catalogue()` |
 | `hermes_endpoint` resource-type | the shared endpoint type | ✅ yes | ✅ yes |
 | `f/hermes_state/**` | **runtime state** (timestamps, cursors, non-secret vars) | ❌ no | ❌ **no** |
-| `f/hermes_flow_state/**` | **lifecycle runtime state** (deprecation, rollback, and scheduled-health records) | ❌ no | ❌ **no** |
+| `f/hermes_flow_state/**` | **lifecycle runtime state** (deprecation, rollback, scheduled-health, and rollback-recommendation execution records) | ❌ no | ❌ **no** |
 | **`f/hermes_flow/candidates/**`** | **candidate capabilities** (HF-011) — proposed, not-yet-promoted code | ❌ no | ❌ **no**, explicitly excluded (see below) |
 | any other item dropped into `f/data_platform/`, `f/hermes_flow/`, or `f/workflows/` not named above | unenumerated pipeline/catalogue/workflow assets | n/a | ❌ **no** |
 | any other `f/*` folder | unrelated projects | ❌ no | ❌ no |
@@ -79,7 +79,7 @@ Two settings enforce this:
   - `f/hermes_flow/` (currently `f/hermes_flow/folder.meta.yaml`,
     `f/hermes_flow/catalogue/models.*`, `f/hermes_flow/catalogue/search.*`,
     `f/hermes_flow/policies/evaluator.*`, and
-    `f/hermes_flow/candidate_ops/{models,create,diff,promote,prepare_promotion,lifecycle}.*`,
+    `f/hermes_flow/candidate_ops/{models,create,diff,promote,prepare_promotion,lifecycle,rollback_recommendation}.*`,
     `f/hermes_flow/testing/{runner,example_test,regression,scheduled_health,health_report,source_drift_fixture}.*`, plus
     `f/hermes_flow/repair/{folder.meta.yaml,models.*,inspection.*,generate_candidate.*,promote_fixture.*,orchestrate.*,finalize_retry.*,adaptive_repair.flow/**}`, and
     `f/hermes_flow/candidate_ops/promotion.flow/**`) has a harder
