@@ -144,9 +144,12 @@ Sprint 2/3 pieces. The demo scenario is a deliberately changed retail fixture.
 
 ## Sprint 6+ — Hardening (Phase 6 + deferred Phase 2 items)
 
-HF-033 health dashboard (Grafana — observability stack
-already optional in compose), HF-034 rollback recommendation, HF-035
-retention/privacy/cost, HF-036 documentation and clean-install walkthrough.
+HF-034 rollback recommendation, HF-035 retention/privacy/cost, HF-036
+documentation and clean-install walkthrough.
+
+| Task | Implementation | Evidence |
+|---|---|---|
+| HF-033 Capability health dashboard (done) | `f/hermes_flow/testing/health_report` combines versioned catalogue metadata with HF-020 current test state, returns Windmill-readable health rows and atomically projects current-state Node Exporter textfile metrics; the optional observability override provisions the `HermesFlow Capability Health` Grafana dashboard and five-minute report schedule | Healthy/stale-warning/failed/untested and active-version cases; maturity/failure/freshness/scheduled-dependent metrics; Windmill asset/job/schedule links; atomic replace/no history; checked-in report schema and dashboard JSON |
 
 ## Standing constraints (from the document's definition of done + this repo's history)
 

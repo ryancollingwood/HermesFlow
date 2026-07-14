@@ -42,6 +42,7 @@ includes:
   - "f/hermes_flow/testing/regression.*"
   - "f/hermes_flow/testing/source_drift_fixture.*"
   - "f/hermes_flow/testing/scheduled_health.*"
+  - "f/hermes_flow/testing/health_report.*"
   - "f/hermes_flow/repair/folder.meta.yaml"
   - "f/hermes_flow/repair/models.*"
   - "f/hermes_flow/repair/inspection.*"

@@ -1,0 +1,251 @@
+{
+  "$defs": {
+    "CapabilityHealthRow": {
+      "properties": {
+        "path": {
+          "title": "Path",
+          "type": "string"
+        },
+        "kind": {
+          "$ref": "#/$defs/CapabilityKind"
+        },
+        "maturity": {
+          "title": "Maturity",
+          "type": "string"
+        },
+        "active_version": {
+          "title": "Active Version",
+          "type": "string"
+        },
+        "tested_version": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tested Version"
+        },
+        "owners": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Owners",
+          "type": "array"
+        },
+        "status": {
+          "$ref": "#/$defs/HealthStatus"
+        },
+        "last_test_status": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Test Status"
+        },
+        "last_test_at": {
+          "anyOf": [
+            {
+              "format": "date-time",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Test At"
+        },
+        "age_seconds": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Age Seconds"
+        },
+        "freshness": {
+          "$ref": "#/$defs/Freshness"
+        },
+        "consecutive_failures": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Consecutive Failures",
+          "type": "integer"
+        },
+        "recent_failure_count": {
+          "default": 0,
+          "maximum": 10,
+          "minimum": 0,
+          "title": "Recent Failure Count",
+          "type": "integer"
+        },
+        "recent_window_size": {
+          "default": 0,
+          "maximum": 10,
+          "minimum": 0,
+          "title": "Recent Window Size",
+          "type": "integer"
+        },
+        "run_count": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Run Count",
+          "type": "integer"
+        },
+        "last_test_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Last Test Ids",
+          "type": "array"
+        },
+        "last_job_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Last Job Ids",
+          "type": "array"
+        },
+        "scheduled_health_enabled": {
+          "title": "Scheduled Health Enabled",
+          "type": "boolean"
+        },
+        "scheduled_dependents": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Scheduled Dependents",
+          "type": "array"
+        },
+        "asset_url": {
+          "title": "Asset Url",
+          "type": "string"
+        },
+        "last_job_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Last Job Url"
+        },
+        "schedule_url": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Schedule Url"
+        }
+      },
+      "required": [
+        "path",
+        "kind",
+        "maturity",
+        "active_version",
+        "owners",
+        "status",
+        "freshness",
+        "scheduled_health_enabled",
+        "asset_url"
+      ],
+      "title": "CapabilityHealthRow",
+      "type": "object"
+    },
+    "CapabilityKind": {
+      "enum": [
+        "script",
+        "flow"
+      ],
+      "title": "CapabilityKind",
+      "type": "string"
+    },
+    "Freshness": {
+      "enum": [
+        "fresh",
+        "stale",
+        "missing"
+      ],
+      "title": "Freshness",
+      "type": "string"
+    },
+    "HealthStatus": {
+      "enum": [
+        "healthy",
+        "warning",
+        "failed",
+        "untested"
+      ],
+      "title": "HealthStatus",
+      "type": "string"
+    }
+  },
+  "properties": {
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "generated_at": {
+      "format": "date-time",
+      "title": "Generated At",
+      "type": "string"
+    },
+    "workspace": {
+      "title": "Workspace",
+      "type": "string"
+    },
+    "windmill_base_url": {
+      "title": "Windmill Base Url",
+      "type": "string"
+    },
+    "stale_after_seconds": {
+      "minimum": 60,
+      "title": "Stale After Seconds",
+      "type": "integer"
+    },
+    "source": {
+      "default": "CapabilityMetadata + HF-020 HealthState",
+      "title": "Source",
+      "type": "string"
+    },
+    "capabilities": {
+      "items": {
+        "$ref": "#/$defs/CapabilityHealthRow"
+      },
+      "title": "Capabilities",
+      "type": "array"
+    }
+  },
+  "required": [
+    "generated_at",
+    "workspace",
+    "windmill_base_url",
+    "stale_after_seconds",
+    "capabilities"
+  ],
+  "title": "CapabilityHealthReport",
+  "type": "object"
+}

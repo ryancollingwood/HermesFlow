@@ -1,0 +1,24 @@
+summary: Project authoritative capability health into a report and Prometheus metrics
+description: Combines versioned CapabilityMetadata with HF-020 scheduled-test
+  state, classifies healthy, warning, failed, stale, and untested capabilities,
+  links Windmill assets/jobs/schedules, and atomically replaces the Node
+  Exporter textfile snapshot consumed by the provisioned Grafana dashboard.
+lock: '!inline f/hermes_flow/testing/health_report.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    catalogue_yaml:
+      type: string
+      description: Versioned HermesFlow capability catalogue YAML.
+    windmill_base_url:
+      type: string
+      description: Public base URL used for dashboard asset and job links.
+      default: http://windmill.localhost
+    stale_after_seconds:
+      type: integer
+      description: Age after which current-version test evidence is warning/stale.
+      default: 86400
+      minimum: 60
+  required: [catalogue_yaml]

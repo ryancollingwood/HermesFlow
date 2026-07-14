@@ -262,6 +262,10 @@ and Loki/Promtail come up — dashboards at `http://grafana.localhost` (`admin` 
 `GRAFANA_ADMIN_PASSWORD`). The same thing `make observability` does; revert
 (and drop the override) with `make observability-revert`. See
 [README → Observability](README.md#observability-optional).
+The provisioned Grafana instance includes the HermesFlow capability-health
+dashboard; its current-state metrics are projected from Windmill HF-020 test
+state through Node Exporter's textfile collector, with no additional service or
+log store.
 
 ### 17. Ollama (opt-in with `--with-ollama`, or use `--external-ollama`)
 Without either flag, `HINDSIGHT_LLM_BASE_URL` / `BASEROW_OLLAMA_HOST` already
