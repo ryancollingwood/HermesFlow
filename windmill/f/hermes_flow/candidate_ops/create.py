@@ -111,6 +111,10 @@ def create_candidate(
     conversation_id: Optional[str] = None,
     request_id: Optional[str] = None,
     generated_by_capability: Optional[str] = None,
+    failed_job_id: Optional[str] = None,
+    repair_context_sha256: Optional[str] = None,
+    generation_trace_id: Optional[str] = None,
+    generation_artifact_ids: Optional[list[str]] = None,
     client: Optional[WindmillAdminClient] = None,
 ) -> dict:
     """Create (or idempotently return) a candidate. Returns a dict with an
@@ -161,6 +165,10 @@ def create_candidate(
         conversation_id=conversation_id,
         request_id=request_id,
         generated_by_capability=generated_by_capability,
+        failed_job_id=failed_job_id,
+        repair_context_sha256=repair_context_sha256,
+        generation_trace_id=generation_trace_id,
+        generation_artifact_ids=generation_artifact_ids or [],
     )
 
     create_resp = w.post(
@@ -207,6 +215,10 @@ def main(
     conversation_id: str = "",
     request_id: str = "",
     generated_by_capability: str = "",
+    failed_job_id: str = "",
+    repair_context_sha256: str = "",
+    generation_trace_id: str = "",
+    generation_artifact_ids: Optional[list[str]] = None,
 ) -> dict:
     """Windmill entrypoint. Empty-string optionals (Windmill has no None in its UI
     forms) are normalized to None before delegating to create_candidate()."""
@@ -220,4 +232,8 @@ def main(
         conversation_id=conversation_id or None,
         request_id=request_id or None,
         generated_by_capability=generated_by_capability or None,
+        failed_job_id=failed_job_id or None,
+        repair_context_sha256=repair_context_sha256 or None,
+        generation_trace_id=generation_trace_id or None,
+        generation_artifact_ids=generation_artifact_ids or [],
     )

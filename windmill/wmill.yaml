@@ -44,6 +44,7 @@ includes:
   - "f/hermes_flow/repair/folder.meta.yaml"
   - "f/hermes_flow/repair/models.*"
   - "f/hermes_flow/repair/inspection.*"
+  - "f/hermes_flow/repair/generate_candidate.*"
   - "f/data_platform/folder.meta.yaml"
   - "f/data_platform/data_platform_db.resource.yaml"
   - "f/data_platform/db_password.variable.yaml"

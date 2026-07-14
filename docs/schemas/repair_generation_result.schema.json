@@ -1,0 +1,354 @@
+{
+  "$defs": {
+    "ArtifactRef": {
+      "description": "Points at one stored artifact and how it fits into a run's lineage.",
+      "properties": {
+        "artifact_id": {
+          "description": "Unique ID for this artifact reference.",
+          "format": "uuid",
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "content_hash": {
+          "description": "Lowercase 64-character hex SHA-256 digest of the artifact's content.",
+          "title": "Content Hash",
+          "type": "string"
+        },
+        "created_at": {
+          "description": "When this artifact was written (UTC).",
+          "format": "date-time",
+          "title": "Created At",
+          "type": "string"
+        },
+        "creator_capability": {
+          "description": "Capability path that produced this artifact.",
+          "minLength": 1,
+          "title": "Creator Capability",
+          "type": "string"
+        },
+        "creator_capability_version": {
+          "description": "Version of that capability at the time it produced this artifact.",
+          "minLength": 1,
+          "title": "Creator Capability Version",
+          "type": "string"
+        },
+        "derived_from": {
+          "description": "artifact_id of each artifact this one was derived from. Empty for a raw artifact with no upstream input captured by this store.",
+          "items": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "title": "Derived From",
+          "type": "array"
+        },
+        "media_type": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "IANA media type of the stored content. HF-017 adapters always populate it; optional for backward compatibility with pre-HF-017 references.",
+          "title": "Media Type"
+        },
+        "schema_version": {
+          "default": "1.0",
+          "description": "Schema MAJOR.MINOR this record was written against.",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "size_bytes": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Artifact content size in bytes. HF-017 storage adapters always populate it; optional for backward compatibility with pre-HF-017 references.",
+          "title": "Size Bytes"
+        },
+        "stage": {
+          "$ref": "#/$defs/ArtifactStage",
+          "description": "raw (untransformed input), intermediate (a transformation step's output), or final (a run's end result)."
+        },
+        "storage_uri": {
+          "description": "Where the content lives, e.g. file:///shared/artifacts/<hash[:2]>/<hash>.",
+          "minLength": 1,
+          "title": "Storage Uri",
+          "type": "string"
+        },
+        "trace_id": {
+          "description": "trace_id of the ExecutionContext that produced this artifact.",
+          "format": "uuid",
+          "title": "Trace Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "trace_id",
+        "stage",
+        "content_hash",
+        "storage_uri",
+        "creator_capability",
+        "creator_capability_version"
+      ],
+      "title": "ArtifactRef",
+      "type": "object"
+    },
+    "ArtifactStage": {
+      "description": "Where an artifact sits in a run's raw -> intermediate -> final pipeline.",
+      "enum": [
+        "raw",
+        "intermediate",
+        "final"
+      ],
+      "title": "ArtifactStage",
+      "type": "string"
+    },
+    "PatchValidation": {
+      "additionalProperties": false,
+      "properties": {
+        "active_lines": {
+          "minimum": 1,
+          "title": "Active Lines",
+          "type": "integer"
+        },
+        "changed_lines": {
+          "minimum": 1,
+          "title": "Changed Lines",
+          "type": "integer"
+        },
+        "new_imports": {
+          "items": {
+            "type": "string"
+          },
+          "title": "New Imports",
+          "type": "array"
+        },
+        "test_update_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Test Update Ids",
+          "type": "array"
+        }
+      },
+      "required": [
+        "changed_lines",
+        "active_lines"
+      ],
+      "title": "PatchValidation",
+      "type": "object"
+    },
+    "RepairPatchProposal": {
+      "additionalProperties": false,
+      "properties": {
+        "patched_content": {
+          "maxLength": 500000,
+          "minLength": 1,
+          "title": "Patched Content",
+          "type": "string"
+        },
+        "rationale": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Rationale",
+          "type": "string"
+        },
+        "summary": {
+          "maxLength": 1000,
+          "minLength": 1,
+          "title": "Summary",
+          "type": "string"
+        },
+        "test_updates": {
+          "items": {
+            "$ref": "#/$defs/TestUpdate"
+          },
+          "maxItems": 20,
+          "minItems": 1,
+          "title": "Test Updates",
+          "type": "array"
+        }
+      },
+      "required": [
+        "summary",
+        "rationale",
+        "patched_content",
+        "test_updates"
+      ],
+      "title": "RepairPatchProposal",
+      "type": "object"
+    },
+    "TestUpdate": {
+      "additionalProperties": false,
+      "properties": {
+        "failure_reproduction": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Failure Reproduction",
+          "type": "string"
+        },
+        "proposed_change": {
+          "maxLength": 4000,
+          "minLength": 1,
+          "title": "Proposed Change",
+          "type": "string"
+        },
+        "test_id": {
+          "maxLength": 500,
+          "minLength": 1,
+          "title": "Test Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "test_id",
+        "failure_reproduction",
+        "proposed_change"
+      ],
+      "title": "TestUpdate",
+      "type": "object"
+    }
+  },
+  "additionalProperties": false,
+  "properties": {
+    "attempts": {
+      "items": {
+        "additionalProperties": true,
+        "type": "object"
+      },
+      "title": "Attempts",
+      "type": "array"
+    },
+    "candidate": {
+      "anyOf": [
+        {
+          "additionalProperties": true,
+          "type": "object"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Candidate"
+    },
+    "failed_job_id": {
+      "title": "Failed Job Id",
+      "type": "string"
+    },
+    "generation_artifacts": {
+      "items": {
+        "$ref": "#/$defs/ArtifactRef"
+      },
+      "title": "Generation Artifacts",
+      "type": "array"
+    },
+    "generation_prompt_sha256": {
+      "title": "Generation Prompt Sha256",
+      "type": "string"
+    },
+    "generation_trace_id": {
+      "title": "Generation Trace Id",
+      "type": "string"
+    },
+    "model": {
+      "title": "Model",
+      "type": "string"
+    },
+    "proposal": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RepairPatchProposal"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "rejection_reason": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Rejection Reason"
+    },
+    "repair_context_sha256": {
+      "title": "Repair Context Sha256",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_path": {
+      "title": "Source Path",
+      "type": "string"
+    },
+    "source_version": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Source Version"
+    },
+    "source_windmill_hash": {
+      "title": "Source Windmill Hash",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "candidate_created",
+        "rejected"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "validation": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PatchValidation"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    }
+  },
+  "required": [
+    "status",
+    "failed_job_id",
+    "source_path",
+    "source_windmill_hash",
+    "repair_context_sha256",
+    "generation_prompt_sha256",
+    "generation_trace_id",
+    "generation_artifacts",
+    "model",
+    "attempts"
+  ],
+  "title": "RepairGenerationResult",
+  "type": "object"
+}

@@ -138,6 +138,7 @@ Sprint 2/3 pieces. The demo scenario is a deliberately changed retail fixture.
 | Task | Implementation | Evidence |
 |---|---|---|
 | HF-029 Failure inspection package (done) | `f/hermes_flow/repair/inspection`: retrieves a failed job, active asset, bounded/redacted inputs and logs, artifact references, reverse-dependency impact, and capability-scoped recent tests; returns a versioned `RepairContext` linking the original job with deterministic input/source-drift/code/dependency/policy/infrastructure classification | Exact 128 KiB default envelope bound with section hashes and explicit omissions; conversation-field exclusion; credential redaction across inputs/logs/code/errors/tests; parser, unavailable endpoint, database dependency, missing active asset, and unavailable-job adapter tests; checked-in JSON Schema |
+| HF-030 Repair candidate generation (done) | `f/hermes_flow/repair/generate_candidate`: verifies the inspected active hash/content is current, invokes Hermes through HF-019 with a strict full-source repair schema, checks minimality/dependencies/effects/unsafe calls, and creates only an HF-011 candidate | Exact prompt/context/raw/parsed artifact retention and candidate provenance to failed job/trace; source-selector drift integration; malformed/schema-invalid/unparseable/unsafe/non-minimal/stale/truncated rejection tests; checked-in result schema |
 
 ## Sprint 6+ — Hardening (Phase 6 + deferred Phase 2 items)
 

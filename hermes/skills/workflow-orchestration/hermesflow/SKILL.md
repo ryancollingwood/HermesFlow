@@ -1,7 +1,7 @@
 ---
 name: hermesflow
 description: Orchestrate HermesFlow tasks — search for or generate a capability, run it exclusively through Windmill, and present the result. Use for any task that needs code to run, including natural-language product collection, comparison, price research, or multi-source shopping requests.
-version: 0.3.1
+version: 0.4.0
 author: Ryan Philip Collingwood
 license: MIT
 metadata:

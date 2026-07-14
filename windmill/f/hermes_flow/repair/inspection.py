@@ -394,6 +394,7 @@ def build_repair_context(
         active_capability=ActiveCapabilityEvidence(
             path=path,
             capability_version=_clip(version, 200) or None,
+            windmill_hash=_clip(active_asset.get("hash"), 500) or None,
             asset_kind=asset_kind,
             code=code_document,
         ),

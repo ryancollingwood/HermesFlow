@@ -23,6 +23,13 @@ This is true no matter how small the change looks. "Just add one field" or
 active code and still needs the candidate → test → promote path — there is
 no size-based exception.
 
+For a repair of a failed active script, use
+`f/hermes_flow/repair/generate_candidate` with the complete HF-029
+`RepairContext` instead of authoring a patch directly. HF-030 pins the candidate
+to the inspected active Windmill hash, retains the exact prompt/context/model
+outputs, requires a concrete test update, and rejects stale, invalid, unsafe, or
+effect-expanding patches before candidate creation.
+
 ## What a new candidate must carry
 
 Author a `CapabilityMetadata` record (`f/libraries/capability/models.py`)

@@ -126,6 +126,20 @@ def test_record_rejects_a_path_that_does_not_match_its_candidate_id():
         )
 
 
+def test_repair_candidate_rejects_partial_generation_provenance():
+    candidate_id = compute_candidate_id("repair-x")
+    with pytest.raises(ValidationError, match="repair candidate provenance is incomplete"):
+        CandidateRecord(
+            candidate_id=candidate_id,
+            path=compute_candidate_path(candidate_id),
+            request_key="repair-x",
+            reason="partial repair provenance",
+            source_path="f/capabilities/source-selector",
+            base_version="active-hash",
+            failed_job_id="failed-job",
+        )
+
+
 # ── Creating new candidates ───────────────────────────────────────────────────
 
 
@@ -154,6 +168,12 @@ def test_created_candidate_metadata_round_trips():
         conversation_id="conv-abc",
         request_id="req-xyz",
         generated_by_capability="f/libraries/ai/invoke_hermes_structured",
+        source_path="f/capabilities/source-selector",
+        base_version="active-hash",
+        failed_job_id="job-failed-1",
+        repair_context_sha256="a" * 64,
+        generation_trace_id="trace-1",
+        generation_artifact_ids=["artifact-prompt", "artifact-output"],
         client=fake,
     )
     stored = CandidateRecord.model_validate_json(fake.variables[metadata_variable_path(result["candidate_id"])])
@@ -161,6 +181,10 @@ def test_created_candidate_metadata_round_trips():
     assert stored.conversation_id == "conv-abc"
     assert stored.request_id == "req-xyz"
     assert stored.generated_by_capability == "f/libraries/ai/invoke_hermes_structured"
+    assert stored.failed_job_id == "job-failed-1"
+    assert stored.repair_context_sha256 == "a" * 64
+    assert stored.generation_trace_id == "trace-1"
+    assert stored.generation_artifact_ids == ["artifact-prompt", "artifact-output"]
 
 
 # ── Deriving candidates from an active version ───────────────────────────────

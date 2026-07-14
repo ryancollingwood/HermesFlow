@@ -48,6 +48,11 @@ class OriginalJob(BaseModel):
 class ActiveCapabilityEvidence(BaseModel):
     path: str = Field(..., min_length=1, max_length=500)
     capability_version: Optional[str] = Field(default=None, max_length=200)
+    windmill_hash: Optional[str] = Field(
+        default=None,
+        max_length=500,
+        description="Windmill's immutable active-script hash captured during inspection.",
+    )
     asset_kind: str = Field(default="script", max_length=20)
     code: BoundedDocument
 
