@@ -127,11 +127,35 @@ class CapabilityEffects(BaseModel):
 
 
 class CapabilityLimits(BaseModel):
-    """Bounds enforced when this capability runs. All optional — unset means unbounded."""
+    """Bounds enforced when this capability runs. All optional — unset means unbounded.
+
+    HF-035 adds the size/record-count/cost triad alongside the pre-existing
+    ``timeout_seconds`` (duration): together these are the four retention/cost
+    dimensions `f.hermes_flow.policies.evaluator.evaluate_policy` can deny a
+    request for, the same way it already denies on `max_concurrency`/
+    `rate_limit_per_minute`. Declaring a limit here does not itself measure or
+    estimate anything — evaluation only compares whatever the caller reports it
+    expects (``PolicyContext.requested_*``) against the declared bound.
+    """
 
     timeout_seconds: Optional[int] = Field(default=None, gt=0)
     max_concurrency: Optional[int] = Field(default=None, gt=0)
     rate_limit_per_minute: Optional[int] = Field(default=None, gt=0)
+    max_response_bytes: Optional[int] = Field(
+        default=None, gt=0,
+        description="Largest response/output size this capability may return, in bytes.",
+    )
+    max_record_count: Optional[int] = Field(
+        default=None, gt=0,
+        description="Largest number of records (rows, items, documents) one invocation may "
+        "produce or process, e.g. a dataset extraction's row count.",
+    )
+    max_cost_usd: Optional[float] = Field(
+        default=None, gt=0,
+        description="Largest estimated model/inference cost, in USD, one invocation may incur. "
+        "See f.libraries.retention.models.estimate_cost_usd for the caller-side estimate this "
+        "is compared against.",
+    )
 
 
 class ScheduledHealthPolicy(BaseModel):

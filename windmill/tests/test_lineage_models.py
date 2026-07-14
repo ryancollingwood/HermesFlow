@@ -7,7 +7,7 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from f.libraries.lineage.models import ArtifactRef, ArtifactStage, ExecutionContext
+from f.libraries.lineage.models import ArtifactRef, ArtifactStage, ArtifactTombstone, ExecutionContext
 
 SHA256_OF_EMPTY = hashlib.sha256(b"").hexdigest()
 SCHEMAS_DIR = pathlib.Path(__file__).parent.parent.parent / "docs" / "schemas"
@@ -221,12 +221,48 @@ def test_lineage_chain_raw_to_transformation_to_final():
     assert raw.derived_from == []
 
 
+# ── ArtifactTombstone: HF-035 lineage-preserving deletion record ────────────
+
+
+def test_tombstone_carries_same_lineage_fields_as_the_deleted_ref():
+    ctx = make_context()
+    ref = make_artifact(ctx.trace_id, derived_from=[uuid4()])
+    tombstone = ArtifactTombstone(
+        artifact_id=ref.artifact_id,
+        trace_id=ref.trace_id,
+        stage=ref.stage,
+        content_hash=ref.content_hash,
+        creator_capability=ref.creator_capability,
+        creator_capability_version=ref.creator_capability_version,
+        derived_from=ref.derived_from,
+        reason="retention expiry",
+    )
+    assert tombstone.artifact_id == ref.artifact_id
+    assert tombstone.derived_from == ref.derived_from
+    assert tombstone.reason == "retention expiry"
+
+
+def test_tombstone_requires_a_non_empty_reason():
+    ctx = make_context()
+    ref = make_artifact(ctx.trace_id)
+    with pytest.raises(ValidationError):
+        ArtifactTombstone(
+            artifact_id=ref.artifact_id, trace_id=ref.trace_id, stage=ref.stage,
+            content_hash=ref.content_hash, creator_capability=ref.creator_capability,
+            creator_capability_version=ref.creator_capability_version, reason="",
+        )
+
+
 # ── docs/CI: checked-in JSON Schema exports must match the models ───────────
 
 
 @pytest.mark.parametrize(
     "model,filename",
-    [(ExecutionContext, "execution_context.schema.json"), (ArtifactRef, "artifact_ref.schema.json")],
+    [
+        (ExecutionContext, "execution_context.schema.json"),
+        (ArtifactRef, "artifact_ref.schema.json"),
+        (ArtifactTombstone, "artifact_tombstone.schema.json"),
+    ],
 )
 def test_checked_in_json_schema_matches_model(model, filename):
     schema_path = SCHEMAS_DIR / filename

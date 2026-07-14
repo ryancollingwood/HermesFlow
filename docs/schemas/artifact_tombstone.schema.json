@@ -1,0 +1,81 @@
+{
+  "$defs": {
+    "ArtifactStage": {
+      "description": "Where an artifact sits in a run's raw -> intermediate -> final pipeline.",
+      "enum": [
+        "raw",
+        "intermediate",
+        "final"
+      ],
+      "title": "ArtifactStage",
+      "type": "string"
+    }
+  },
+  "description": "HF-035: what remains of an `ArtifactRef` after its content is deleted.\n\nDeleting an artifact's bytes must not break `derived_from` lineage chains\nthat point at it \u2014 a downstream artifact's `derived_from` list stays\nresolvable (the id still exists, just as a tombstone) even though the\ncontent itself is gone. See\n`f.libraries.storage.artifacts.FilesystemArtifactStore.delete`.",
+  "properties": {
+    "artifact_id": {
+      "description": "Same artifact_id as the deleted ArtifactRef.",
+      "format": "uuid",
+      "title": "Artifact Id",
+      "type": "string"
+    },
+    "content_hash": {
+      "description": "The deleted content's hash, retained for lineage/audit even though the object itself is gone.",
+      "title": "Content Hash",
+      "type": "string"
+    },
+    "creator_capability": {
+      "minLength": 1,
+      "title": "Creator Capability",
+      "type": "string"
+    },
+    "creator_capability_version": {
+      "minLength": 1,
+      "title": "Creator Capability Version",
+      "type": "string"
+    },
+    "deleted_at": {
+      "format": "date-time",
+      "title": "Deleted At",
+      "type": "string"
+    },
+    "derived_from": {
+      "items": {
+        "format": "uuid",
+        "type": "string"
+      },
+      "title": "Derived From",
+      "type": "array"
+    },
+    "reason": {
+      "description": "Why this artifact was deleted.",
+      "minLength": 1,
+      "title": "Reason",
+      "type": "string"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "stage": {
+      "$ref": "#/$defs/ArtifactStage"
+    },
+    "trace_id": {
+      "format": "uuid",
+      "title": "Trace Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "artifact_id",
+    "trace_id",
+    "stage",
+    "content_hash",
+    "creator_capability",
+    "creator_capability_version",
+    "reason"
+  ],
+  "title": "ArtifactTombstone",
+  "type": "object"
+}

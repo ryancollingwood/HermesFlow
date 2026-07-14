@@ -1,4 +1,5 @@
-"""HF-017 content-addressed artifact storage tests."""
+"""HF-017 content-addressed artifact storage tests. HF-035 adds tombstone-preserving
+deletion tests."""
 import hashlib
 import json
 from uuid import uuid4
@@ -9,6 +10,7 @@ from f.libraries.lineage.models import ArtifactRef, ArtifactStage
 from f.libraries.storage.artifacts import (
     ArtifactIntegrityError,
     ArtifactStorageError,
+    ArtifactTombstonedError,
     FilesystemArtifactStore,
 )
 
@@ -166,3 +168,72 @@ def test_artifacts_persist_when_store_instance_is_recreated(tmp_path):
     restarted_store = FilesystemArtifactStore(tmp_path)
     assert restarted_store.read(ref) == b"persistent"
     assert restarted_store.read_metadata(ref.artifact_id)["artifact"]["content_hash"] == ref.content_hash
+
+
+# ── HF-035: retention-driven deletion preserves tombstone lineage ───────────
+
+
+def test_delete_replaces_metadata_with_a_tombstone_and_blocks_read(tmp_path):
+    store = FilesystemArtifactStore(tmp_path)
+    ref = write(store, b"to be deleted")
+    tombstone = store.delete(ref, "retention expiry: short_term policy")
+    assert tombstone.artifact_id == ref.artifact_id
+    assert tombstone.content_hash == ref.content_hash
+    assert tombstone.reason == "retention expiry: short_term policy"
+    assert store.is_tombstoned(ref.artifact_id) is True
+    with pytest.raises(ArtifactTombstonedError, match="deleted under a retention policy"):
+        store.read(ref)
+
+
+def test_delete_preserves_derived_from_lineage_after_deletion(tmp_path):
+    store = FilesystemArtifactStore(tmp_path)
+    raw = write(store, "raw")
+    derived = write(store, "parsed", stage=ArtifactStage.intermediate, derived_from=[raw.artifact_id])
+    store.delete(raw, "retention expiry")
+    # The downstream artifact's derived_from link still resolves to a real
+    # (if tombstoned) record — it was never silently dropped or orphaned.
+    envelope = store.read_metadata(raw.artifact_id)
+    assert envelope["tombstone"]["artifact_id"] == str(raw.artifact_id)
+    assert derived.derived_from == [raw.artifact_id]
+    assert store.read(derived) == b"parsed"
+
+
+def test_delete_does_not_remove_shared_content_addressed_bytes_for_other_references(tmp_path):
+    store = FilesystemArtifactStore(tmp_path)
+    first = write(store, "same", metadata={"source": "one"})
+    second = write(store, "same", metadata={"source": "two"})
+    store.delete(first, "retention expiry")
+    with pytest.raises(ArtifactTombstonedError):
+        store.read(first)
+    # A different artifact_id sharing the same underlying bytes is unaffected.
+    assert store.read(second) == b"same"
+
+
+def test_delete_requires_a_non_empty_reason(tmp_path):
+    store = FilesystemArtifactStore(tmp_path)
+    ref = write(store, b"content")
+    with pytest.raises(ArtifactStorageError, match="non-empty reason"):
+        store.delete(ref, "")
+
+
+def test_delete_is_idempotent(tmp_path):
+    store = FilesystemArtifactStore(tmp_path)
+    ref = write(store, b"content")
+    first = store.delete(ref, "first reason")
+    second = store.delete(ref, "second reason, should be ignored")
+    assert first == second
+    assert first.reason == "first reason"
+
+
+def test_is_tombstoned_is_false_for_a_never_written_artifact_id(tmp_path):
+    store = FilesystemArtifactStore(tmp_path)
+    assert store.is_tombstoned(uuid4()) is False
+
+
+def test_read_metadata_still_returns_the_tombstone_envelope(tmp_path):
+    store = FilesystemArtifactStore(tmp_path)
+    ref = write(store, b"content")
+    store.delete(ref, "retention expiry")
+    envelope = store.read_metadata(ref.artifact_id)
+    assert "tombstone" in envelope
+    assert "artifact" not in envelope

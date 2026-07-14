@@ -159,6 +159,76 @@ def test_capability_with_no_declared_limit_cannot_be_exceeded():
     assert decision.outcome is PolicyOutcome.automatic
 
 
+# ── HF-035: duration/size/record-count/cost limits, same deny-not-approval rule ──
+
+
+def test_requested_duration_exceeding_timeout_is_denied():
+    cap = make_capability(limits=CapabilityLimits(timeout_seconds=30))
+    decision = evaluate_policy(
+        PolicyContext(action=AutonomyAction.execute, capability=cap, requested_duration_seconds=60)
+    )
+    assert decision.outcome is PolicyOutcome.denied
+    assert "duration" in decision.reason
+
+
+def test_requested_response_bytes_exceeding_limit_is_denied():
+    cap = make_capability(limits=CapabilityLimits(max_response_bytes=1_000))
+    decision = evaluate_policy(
+        PolicyContext(action=AutonomyAction.execute, capability=cap, requested_response_bytes=5_000)
+    )
+    assert decision.outcome is PolicyOutcome.denied
+    assert "response size" in decision.reason
+
+
+def test_requested_record_count_exceeding_limit_is_denied():
+    cap = make_capability(limits=CapabilityLimits(max_record_count=100))
+    decision = evaluate_policy(
+        PolicyContext(action=AutonomyAction.execute, capability=cap, requested_record_count=500)
+    )
+    assert decision.outcome is PolicyOutcome.denied
+    assert "record count" in decision.reason
+
+
+def test_requested_cost_exceeding_limit_is_denied():
+    cap = make_capability(limits=CapabilityLimits(max_cost_usd=1.0))
+    decision = evaluate_policy(
+        PolicyContext(action=AutonomyAction.execute, capability=cap, requested_cost_usd=5.0)
+    )
+    assert decision.outcome is PolicyOutcome.denied
+    assert "cost" in decision.reason
+
+
+@pytest.mark.parametrize(
+    "field,limit_field,limit_value,requested_value",
+    [
+        ("requested_duration_seconds", "timeout_seconds", 30, 10),
+        ("requested_response_bytes", "max_response_bytes", 1_000, 500),
+        ("requested_record_count", "max_record_count", 100, 50),
+        ("requested_cost_usd", "max_cost_usd", 1.0, 0.5),
+    ],
+)
+def test_hf035_requested_value_within_limit_is_unaffected(
+    field, limit_field, limit_value, requested_value
+):
+    cap = make_capability(limits=CapabilityLimits(**{limit_field: limit_value}))
+    decision = evaluate_policy(
+        PolicyContext(action=AutonomyAction.execute, capability=cap, **{field: requested_value})
+    )
+    assert decision.outcome is PolicyOutcome.automatic
+
+
+@pytest.mark.parametrize(
+    "field",
+    ["requested_duration_seconds", "requested_response_bytes", "requested_record_count", "requested_cost_usd"],
+)
+def test_hf035_declared_limit_without_a_matching_request_is_not_a_violation(field):
+    cap = make_capability(limits=CapabilityLimits(
+        timeout_seconds=30, max_response_bytes=1_000, max_record_count=100, max_cost_usd=1.0,
+    ))
+    decision = evaluate_policy(PolicyContext(action=AutonomyAction.execute, capability=cap))
+    assert decision.outcome is PolicyOutcome.automatic
+
+
 # ── Policy result includes decision, reason, and relevant metadata ──────────
 
 

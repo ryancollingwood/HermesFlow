@@ -1,0 +1,90 @@
+{
+  "$defs": {
+    "RetentionClass": {
+      "description": "How long a data category is kept, independent of *why* (see RetentionPolicy.notes).",
+      "enum": [
+        "ephemeral",
+        "short_term",
+        "standard",
+        "long_term",
+        "indefinite"
+      ],
+      "title": "RetentionClass",
+      "type": "string"
+    }
+  },
+  "description": "Declared retention bounds for one data category.",
+  "properties": {
+    "category": {
+      "minLength": 1,
+      "title": "Category",
+      "type": "string"
+    },
+    "max_age_seconds": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "description": "Delete once an item is older than this. Unset means no automatic age-based expiry (typical for long_term/indefinite).",
+      "title": "Max Age Seconds"
+    },
+    "max_record_count": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Max Record Count"
+    },
+    "max_size_bytes": {
+      "anyOf": [
+        {
+          "exclusiveMinimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Max Size Bytes"
+    },
+    "notes": {
+      "default": "",
+      "maxLength": 2000,
+      "title": "Notes",
+      "type": "string"
+    },
+    "requires_tombstone": {
+      "default": true,
+      "description": "Whether deletion of this category must preserve a tombstone record (lineage-linked artifacts) rather than a bare delete.",
+      "title": "Requires Tombstone",
+      "type": "boolean"
+    },
+    "retention_class": {
+      "$ref": "#/$defs/RetentionClass"
+    },
+    "schema_version": {
+      "default": "1.0",
+      "title": "Schema Version",
+      "type": "string"
+    }
+  },
+  "required": [
+    "category",
+    "retention_class"
+  ],
+  "title": "RetentionPolicy",
+  "type": "object"
+}

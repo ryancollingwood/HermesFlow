@@ -43,10 +43,15 @@ Fail-closed rules, in priority order:
    `approval_required`. (An already-`approval_required` action stays
    `approval_required` — there is nowhere further to escalate to below
    `denied`, and a human review step already covers it.)
-5. A request whose `requested_concurrency`/`requested_rate_per_minute`
-   exceeds the capability's own declared `CapabilityLimits` is `denied` —
-   exceeding a declared bound is a violation to reject, not a risk to
-   route for approval.
+5. A request whose `requested_concurrency`/`requested_rate_per_minute`/
+   `requested_duration_seconds`/`requested_response_bytes`/
+   `requested_record_count`/`requested_cost_usd` exceeds the capability's own
+   declared `CapabilityLimits` is `denied` — exceeding a declared bound is a
+   violation to reject, not a risk to route for approval. The last four
+   (HF-035) are the retention/cost dimensions in
+   `f.libraries.capability.models.CapabilityLimits`; like concurrency and
+   rate, a limit that's merely *declared* but not *requested* for this call
+   is not itself a violation — there's nothing to compare.
 6. Otherwise, the decision is exactly the capability's own
    `AutonomyPolicy.level_for(action)`.
 
@@ -86,6 +91,10 @@ class PolicyContext(BaseModel):
     )
     requested_concurrency: Optional[int] = Field(default=None, ge=1)
     requested_rate_per_minute: Optional[int] = Field(default=None, ge=1)
+    requested_duration_seconds: Optional[int] = Field(default=None, ge=1)
+    requested_response_bytes: Optional[int] = Field(default=None, ge=0)
+    requested_record_count: Optional[int] = Field(default=None, ge=0)
+    requested_cost_usd: Optional[float] = Field(default=None, ge=0)
     destructive: bool = Field(
         default=False,
         description="Caller-supplied flag for a specific invocation known to be "
@@ -142,30 +151,22 @@ def evaluate_policy(context: PolicyContext) -> PolicyDecision:
         )
 
     limits = capability.limits
-    if (
-        context.requested_concurrency is not None
-        and limits.max_concurrency is not None
-        and context.requested_concurrency > limits.max_concurrency
-    ):
-        return PolicyDecision(
-            action=action,
-            capability_path=capability.path,
-            outcome=PolicyOutcome.denied,
-            reason=f"requested concurrency {context.requested_concurrency} exceeds capability limit "
-            f"{limits.max_concurrency}",
-        )
-    if (
-        context.requested_rate_per_minute is not None
-        and limits.rate_limit_per_minute is not None
-        and context.requested_rate_per_minute > limits.rate_limit_per_minute
-    ):
-        return PolicyDecision(
-            action=action,
-            capability_path=capability.path,
-            outcome=PolicyOutcome.denied,
-            reason=f"requested rate {context.requested_rate_per_minute}/min exceeds capability limit "
-            f"{limits.rate_limit_per_minute}/min",
-        )
+    bounded_requests = (
+        ("concurrency", context.requested_concurrency, limits.max_concurrency, ""),
+        ("rate", context.requested_rate_per_minute, limits.rate_limit_per_minute, "/min"),
+        ("duration", context.requested_duration_seconds, limits.timeout_seconds, "s"),
+        ("response size", context.requested_response_bytes, limits.max_response_bytes, " bytes"),
+        ("record count", context.requested_record_count, limits.max_record_count, ""),
+        ("cost", context.requested_cost_usd, limits.max_cost_usd, " USD"),
+    )
+    for label, requested, limit, unit in bounded_requests:
+        if requested is not None and limit is not None and requested > limit:
+            return PolicyDecision(
+                action=action,
+                capability_path=capability.path,
+                outcome=PolicyOutcome.denied,
+                reason=f"requested {label} {requested}{unit} exceeds capability limit {limit}{unit}",
+            )
 
     outcome = PolicyOutcome(base_level.value)
     return PolicyDecision(
