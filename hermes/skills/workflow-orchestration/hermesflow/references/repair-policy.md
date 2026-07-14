@@ -6,14 +6,16 @@ following
 `... -> EXECUTE -> SUCCEEDED/FAILED -> INSPECT -> PATCH -> TEST ->
 PROMOTE` tail.
 
-**Status note:** HF-029's read-only failure-inspection package now exists at
+**Status note:** HF-029's read-only failure-inspection package exists at
 `f/hermes_flow/repair/inspection`; it returns the bounded, redacted repair
 context documented in
 [`docs/failure-inspection.md`](../../../../../docs/failure-inspection.md).
-HF-030 through HF-032 (repair-candidate generation, drift fixtures, and
-orchestrated retry with attempt limits) are not built yet. Inspection therefore
-does not authorize a patch or retry loop. Run it once when repair evidence is
-needed, then make the deliberate retry/patch/stop decision below.
+HF-030's `f/hermes_flow/repair/generate_candidate` now turns a complete context
+into a policy-checked candidate with exact generation provenance; see
+[`docs/repair-candidate-generation.md`](../../../../../docs/repair-candidate-generation.md).
+HF-031 and HF-032 (drift-fixture promotion and bounded orchestrated retry) are
+not built yet. Inspection or generation therefore does not authorize promotion
+or a retry loop.
 
 ## 1. INSPECT — read what actually happened before acting
 
@@ -53,8 +55,11 @@ Start from the `ExecutionResult`:
   submitting a job with an unresolved `conn: hermes_endpoint` argument,
   producing `TypeError: 'NoneType' object is not subscriptable` —
   ADR 0005's Consequences). A patch is generated code and follows
-  `generation-policy.md` in full: it's a new/modified **candidate**, never
-  a direct edit to the active capability, carries its own updated
+  `generation-policy.md` in full. Run `f/hermes_flow/repair/generate_candidate`
+  only with the complete HF-029 context and current versioned catalogue. A
+  rejected, stale, truncated, or incomplete context means stop and surface the
+  reason; never hand-edit around the gate. A valid repair is a new
+  **candidate**, never a direct edit to the active capability, carries its own updated
   `CapabilityMetadata`, and needs its own `TEST` pass before `PROMOTE` —
   the fact that it's "just a fix" doesn't shortcut Rule 3.
 - **Stop and ask** — appropriate whenever the failure implies something

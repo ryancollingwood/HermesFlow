@@ -10,6 +10,7 @@ The inspector starts from the original failed job and returns:
 
 - an API link to that job, including workspace, path, and job ID;
 - the active capability version and a bounded code/flow snapshot;
+- the active script's immutable Windmill hash for HF-030 stale-base checks;
 - bounded, redacted job inputs and logs;
 - artifact references discovered in the failed result, never artifact contents;
 - direct and transitive consumer impact from the versioned catalogue;
@@ -31,6 +32,10 @@ schema dependency, while a refused database connection is infrastructure.
 
 Classification is advisory evidence for HF-030. It does not automatically
 select retry, repair, rollback, or promotion.
+
+HF-030 consumes a complete context as documented in
+[`docs/repair-candidate-generation.md`](repair-candidate-generation.md). A
+truncated or stale active-code snapshot is not eligible for generation.
 
 ## Bounds and omissions
 

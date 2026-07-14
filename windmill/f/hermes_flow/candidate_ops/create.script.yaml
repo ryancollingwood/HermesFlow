@@ -21,7 +21,24 @@ schema:
       description: ''
       default: ''
       originalType: string
+    failed_job_id:
+      type: string
+      description: ''
+      default: ''
+      originalType: string
     generated_by_capability:
+      type: string
+      description: ''
+      default: ''
+      originalType: string
+    generation_artifact_ids:
+      type: array
+      description: ''
+      default: null
+      items:
+        type: string
+      originalType: string[]
+    generation_trace_id:
       type: string
       description: ''
       default: ''
@@ -35,6 +52,11 @@ schema:
       type: string
       description: ''
       default: null
+      originalType: string
+    repair_context_sha256:
+      type: string
+      description: ''
+      default: ''
       originalType: string
     request_id:
       type: string

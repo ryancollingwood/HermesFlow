@@ -45,6 +45,40 @@ entries:
         network: true
 
   - kind: script
+    tags: [repair, ai, candidate, provenance, policy, source-drift]
+    inputs_summary: >-
+      A complete HF-029 RepairContext, Hermes endpoint resource, versioned
+      capability catalogue, model controls, and minimal-change limits.
+    outputs_summary: >-
+      A repair-generation result containing either an isolated candidate and
+      patch validation or a retained, attributable rejection with exact
+      prompt, context, raw-output, and parsed-output artifacts.
+    input_kinds: [repair_context, resource:hermes_endpoint, capability_catalogue]
+    output_kinds: [repair_generation_result, candidate_record, artifact_refs]
+    metadata:
+      path: f/hermes_flow/repair/generate_candidate
+      capability_version: "1.0.0"
+      summary: Generate a minimal policy-checked repair candidate from a failed active script without mutating it.
+      maturity: experimental
+      deterministic: false
+      owners: [platform]
+      dependencies:
+        - f/hermes_flow/repair/models
+        - f/hermes_flow/catalogue/models
+        - f/hermes_flow/candidate_ops/create
+        - f/libraries/ai/invoke_hermes_structured
+        - f/libraries/lineage/models
+        - f/libraries/storage/artifacts
+      test_requirements: [contracts/repair-generation-result]
+      limits:
+        timeout_seconds: 300
+        max_concurrency: 2
+        rate_limit_per_minute: 10
+      effects:
+        network: true
+        filesystem: true
+
+  - kind: script
     tags: [data-platform, extract, hacker-news, dlt]
     inputs_summary: >-
       limit: optional integer, number of top stories to fetch (default 20).

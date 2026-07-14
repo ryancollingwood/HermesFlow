@@ -88,7 +88,10 @@ def test_failure_classification_examples(evidence, expected):
 def test_complete_context_links_job_and_gathers_each_evidence_category():
     context = build_repair_context(
         job=failed_job(),
-        active_asset={"content": "def parse(page):\n    return page.select('.product')\n"},
+        active_asset={
+            "hash": "active-windmill-hash",
+            "content": "def parse(page):\n    return page.select('.product')\n",
+        },
         catalogue=CATALOGUE,
         logs="Parser failed because selector not found",
         recent_test_evidence=[
@@ -107,6 +110,7 @@ def test_complete_context_links_job_and_gathers_each_evidence_category():
     assert context.original_job.job_id == failed_job()["id"]
     assert context.original_job.api_url.endswith(f"/api/w/main/jobs_u/get/{failed_job()['id']}")
     assert context.active_capability.capability_version == "1.2.3"
+    assert context.active_capability.windmill_hash == "active-windmill-hash"
     assert "source_url" in context.inputs.content
     assert "selector not found" in context.logs.content
     assert context.artifacts[0].artifact_id == "11111111-1111-1111-1111-111111111111"

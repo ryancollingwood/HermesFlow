@@ -1,0 +1,50 @@
+summary: Generate a minimal policy-checked repair candidate from an HF-029 context
+description: Calls Hermes through the schema-validated HF-019 wrapper, retains
+  exact generation evidence, rejects stale, invalid, non-minimal, or unsafe
+  patches, and writes valid output only to the isolated candidate namespace.
+lock: '!inline f/hermes_flow/repair/generate_candidate.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    catalogue_yaml:
+      type: string
+      description: Versioned HermesFlow capability catalogue YAML.
+      default: null
+      originalType: string
+    conn:
+      type: object
+      description: Hermes OpenAI-compatible endpoint used for repair generation.
+      default: null
+      format: resource-hermes_endpoint
+    max_change_ratio:
+      type: number
+      description: Relative minimal-change bound against active source lines.
+      default: 0.35
+    max_changed_lines:
+      type: integer
+      description: Absolute upper bound on added and removed patch lines.
+      default: 100
+    max_retries:
+      type: integer
+      description: Schema-validation retries after the first model attempt.
+      default: 1
+    max_tokens:
+      type: integer
+      description: Maximum model output tokens.
+      default: 8192
+    model:
+      type: string
+      description: Hermes model alias or model ID.
+      default: hermes
+      originalType: string
+    repair_context:
+      type: object
+      description: Complete, untruncated HF-029 RepairContext for the failed active script.
+      default: null
+      properties: {}
+  required:
+    - conn
+    - repair_context
+    - catalogue_yaml

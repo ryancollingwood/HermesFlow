@@ -85,12 +85,55 @@ class CandidateRecord(BaseModel):
         description="Capability path that generated this candidate's content, if an AI "
         "capability (HF-019) produced it rather than a human.",
     )
+    failed_job_id: Optional[str] = Field(
+        default=None,
+        description="Original failed Windmill job that caused this repair candidate.",
+    )
+    repair_context_sha256: Optional[str] = Field(
+        default=None,
+        pattern=r"^[0-9a-f]{64}$",
+        description="Digest of the exact redacted RepairContext supplied to generation.",
+    )
+    generation_trace_id: Optional[str] = Field(
+        default=None,
+        description="HF-019 lineage trace retaining prompt, input, and model-output artifacts.",
+    )
+    generation_artifact_ids: list[str] = Field(
+        default_factory=list,
+        description="Retained HF-019 prompt, context/input, raw-output, and parsed-output artifacts.",
+    )
     created_at: datetime = Field(default_factory=_utcnow)
 
     @model_validator(mode="after")
     def _derived_candidates_need_a_base_version(self) -> "CandidateRecord":
         if self.source_path is not None and not self.base_version:
             raise ValueError("base_version is required whenever source_path is set")
+        return self
+
+    @model_validator(mode="after")
+    def _repair_provenance_is_complete(self) -> "CandidateRecord":
+        repair_fields = (
+            self.failed_job_id,
+            self.repair_context_sha256,
+            self.generation_trace_id,
+            self.generation_artifact_ids,
+        )
+        if any(repair_fields):
+            missing = []
+            if not self.failed_job_id:
+                missing.append("failed_job_id")
+            if not self.repair_context_sha256:
+                missing.append("repair_context_sha256")
+            if not self.generation_trace_id:
+                missing.append("generation_trace_id")
+            if not self.generation_artifact_ids:
+                missing.append("generation_artifact_ids")
+            if not self.source_path:
+                missing.append("source_path")
+            if missing:
+                raise ValueError(
+                    "repair candidate provenance is incomplete; missing " + ", ".join(missing)
+                )
         return self
 
     @model_validator(mode="after")

@@ -29,6 +29,20 @@
           "minLength": 1,
           "title": "Path",
           "type": "string"
+        },
+        "windmill_hash": {
+          "anyOf": [
+            {
+              "maxLength": 500,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "description": "Windmill's immutable active-script hash captured during inspection.",
+          "title": "Windmill Hash"
         }
       },
       "required": [
