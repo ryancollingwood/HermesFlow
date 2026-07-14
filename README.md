@@ -1,9 +1,62 @@
-# Hermes Agent + Windmill + Hindsight
+# HermesFlow
 
-A self-hosted stack pairing the [Hermes Agent](https://hermes-agent.nousresearch.com)
-gateway with [Windmill](https://www.windmill.dev) and
-[Hindsight](https://hindsight.vectorize.io) memory, behind a single Caddy ingress,
-with the Windmill side pre-wired to call Hermes as an OpenAI-compatible endpoint.
+**HermesFlow turns a natural-language request into deterministic, tested,
+versioned code — executed exclusively by Windmill, never as an ad hoc agent
+action.** Ask for something that needs to run (fetch data, compare prices,
+generate a report) and Hermes first searches for an existing capability
+instead of writing new code; when nothing already covers the request, any
+new or changed capability lands in an isolated **candidate** namespace, gets
+diffed against the active version, has every consumer it could affect
+identified and tested, and only goes live after an explicit, authenticated
+human approval — promotion is never automatic, structurally, no matter how
+low-risk a capability looks. Once live, a capability's health is
+continuously monitored; a sustained regression can trigger AI-assisted
+repair or an automatic rollback recommendation, and every executed task
+returns a real Windmill job reference, never a silently faked result.
+
+**New here? Start with the walkthrough:**
+[`docs/exemplar-walkthrough.md`](docs/exemplar-walkthrough.md) takes you from
+a single Hermes conversation, through capability search and execution, to
+inspecting the result directly in Windmill — the shortest path to seeing the
+whole lifecycle work end to end.
+
+Underneath, it's a self-hosted stack pairing the
+[Hermes Agent](https://hermes-agent.nousresearch.com) gateway with
+[Windmill](https://www.windmill.dev) (the sole execution engine) and
+[Hindsight](https://hindsight.vectorize.io) memory, behind a single Caddy
+ingress.
+
+## The capability lifecycle
+
+Capabilities move through one deterministic path, enforced by code and
+policy rather than convention:
+
+```
+REQUESTED -> SEARCH -> COMPOSE/REUSE/GENERATE -> CANDIDATE -> TESTED -> ACTIVE
+  -> EXECUTE -> SUCCEEDED/FAILED -> INSPECT -> PATCH -> TEST -> PROMOTE
+```
+
+| Stage | What happens | Read more |
+|---|---|---|
+| Discover / select | Search the versioned capability catalogue before writing anything new — a primitive, then a composed workflow, then generation, in that order | [`hermesflow` skill](hermes/skills/workflow-orchestration/hermesflow/SKILL.md), [architecture/adr/0002](architecture/adr/0002-capability-lifecycle.md) |
+| Candidate | New/changed code always lands at an isolated, deterministic candidate path first — never a direct edit to active code | [architecture/adr/0002](architecture/adr/0002-capability-lifecycle.md) |
+| Diff, impact, promotion | Candidate vs. active diff, reverse-dependency impact, and every required test are evaluated before a **native Windmill approval suspension** — `promote`/`schedule` can never be automatic for any capability | [`docs/plans/hermesflow-lifecycle.md`](docs/plans/hermesflow-lifecycle.md) |
+| Health monitoring | Metadata-driven scheduled tests track consecutive failures per capability; a live dashboard and Prometheus metrics surface healthy/warning/failed/untested status | [`docs/capability-health-dashboard.md`](docs/capability-health-dashboard.md) |
+| Adaptive repair | A failed job is inspected and classified; source-drift/code/dependency failures can generate a tested repair candidate and one bounded, approval-gated retry | [`docs/adaptive-repair-retry.md`](docs/adaptive-repair-retry.md), [`docs/repair-candidate-generation.md`](docs/repair-candidate-generation.md), [`docs/source-drift-regression-fixtures.md`](docs/source-drift-regression-fixtures.md), [`docs/failure-inspection.md`](docs/failure-inspection.md) |
+| Rollback recommendation | A sustained, non-transient regression can be recommended for rollback and, once approved, restored without losing the failed version from history | [`docs/rollback-recommendation.md`](docs/rollback-recommendation.md) |
+| Retention, privacy, cost | Documented retention classes per data category, size/duration/record-count/cost limits enforced by policy, and lineage-preserving deletion | [`docs/retention-privacy-cost.md`](docs/retention-privacy-cost.md) |
+
+### Execution principle
+
+**Windmill is the exclusive execution boundary for task code.** Hermes
+interprets, plans, and discovers or generates capabilities, but never
+executes task code directly or falls back to shell/Python/browser/filesystem
+tools to get a task done — every executed task runs through Windmill and
+returns a job reference. See
+[architecture/adr/0001-windmill-exclusive-execution.md](architecture/adr/0001-windmill-exclusive-execution.md)
+for the full decision record, and
+[docs/plans/hermesflow-lifecycle.md](docs/plans/hermesflow-lifecycle.md) for
+the implementation backlog.
 
 ## What's in here
 
@@ -19,10 +72,11 @@ with the Windmill side pre-wired to call Hermes as an OpenAI-compatible endpoint
 | `.env.example` | Every configurable knob — copy to `.env` |
 | `Caddyfile` | Reverse-proxy routing for Windmill + Hermes dashboard/API + Hindsight UI |
 | `Makefile` | `bootstrap`, lifecycle, health, backups, key generation |
-| `windmill/` | wmill-syncable resource type, resource, secret, and example scripts |
+| `windmill/` | wmill-syncable capability catalogue, candidate/promotion/repair lifecycle, capability health testing, and example scripts — see [`docs/windmill-sync.md`](docs/windmill-sync.md) for exactly what's in sync scope |
 | `mlx/` | Host-native MLX inference server for Apple Silicon (setup + launch script) |
-| `hermes/` | Thin derived Hermes image — bakes extra Python packages into the venv ([how & why](docs/hermes-docker-build.md)) — plus `hermes/skills/`, version-controlled custom Hermes skills pushed to `DATA_DIR/skills/` via `make hermes-skills-push` |
-| `architecture/adr/` | Architecture Decision Records — starting with the [Windmill-exclusive-execution principle](architecture/adr/0001-windmill-exclusive-execution.md) |
+| `hermes/` | Thin derived Hermes image — bakes extra Python packages into the venv ([how & why](docs/hermes-docker-build.md)) — plus `hermes/skills/`, version-controlled custom Hermes skills (including the `hermesflow` orchestration skill) pushed to `DATA_DIR/skills/` via `make hermes-skills-push` |
+| `architecture/adr/` | Architecture Decision Records — starting with the [Windmill-exclusive-execution principle](architecture/adr/0001-windmill-exclusive-execution.md) and the [capability lifecycle](architecture/adr/0002-capability-lifecycle.md) |
+| `docs/` | Feature docs (linked from [The capability lifecycle](#the-capability-lifecycle) above), [`docs/plans/hermesflow-lifecycle.md`](docs/plans/hermesflow-lifecycle.md) (the implementation backlog), and checked-in JSON Schemas under `docs/schemas/` |
 
 ## Architecture
 
@@ -42,19 +96,8 @@ Six Docker networks keep traffic segmented:
 
 The Hermes dashboard and the OpenAI-compatible API run **inside the single Hermes
 container** (the dashboard is a supervised s6 service — it cannot run as a
-separate container).
-
-### Execution principle
-
-**Windmill is the exclusive execution boundary for task code.** Hermes
-interprets, plans, and discovers or generates capabilities, but never
-executes task code directly or falls back to shell/Python/browser/filesystem
-tools to get a task done — every executed task runs through Windmill and
-returns a job reference. See
-[architecture/adr/0001-windmill-exclusive-execution.md](architecture/adr/0001-windmill-exclusive-execution.md)
-for the full decision record, and
-[docs/plans/hermesflow-lifecycle.md](docs/plans/hermesflow-lifecycle.md) for
-the implementation backlog.
+separate container). See [Execution principle](#execution-principle) above
+for how Windmill and Hermes divide responsibility.
 
 ## Prerequisites
 
@@ -898,7 +941,7 @@ instead of hardcoding the URL/key each time.
 
 ```
 windmill/
-├── wmill.yaml                          # sync config (scope: f/hermes/**, f/collection/**, and an explicit f/data_platform/ item list)
+├── wmill.yaml                          # sync config — see docs/windmill-sync.md for the full, current scope table
 ├── hermes_endpoint.resource-type.yaml  # resource type: { base_url, api_key }
 └── f/hermes/                           # VERSIONED Hermes code/config
     ├── folder.meta.yaml                # folder permissions/owners (tracked so a push won't strip them)
@@ -1004,13 +1047,19 @@ git -C windmill status   # see what changed
 git add windmill/ && git commit -m "windmill: sync from server"
 ```
 
-What gets written is governed by [`windmill/wmill.yaml`](windmill/wmill.yaml):
-`includes: ["f/**", "*.resource-type.yaml"]` scopes the pull to the `f/`
-namespace (so personal `u/<you>/…` drafts stay out of the repo), and
-`skipSecrets: true` writes a **placeholder** for secret variables instead of the
-real value — so `git diff` never leaks `f/hermes/api_key`. Widen `includes` if you
-want flows or other folders tracked too. The round-trip is just
-`make windmill-pull` (author in the UI) ↔ `make windmill-push` (author in the repo).
+What gets written is governed by [`windmill/wmill.yaml`](windmill/wmill.yaml)'s
+`includes`/`excludes` — deliberately narrow, not a blanket `f/**`: `f/hermes/**`,
+`f/collection/**`, `f/libraries/**`, and `f/capabilities/**` are wholesale
+wildcards, while `f/data_platform/`, `f/hermes_flow/`, and `f/workflows/` are
+scoped item-by-item so a new script dropped into those folders is never swept
+in by accident (see [`docs/windmill-sync.md`](docs/windmill-sync.md) for the
+full scope table and why). Personal `u/<you>/…` drafts and anything not named
+in `includes` stay out of the repo either way, and `skipSecrets: true` writes a
+**placeholder** for secret variables instead of the real value — so `git diff`
+never leaks `f/hermes/api_key`. Widen `includes` deliberately (never to a
+blanket wildcard for the three narrow folders) if you want more tracked. The
+round-trip is just `make windmill-pull` (author in the UI) ↔ `make
+windmill-push` (author in the repo).
 
 To see whether the live server has drifted from what's committed — without
 writing anything — run `make windmill-check`. It requires a clean `windmill/`
@@ -1153,6 +1202,51 @@ Gotchas (all enforced by Windmill):
 - **`savings_percent` stays 0** — expected for the first few requests while
   Headroom calibrates. Check `/v1/compress` with a test payload to confirm
   compression is active.
+
+### HermesFlow lifecycle
+
+- **A request comes back `denied` instead of running or asking for
+  approval** — `evaluate_policy()` fails closed: an unknown capability path,
+  or a request whose declared concurrency/duration/response-size/
+  record-count/cost exceeds the capability's own declared
+  `CapabilityLimits`, is `denied` outright, not routed to approval — the
+  `PolicyDecision.reason` field says exactly which. This is not a bug to
+  work around; either the request needs a real capability to exist first,
+  or its declared limits need raising (a metadata change, reviewed like any
+  other). See [architecture/adr/0002](architecture/adr/0002-capability-lifecycle.md).
+- **A candidate won't promote — "missing required tests" / "failed required
+  tests"** — promotion validates every test the changed capability *and*
+  every consumer it could affect declares; a missing or failing one blocks
+  promotion rather than being silently skipped. Run the same tests locally
+  first (`cd windmill && pytest tests/ -q`, or the specific contract/smoke
+  test named in the error) before retrying promotion.
+- **A capability's dashboard row shows `failed` or `untested`** — `failed`
+  means its latest scheduled health run didn't pass; `untested` means no
+  health evidence exists yet for the *current* active version (a fresh
+  promotion resets health state). Neither is a dashboard bug — see
+  [`docs/capability-health-dashboard.md`](docs/capability-health-dashboard.md)
+  for exactly how each status is derived, and check the linked Windmill job
+  for what actually happened.
+- **Adaptive repair stopped without promoting anything** —
+  `AttemptLimitExceeded` after `max_attempts` (1–3, default 2) is
+  deliberate, not a failure to fix: repair never loops on a repeatedly
+  failing promoted version. A `policy_denied`/`generation_rejected`/
+  `tests_failed` status in the returned `RepairPreparation` names exactly
+  which stage stopped it. See
+  [`docs/adaptive-repair-retry.md`](docs/adaptive-repair-retry.md).
+- **A rollback recommendation says "not recommended" even though a
+  capability is clearly failing** — a failure streak classified entirely as
+  transient `infrastructure` (connection refused, timeouts, DNS, 5xx) is
+  deliberately not recommended for rollback; rolling back working code
+  won't fix an external outage. See
+  [`docs/rollback-recommendation.md`](docs/rollback-recommendation.md) for
+  the exact threshold and classification rule.
+- **Windmill (or the `windmill` MCP connection) is unavailable mid-task** —
+  Hermes reports `outcome=failure` with an actionable `failure_summary` and
+  stops; it does not fall back to direct execution "just this once", by
+  design (see [Execution principle](#execution-principle)). Confirm the
+  stack is up (`docker compose ps`) and the MCP connection is registered
+  (`docker exec hermes hermes mcp list`) before retrying.
 
 ## CI
 
