@@ -1,6 +1,6 @@
 # 0002 — Capability lifecycle: candidate before mutation
 
-**Status:** Proposed
+**Status:** Accepted
 **Related:** [HF-003](https://github.com/ryancollingwood/HermesFlow/issues/41), [HF-010](https://github.com/ryancollingwood/HermesFlow/issues/48), [HF-013](https://github.com/ryancollingwood/HermesFlow/issues/51), `docs/plans/hermesflow-lifecycle.md`
 
 ## Context
@@ -110,14 +110,25 @@ auto-resolved from the source's live Windmill script hash) were both
 verified live, including that deriving a candidate leaves the source
 capability byte-for-byte unchanged.
 
-This still leaves the promotion *workflow* (HF-013: the actual approval
-flow that acts on an `approval_required` decision) undesigned.
+**Promotion workflow implemented (HF-013).** `prepare_promotion`/
+`finalize_promotion` (`f/hermes_flow/candidate_ops/promote.py`) split
+promotion into a validation half (diff, impact, required tests, policy
+decision — all read-only) and a single write step gated on an
+authenticated approval, suspending on a native Windmill flow
+(`promotion.flow`) rather than a bespoke approval mechanism. A repeated
+base-version check immediately before the optimistic versioned write
+catches a stale-base race; nothing is deleted on promotion, only
+superseded. Everything built since — health monitoring (HF-020/HF-033),
+adaptive repair (HF-029–032), rollback recommendation (HF-034) — composes
+this same promotion primitive rather than introducing a second write path.
 
 ## Status
 
 Autonomy schema ([HF-003](https://github.com/ryancollingwood/HermesFlow/issues/41)),
 policy evaluator ([HF-010](https://github.com/ryancollingwood/HermesFlow/issues/48)),
-and candidate creation ([HF-011](https://github.com/ryancollingwood/HermesFlow/issues/49))
-all implemented and done. Still pending the promotion workflow
-([HF-013](https://github.com/ryancollingwood/HermesFlow/issues/51)) before
-this ADR can be marked Accepted.
+candidate creation ([HF-011](https://github.com/ryancollingwood/HermesFlow/issues/49)),
+and the promotion workflow
+([HF-013](https://github.com/ryancollingwood/HermesFlow/issues/51)) are all
+implemented and done. Accepted — every later lifecycle task (deprecation/
+rollback, scheduled health, adaptive repair, rollback recommendation) builds
+on this decision rather than revisiting it.

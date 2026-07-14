@@ -280,6 +280,33 @@ revert (and drop the override) with `make ollama-revert`. Pass
 Docker-host default. See
 [README → Ollama (optional)](README.md#ollama-optional).
 
+### 18. HermesFlow lifecycle assets (recommended after first boot)
+
+Not run by the installer itself — deliberately separate, idempotent
+Makefile targets, the same pattern `docs/windmill-sync.md` requires for all
+`wmill` CLI usage. Run these once the stack is up and the `wmill` CLI is
+installed:
+
+```sh
+make windmill-push       # pushes the capability catalogue, candidate/promotion/
+                          # repair lifecycle scripts, and example capabilities
+                          # (step 11 already created the workspace these push into)
+make hermes-skills-push  # deploys hermes/skills/, including the hermesflow
+                          # orchestration skill, to DATA_DIR/skills/
+make hermesflow-mcp      # mints/reuses a narrowly-scoped token and registers the
+                          # HF-028 product-collection execution tool with Hermes
+                          # (runs hermes-skills-push again — a no-op if already done)
+make collection-db-migrate  # applies pending collection_db migrations the
+                          # product-collection exemplar's snapshot writes need
+```
+
+Without these, Windmill has the base Hermes-integration example scripts from
+step 11 but not the HermesFlow capability lifecycle itself, and Hermes has no
+`hermesflow` skill loaded — a session can still talk to Windmill over MCP, but
+won't have the capability-selection/candidate/promotion guidance the skill
+provides. See [`docs/exemplar-walkthrough.md`](docs/exemplar-walkthrough.md)
+for a worked example that depends on all four having been run.
+
 ## Re-running / repair
 
 Because every step is idempotent you can re-run the installer to:
@@ -288,9 +315,14 @@ Because every step is idempotent you can re-run the installer to:
 - recover after editing `.env`,
 - re-apply Windmill/MCP wiring.
 
-Combine with `--no-pull` to skip image downloads when nothing changed.
+Combine with `--no-pull` to skip image downloads when nothing changed. Step
+18's targets are equally safe to re-run — `windmill-push` dry-runs and aborts
+on any deletion, and the others reuse what already exists.
 
 ## See also
 
 - [README.md](README.md) — full stack overview and per-component docs.
+- [`docs/exemplar-walkthrough.md`](docs/exemplar-walkthrough.md) — a
+  reproducible walkthrough from a Hermes conversation to a Windmill job,
+  once step 18 above is done.
 - The interactive alternative: `make bootstrap` (uses the Hermes setup wizard).
