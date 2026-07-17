@@ -9,36 +9,56 @@ schema:
   $schema: https://json-schema.org/draft/2020-12/schema
   type: object
   properties:
-    conn:
-      type: object
-      format: resource-hermes_endpoint
-    failed_job_id:
-      type: string
     catalogue_yaml:
       type: string
-    manifest_yaml:
-      type: string
-    original_context:
-      type: object
-    max_attempts:
-      type: integer
-      default: 2
-      minimum: 1
-      maximum: 3
-    recent_test_evidence:
-      type: array
-      items: {type: object}
       default: null
-    source_artifact:
+      originalType: string
+    conn:
       type: object
       default: null
+      properties: {}
     expected_behavior:
       type: object
       default: null
+      properties: {}
+    failed_job_id:
+      type: string
+      default: null
+      originalType: string
     fixture_binding:
       type: object
       default: null
+      properties: {}
+    manifest_yaml:
+      type: string
+      default: null
+      originalType: string
+    max_attempts:
+      type: integer
+      default: 2
+      maximum: 3
+      minimum: 1
+    original_context:
+      type: object
+      default: null
+      properties: {}
+    recent_test_evidence:
+      type: array
+      default: null
+      items:
+        type: object
+      originalType: record[]
     sanitization_rules:
       type: object
       default: null
-  required: [conn, failed_job_id, catalogue_yaml, manifest_yaml, original_context]
+      properties: {}
+    source_artifact:
+      type: object
+      default: null
+      properties: {}
+  required:
+    - conn
+    - failed_job_id
+    - catalogue_yaml
+    - manifest_yaml
+    - original_context

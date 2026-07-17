@@ -12,13 +12,17 @@ schema:
     catalogue_yaml:
       type: string
       description: Versioned HermesFlow capability catalogue YAML.
-    windmill_base_url:
-      type: string
-      description: Public base URL used for dashboard asset and job links.
-      default: http://windmill.localhost
+      default: null
+      originalType: string
     stale_after_seconds:
       type: integer
       description: Age after which current-version test evidence is warning/stale.
       default: 86400
       minimum: 60
-  required: [catalogue_yaml]
+    windmill_base_url:
+      type: string
+      description: Public base URL used for dashboard asset and job links.
+      default: http://windmill.localhost
+      originalType: string
+  required:
+    - catalogue_yaml
