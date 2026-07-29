@@ -47,12 +47,14 @@ value:
       summary: Review repair diff, consumer impact, fixture, and test evidence
       value:
         type: rawscript
-        content: '!inline review_repair.inline_script.py'
+        content: '!inline
+          review_repair_diff,_consumer_impact,_fixture,_and_test_evidence.inline_script.py'
         input_transforms:
           evidence:
             type: javascript
             expr: results.prepare
-        lock: '!inline review_repair.inline_script.lock'
+        lock: '!inline
+          review_repair_diff,_consumer_impact,_fixture,_and_test_evidence.inline_script.lock'
         is_trigger: false
         language: python3
       skip_if:

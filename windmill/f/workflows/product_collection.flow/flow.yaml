@@ -8,7 +8,8 @@ value:
       summary: Run bounded product collection inside the Windmill worker
       value:
         type: rawscript
-        content: '!inline run_product_collection.inline_script.py'
+        content: '!inline
+          run_bounded_product_collection_inside_the_windmill_worker.inline_script.py'
         input_transforms:
           db:
             type: javascript
@@ -37,7 +38,8 @@ value:
           timeout_seconds:
             type: javascript
             expr: flow_input.timeout_seconds
-        lock: '!inline run_product_collection.inline_script.lock'
+        lock: '!inline
+          run_bounded_product_collection_inside_the_windmill_worker.inline_script.lock'
         is_trigger: false
         language: python3
 schema:
