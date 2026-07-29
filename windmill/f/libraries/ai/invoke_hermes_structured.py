@@ -8,7 +8,7 @@ from typing import Any, Optional
 from jsonschema import Draft202012Validator
 from pydantic import BaseModel, Field
 
-from f.hermes.client import get_client, hermes_endpoint
+from f.hermes.client import NO_MEMORY_GUARD, get_client, hermes_endpoint
 from f.libraries.lineage.helpers import (
     LineageState,
     begin_lineage,
@@ -79,7 +79,7 @@ def build_request(
             "content": (
                 "Return only JSON matching the supplied response schema. "
                 "Do not wrap it in Markdown."
-            ),
+            ) + NO_MEMORY_GUARD,
         },
         *conversation,
         {
