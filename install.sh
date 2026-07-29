@@ -326,19 +326,54 @@ push_windmill_assets() {
   fi
   # sync keeps secrets out of git (skipSecrets: true), so f/hermes/api_key is
   # never pushed. Seed it server-side from API_SERVER_KEY so the resource works.
-  if [ -n "${API_KEY:-}" ]; then
+  # (Not $API_KEY — that shell var holds the LLM provider key, e.g. an
+  # OpenRouter key; API_SERVER_KEY is the separate Hermes gateway key and is
+  # already exported by the `set -a; . ./.env; set +a` sourcing above.)
+  if [ -n "${API_SERVER_KEY:-}" ]; then
     local vp="f/hermes/api_key"
     # create, else update if it already exists — keeps the value current on re-runs.
     if curl -fsS -H "Host: $hh" -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
          -X POST "$base/api/w/main/variables/create" \
-         -d "{\"path\":\"$vp\",\"value\":\"$API_KEY\",\"is_secret\":true,\"description\":\"Hermes gateway API_SERVER_KEY\"}" >/dev/null 2>&1; then
+         -d "{\"path\":\"$vp\",\"value\":\"$API_SERVER_KEY\",\"is_secret\":true,\"description\":\"Hermes gateway API_SERVER_KEY\"}" >/dev/null 2>&1; then
       echo "✓ created secret variable $vp"
     elif curl -fsS -H "Host: $hh" -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
          -X POST "$base/api/w/main/variables/update/$vp" \
-         -d "{\"value\":\"$API_KEY\"}" >/dev/null 2>&1; then
+         -d "{\"value\":\"$API_SERVER_KEY\"}" >/dev/null 2>&1; then
       echo "✓ updated secret variable $vp"
     else
       echo "⚠ couldn't set $vp — set it in the UI (Variables → $vp) to your API_SERVER_KEY."
+    fi
+  fi
+  # Same idea for the Telegram bot token and allow-list, so Windmill scripts can
+  # send messages/documents to Telegram without their own copy of these secrets.
+  # TG_TOKEN/TG_USERS (flag, or env-var fallback) are resolved once near the top
+  # of the script and are already final by the time setup_windmill() runs.
+  if [ -n "${TG_TOKEN:-}" ]; then
+    local vp="f/hermes/telegram_bot_token"
+    if curl -fsS -H "Host: $hh" -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
+         -X POST "$base/api/w/main/variables/create" \
+         -d "{\"path\":\"$vp\",\"value\":\"$TG_TOKEN\",\"is_secret\":true,\"description\":\"Telegram bot token, used by Windmill scripts sending messages/documents to Telegram\"}" >/dev/null 2>&1; then
+      echo "✓ created secret variable $vp"
+    elif curl -fsS -H "Host: $hh" -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
+         -X POST "$base/api/w/main/variables/update/$vp" \
+         -d "{\"value\":\"$TG_TOKEN\"}" >/dev/null 2>&1; then
+      echo "✓ updated secret variable $vp"
+    else
+      echo "⚠ couldn't set $vp — set it in the UI (Variables → $vp) to your Telegram bot token."
+    fi
+  fi
+  if [ -n "${TG_USERS:-}" ]; then
+    local vp="f/hermes/telegram_allow_user"
+    if curl -fsS -H "Host: $hh" -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
+         -X POST "$base/api/w/main/variables/create" \
+         -d "{\"path\":\"$vp\",\"value\":\"$TG_USERS\",\"is_secret\":true,\"description\":\"Comma-separated Telegram user IDs allowed to receive documents from Windmill scripts\"}" >/dev/null 2>&1; then
+      echo "✓ created secret variable $vp"
+    elif curl -fsS -H "Host: $hh" -H "Authorization: Bearer $token" -H 'Content-Type: application/json' \
+         -X POST "$base/api/w/main/variables/update/$vp" \
+         -d "{\"value\":\"$TG_USERS\"}" >/dev/null 2>&1; then
+      echo "✓ updated secret variable $vp"
+    else
+      echo "⚠ couldn't set $vp — set it in the UI (Variables → $vp) to your Telegram allowed users."
     fi
   fi
 }

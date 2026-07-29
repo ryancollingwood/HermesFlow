@@ -648,6 +648,28 @@ windmill-push: ## Push windmill/ assets (resource type, resource, scripts) to th
 	      echo "✓ updated secret variable $$vp"; \
 	    else echo "⚠ couldn't set $$vp — set it in the UI (Variables → $$vp)"; fi; \
 	  fi; \
+	  if [ -n "$$token" ] && [ -n "$${TELEGRAM_BOT_TOKEN:-}" ]; then \
+	    vp="f/hermes/telegram_bot_token"; \
+	    if curl -fsS -H "Host: $$hh" -H "Authorization: Bearer $$token" -H 'Content-Type: application/json' \
+	         -X POST "$$base/api/w/main/variables/create" \
+	         -d "{\"path\":\"$$vp\",\"value\":\"$$TELEGRAM_BOT_TOKEN\",\"is_secret\":true,\"description\":\"Telegram bot token, used by Windmill scripts sending messages/documents to Telegram\"}" >/dev/null 2>&1; then \
+	      echo "✓ created secret variable $$vp"; \
+	    elif curl -fsS -H "Host: $$hh" -H "Authorization: Bearer $$token" -H 'Content-Type: application/json' \
+	         -X POST "$$base/api/w/main/variables/update/$$vp" -d "{\"value\":\"$$TELEGRAM_BOT_TOKEN\"}" >/dev/null 2>&1; then \
+	      echo "✓ updated secret variable $$vp"; \
+	    else echo "⚠ couldn't set $$vp — set it in the UI (Variables → $$vp)"; fi; \
+	  fi; \
+	  if [ -n "$$token" ] && [ -n "$${TELEGRAM_ALLOWED_USERS:-}" ]; then \
+	    vp="f/hermes/telegram_allow_user"; \
+	    if curl -fsS -H "Host: $$hh" -H "Authorization: Bearer $$token" -H 'Content-Type: application/json' \
+	         -X POST "$$base/api/w/main/variables/create" \
+	         -d "{\"path\":\"$$vp\",\"value\":\"$$TELEGRAM_ALLOWED_USERS\",\"is_secret\":true,\"description\":\"Comma-separated Telegram user IDs allowed to receive documents from Windmill scripts\"}" >/dev/null 2>&1; then \
+	      echo "✓ created secret variable $$vp"; \
+	    elif curl -fsS -H "Host: $$hh" -H "Authorization: Bearer $$token" -H 'Content-Type: application/json' \
+	         -X POST "$$base/api/w/main/variables/update/$$vp" -d "{\"value\":\"$$TELEGRAM_ALLOWED_USERS\"}" >/dev/null 2>&1; then \
+	      echo "✓ updated secret variable $$vp"; \
+	    else echo "⚠ couldn't set $$vp — set it in the UI (Variables → $$vp)"; fi; \
+	  fi; \
 	  if [ -n "$$token" ] && [ -n "$${WINDMILL_COLLECTION_DB_PASSWORD:-}" ]; then \
 	    vp="f/collection/db_password"; \
 	    if curl -fsS -H "Host: $$hh" -H "Authorization: Bearer $$token" -H 'Content-Type: application/json' \

@@ -948,7 +948,8 @@ windmill/
     ├── api_key.variable.yaml           # secret variable (placeholder)
     ├── local.resource.yaml             # a hermes_endpoint resource → $var:f/hermes/api_key
     ├── client.py                       # shared module: get_client(), chat(), main()=model list
-    └── chat.py                         # example consumer: from f.hermes.client import chat
+    ├── chat.py                         # example consumer: from f.hermes.client import chat
+    └── telegram.py                     # shared module: deliver_document_to_telegram() → f/hermes/telegram_bot_token + f/hermes/telegram_allow_user
 ```
 
 > **Two folders, two purposes.** `f/hermes/`, `f/collection/`, and the tracked
@@ -969,12 +970,17 @@ windmill/
 
 **The installer does this for you** when the `wmill` CLI is present. `install.sh`
 / `install.py` create the `main` workspace, then run `wmill sync push` and seed
-the `f/hermes/api_key` secret from your `API_SERVER_KEY`. If the CLI isn't
-installed it prints how to do it later — nothing else in the install depends on
-node/npm. Once the CLI is installed you can (re)push any time:
+the `f/hermes/api_key` secret from your `API_SERVER_KEY`. If you've configured
+the Telegram channel (`TELEGRAM_BOT_TOKEN` / `--telegram-allowed-users`), it
+also seeds `f/hermes/telegram_bot_token` and `f/hermes/telegram_allow_user` —
+used by `f/hermes/telegram.py`'s `deliver_document_to_telegram()` to send
+documents straight from a Windmill script, independent of the Hermes bot
+itself. If the CLI isn't installed it prints how to do it later — nothing
+else in the install depends on node/npm. Once the CLI is installed you can
+(re)push any time:
 
 ```sh
-make windmill-push       # registers the CLI profile, pushes assets, seeds the api_key secret
+make windmill-push       # registers the CLI profile, pushes assets, seeds the api_key/telegram secrets
 ```
 
 > **`sync push` is a mirror, not an upload.** It makes the remote workspace match

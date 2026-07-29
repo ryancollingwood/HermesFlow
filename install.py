@@ -490,6 +490,38 @@ def push_windmill_assets(token: str) -> None:
                 say(f"{OK} updated secret variable {vp}")
             else:
                 say(f"{WARN} couldn't set {vp} — set it in the UI (Variables → {vp}) to your API_SERVER_KEY.")
+    # Same idea for the Telegram bot token and allow-list, so Windmill scripts can
+    # send messages/documents to Telegram without their own copy of these secrets.
+    telegram_bot_token = env_value("TELEGRAM_BOT_TOKEN")
+    if telegram_bot_token:
+        vp = "f/hermes/telegram_bot_token"
+        cst, _ = wm_http("POST", "/api/w/main/variables/create", bearer=token,
+                         json_body={"path": vp, "value": telegram_bot_token, "is_secret": True,
+                                    "description": "Telegram bot token, used by Windmill scripts sending messages/documents to Telegram"})
+        if cst in (200, 201):
+            say(f"{OK} created secret variable {vp}")
+        else:
+            ust, _ = wm_http("POST", f"/api/w/main/variables/update/{vp}", bearer=token,
+                             json_body={"value": telegram_bot_token})
+            if ust in (200, 201):
+                say(f"{OK} updated secret variable {vp}")
+            else:
+                say(f"{WARN} couldn't set {vp} — set it in the UI (Variables → {vp}) to your TELEGRAM_BOT_TOKEN.")
+    telegram_allowed_users = env_value("TELEGRAM_ALLOWED_USERS")
+    if telegram_allowed_users:
+        vp = "f/hermes/telegram_allow_user"
+        cst, _ = wm_http("POST", "/api/w/main/variables/create", bearer=token,
+                         json_body={"path": vp, "value": telegram_allowed_users, "is_secret": True,
+                                    "description": "Comma-separated Telegram user IDs allowed to receive documents from Windmill scripts"})
+        if cst in (200, 201):
+            say(f"{OK} created secret variable {vp}")
+        else:
+            ust, _ = wm_http("POST", f"/api/w/main/variables/update/{vp}", bearer=token,
+                             json_body={"value": telegram_allowed_users})
+            if ust in (200, 201):
+                say(f"{OK} updated secret variable {vp}")
+            else:
+                say(f"{WARN} couldn't set {vp} — set it in the UI (Variables → {vp}) to your TELEGRAM_ALLOWED_USERS.")
 
 
 def setup_windmill() -> None:
@@ -951,10 +983,14 @@ def main() -> None:
         say(f"{WARN} no API key supplied for {args.provider} — set {key_var} or pass --api-key.")
         say(f"  Add it to {Path(data_dir) / '.env'} later and run: docker restart hermes")
 
-    # Telegram channel (optional) — written to the same /opt/data/.env Hermes reads.
+    # Telegram channel (optional) — written to the same /opt/data/.env Hermes reads,
+    # AND to the top-level .env so push_windmill_assets() can seed the matching
+    # f/hermes/telegram_bot_token / f/hermes/telegram_allow_user Windmill secrets.
     if tg_token:
         set_data_env(data_dir, "TELEGRAM_BOT_TOKEN", tg_token)
         set_data_env(data_dir, "TELEGRAM_ALLOWED_USERS", tg_users)
+        env_set("TELEGRAM_BOT_TOKEN", tg_token)
+        env_set("TELEGRAM_ALLOWED_USERS", tg_users)
         say(f"{OK} configured Telegram channel (bot token + allowed users) in {Path(data_dir) / '.env'}")
         # Fresh install: Hermes starts fresh next step. Re-run: restart to pick it up.
         if out(["docker", "inspect", "-f", "{{.State.Running}}", "hermes"]) == "true":
