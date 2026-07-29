@@ -21,6 +21,22 @@ class hermes_endpoint(TypedDict):
     api_key: str
 
 
+# Hermes's OpenAI-compatible API server runs every request as a full agent
+# turn with the `api_server` platform's toolset (including memory-write
+# tools) available — there's no per-request way to scope that down, and it's
+# shared with the Hermes dashboard, so it can't be disabled platform-wide.
+# Append this to any system prompt sent from Windmill so the agent doesn't
+# mistake pipeline content for something a person said and worth retaining.
+NO_MEMORY_GUARD = (
+    "\n\nIMPORTANT: this request was generated programmatically by a "
+    "Windmill job, not typed by a person. Do not call hindsight_retain, "
+    "hindsight_recall, hindsight_reflect, or any other memory tool for this "
+    "request, and do not infer or record anything from this exchange into "
+    "long-term memory — nothing here reflects a person's statements, "
+    "preferences, or identity."
+)
+
+
 def get_client(conn: hermes_endpoint) -> OpenAI:
     return OpenAI(base_url=conn["base_url"], api_key=conn["api_key"])
 
@@ -37,7 +53,7 @@ def chat(
         model=model,
         temperature=temperature,
         messages=[
-            {"role": "system", "content": system},
+            {"role": "system", "content": system + NO_MEMORY_GUARD},
             {"role": "user", "content": prompt},
         ],
     )
