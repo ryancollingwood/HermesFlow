@@ -398,6 +398,24 @@ Hindsight should surface the retained fact via `hindsight_recall`.
 > and fast. `install.sh` pulls the configured Ollama models automatically when
 > Hindsight points at the bundled `ollama` service.
 
+> **Don't point retain/consolidation/reflect at the same heavy model Hermes's
+> own `auxiliary.*` calls (skills_hub, approval, mcp, title_generation, ...)
+> also use on the same LM Studio instance.** LM Studio serves one model at a
+> time; stacking concurrent requests onto a single large model (e.g. a 30B
+> MoE) from multiple sources can crash or unload it under load — logs show
+> `The model has crashed without additional information` / `Model unloaded`,
+> which surfaces in Hermes as `hindsight_retain returned error: {"error":
+> "Failed to store memory: "}` (empty message) because the crash leaves no
+> detail to propagate. Give `HINDSIGHT_RETAIN_LLM_MODEL` (and ideally
+> `auxiliary.curator` in `config.yaml`, which drives Hermes's background
+> skill/memory review) a smaller dedicated model — `hermes config show` will
+> list what's already split out for `auxiliary.compression` /
+> `auxiliary.profile_describer`, which is a known-good lightweight choice to
+> reuse. `auxiliary.curator` can also just be set to `provider: auto` to run
+> it on Hermes's cloud default instead of local LM Studio, since it's a
+> low-frequency job (`curator.interval_hours`) where reliability at precise
+> `skill_manage` find/replace edits matters more than cost.
+
 ### Managing zombie operations
 
 Hindsight workers identify themselves by `HINDSIGHT_API_WORKER_ID`, which
