@@ -262,7 +262,11 @@ services:
   #  LLM is used for fact extraction and reflect synthesis — points at LM Studio.
   # ---------------------------------------------------------------------------
   hindsight:
-    image: ghcr.io/vectorize-io/hindsight:latest
+    # Pinned (2026-08-05). :latest meant the config surface — which env vars
+    # exist and what they default to — could change silently under us. The
+    # authority for that surface is /app/api/hindsight_api/config.py inside
+    # THIS image; re-read it before bumping the tag.
+    image: ghcr.io/vectorize-io/hindsight:${HINDSIGHT_IMAGE_TAG:-0.8.5}
     container_name: hindsight
     restart: unless-stopped
     depends_on:
@@ -276,15 +280,32 @@ services:
       - HINDSIGHT_API_LLM_BASE_URL=${HINDSIGHT_LLM_BASE_URL:-http://host.docker.internal:11434/v1}
       - HINDSIGHT_API_LLM_MODEL=${HINDSIGHT_LLM_MODEL:-qwen2.5:14b}
       - HINDSIGHT_API_LLM_PROVIDER=${HINDSIGHT_LLM_PROVIDER:-openai}
-      - HINDSIGHT_API_LLM_RESPONSE_FORMAT=${HINDSIGHT_LLM_RESPONSE_FORMAT:-json_schema}
+      # NOTE: HINDSIGHT_API_LLM_RESPONSE_FORMAT was removed (2026-08-05).
+      # "RESPONSE_FORMAT" appears zero times in the image's config.py, which is
+      # the authority for env-var names — the var was silently ignored.
+      # STRICT_SCHEMA below is the real control.
       # Grammar-enforce structured output via the provider's strongest schema
       # mode. Some OpenAI-compatible backends (e.g. LM Studio) reject the
       # soft `json_object` fallback outright (400: response_format.type must
       # be 'json_schema' or 'text'), so this must be true for those backends.
       - HINDSIGHT_API_LLM_STRICT_SCHEMA=${HINDSIGHT_LLM_STRICT_SCHEMA:-true}
-      - HINDSIGHT_API_LLM_TIMEOUT=${HINDSIGHT_API_LLM_TIMEOUT:-8400}
+      # Name mismatch fixed 2026-08-05: this read ${HINDSIGHT_API_LLM_TIMEOUT}
+      # but .env defines HINDSIGHT_LLM_TIMEOUT (every other var here drops the
+      # _API_ infix), so the .env value was never wired and the 8400 default
+      # always won. Both names accepted now, .env's un-prefixed name first.
+      - HINDSIGHT_API_LLM_TIMEOUT=${HINDSIGHT_LLM_TIMEOUT:-${HINDSIGHT_API_LLM_TIMEOUT:-600}}
       - HINDSIGHT_API_LLM_MAX_CONCURRENT=${HINDSIGHT_LLM_MAX_CONCURRENT:-1}
-      - HINDSIGHT_API_LLM_REASONING_EFFORT=${HINDSIGHT_LLM_REASONING_EFFORT:-low}
+      # NOTE: HINDSIGHT_API_LLM_REASONING_EFFORT was removed (2026-08-05).
+      # _supports_reasoning_model() only sends reasoning_effort for model names
+      # containing gpt-5/o1/o3 (or thinking DeepSeek variants), so it was a
+      # no-op here. Use LLM_EXTRA_BODY below instead.
+      #
+      # Extra JSON merged into the OpenAI request body (disables Qwen thinking).
+      # The default MUST be the literal `null` and the real value MUST live in
+      # .env: `${VAR:-{"a": {"b": false}}}` terminates at the first unmatched
+      # `}` and the bare `: ` breaks YAML — `docker compose config` fails with
+      # "mapping values are not allowed in this context".
+      - 'HINDSIGHT_API_LLM_EXTRA_BODY=${HINDSIGHT_API_LLM_EXTRA_BODY:-null}'
       # ── Per-operation LLM overrides ────────────────────────────────────────
       - HINDSIGHT_API_RETAIN_LLM_PROVIDER=${HINDSIGHT_RETAIN_LLM_PROVIDER:-}
       - HINDSIGHT_API_RETAIN_LLM_API_KEY=${HINDSIGHT_RETAIN_LLM_API_KEY:-}
@@ -320,7 +341,11 @@ services:
       - HINDSIGHT_API_WORKER_MAX_SLOTS=${HINDSIGHT_API_WORKER_MAX_SLOTS:-3}
       - HINDSIGHT_API_WORKER_CONSOLIDATION_MAX_SLOTS=${HINDSIGHT_API_WORKER_CONSOLIDATION_MAX_SLOTS:-1}
       - HINDSIGHT_API_WORKER_RETAIN_MAX_SLOTS=${HINDSIGHT_API_WORKER_RETAIN_MAX_SLOTS:-1}
-      - HINDSIGHT_API_LOG_LEVEL=${HINDSIGHT_LOG_LEVEL:-INFO}
+      # MUST be lowercase. 0.8.5 passes this straight to uvicorn, whose
+      # LOG_LEVELS dict is keyed on lowercase names — an uppercase value
+      # crash-loops the container at startup with `KeyError: 'INFO'` before
+      # the HTTP server binds. 0.8.4 tolerated uppercase; 0.8.5 does not.
+      - HINDSIGHT_API_LOG_LEVEL=${HINDSIGHT_LOG_LEVEL:-info}
       - HINDSIGHT_API_WORKER_POLL_INTERVAL_MS=${HINDSIGHT_API_WORKER_POLL_INTERVAL_MS:-1000}
     volumes:
       - ${HINDSIGHT_CACHE_DIR:-./data/hindsight/cache}:/home/hindsight/.cache
