@@ -8,6 +8,7 @@
 - `docs/hermes-docker-build.md` has the full rationale for the lazy-install security model referenced (but not fully reproduced) in AGENTS.md's "Adding Python packages for Hermes" section.
 - `docs/windmill-sync.md` has the full sync-scope breakdown; AGENTS.md only summarizes it.
 - `docs/hermes-skills.md` covers creating/pushing/pulling/auditing custom Hermes skills (`hermes/skills/` ↔ `DATA_DIR/skills/`) — same narrow-scope, additive-not-mirror pattern as Windmill sync, applied to skills.
+- `docs/hindsight-tuning.md` is required reading before changing any `HINDSIGHT_*` variable: the retain path fails *silently* (jobs report `completed` while writing nothing), so it documents the health queries that actually detect that, the settings that are silent no-ops, and the image-upgrade traps.
 - `docs/failure-inspection.md` defines HF-029's bounded, redacted repair context, deterministic failure classes, and original-job evidence contract.
 - `docs/repair-candidate-generation.md` defines HF-030's minimal patch prompt, exact generation provenance, stale-base checks, and fail-closed candidate policy.
 - `docs/source-drift-regression-fixtures.md` defines HF-031's sanitised content-addressed HTML/JSON fixtures and dynamic candidate regression selection.
