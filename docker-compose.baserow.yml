@@ -43,7 +43,7 @@ services:
   #  MCP server are all served on port 80.
   # ---------------------------------------------------------------------------
   baserow:
-    image: baserow/baserow:${BASEROW_VERSION:-2.2.2}
+    image: baserow/baserow:${BASEROW_VERSION:-2.3.3}
     container_name: baserow
     restart: unless-stopped
     depends_on:

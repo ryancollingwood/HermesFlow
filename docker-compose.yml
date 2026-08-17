@@ -17,7 +17,7 @@ x-logging: &default-logging
     compress: "true"
 
 # Shared base for the Windmill app image so the worker definitions stay DRY
-x-windmill-image: &wm-image ${WM_IMAGE:-ghcr.io/windmill-labs/windmill:main}
+x-windmill-image: &wm-image ${WM_IMAGE:-ghcr.io/windmill-labs/windmill:1.790.0}
 
 networks:
   # db <-> windmill server/workers. Not exposed to Hermes or the proxy.
@@ -262,11 +262,11 @@ services:
   #  LLM is used for fact extraction and reflect synthesis — points at LM Studio.
   # ---------------------------------------------------------------------------
   hindsight:
-    # Pinned (2026-08-05). :latest meant the config surface — which env vars
+    # Pinned (updated 2026-08-17). :latest meant the config surface — which env vars
     # exist and what they default to — could change silently under us. The
     # authority for that surface is /app/api/hindsight_api/config.py inside
     # THIS image; re-read it before bumping the tag.
-    image: ghcr.io/vectorize-io/hindsight:${HINDSIGHT_IMAGE_TAG:-0.8.5}
+    image: ghcr.io/vectorize-io/hindsight:${HINDSIGHT_IMAGE_TAG:-0.9.1}
     container_name: hindsight
     restart: unless-stopped
     depends_on:
