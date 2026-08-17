@@ -45,7 +45,7 @@ services:
   #  Directus app (Studio UI + REST/GraphQL API + MCP server, once enabled).
   # ---------------------------------------------------------------------------
   directus:
-    image: directus/directus:${DIRECTUS_VERSION:-latest}
+    image: directus/directus:${DIRECTUS_VERSION:-12.2.0}
     container_name: directus
     restart: unless-stopped
     depends_on:
@@ -78,7 +78,7 @@ services:
       # Direct host access (optional); primary access is via Caddy.
       - "${DIRECTUS_BIND:-127.0.0.1}:${DIRECTUS_PORT:-8055}:8055"
     healthcheck:
-      test: ["CMD", "curl", "-fsS", "http://localhost:8055/server/health"]
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8055/server/ping').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
       interval: 30s
       timeout: 5s
       retries: 5

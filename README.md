@@ -827,7 +827,7 @@ docker exec hermes hermes mcp test baserow     # ✓ Connected, lists the tools
 
 | Variable | Default | Notes |
 |---|---|---|
-| `BASEROW_VERSION` | `2.2.2` | Image tag — bump to upgrade |
+| `BASEROW_VERSION` | `2.3.3` | Image tag — bump to upgrade |
 | `BASEROW_PUBLIC_URL` | `http://baserow.localhost` | Must match how you reach it |
 | `BASEROW_DATA_DIR` | `${HOME}/HermesFlow/baserow` | Assets + attachments volume |
 | `BASEROW_DB_DATA_DIR` / `BASEROW_REDIS_DATA_DIR` | `…/baserow/{db,redis}` | Dedicated Postgres / Redis data |
@@ -875,7 +875,7 @@ equivalent Baserow flow).
 
 | Variable | Default | Notes |
 |---|---|---|
-| `DIRECTUS_VERSION` | `latest` | Image tag — pin to upgrade deliberately |
+| `DIRECTUS_VERSION` | `12.2.0` | Image tag — bump to upgrade deliberately |
 | `DIRECTUS_PUBLIC_URL` | `http://directus.localhost` | Must match how you reach it |
 | `DIRECTUS_UPLOADS_DIR` / `DIRECTUS_EXTENSIONS_DIR` | `${HOME}/HermesFlow/directus/{uploads,extensions}` | Asset + extension volumes |
 | `DIRECTUS_KEY` / `DIRECTUS_SECRET` | _(generated)_ | App key/secret — `make secrets` fills them |
