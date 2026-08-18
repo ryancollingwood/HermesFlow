@@ -62,6 +62,45 @@ alongside the code, not as an afterthought:
   out to a network or external service. Unbounded-by-default is not a safe
   default for generated code you haven't operated yet.
 
+## Code requirements
+
+CI runs `ruff check --fix` against the whole tree, but that `--fix` only
+cleans up the checkout the CI job runs in — it never writes the fix back
+into the candidate's committed code. Don't rely on CI to catch or repair
+these; run `ruff check` (`--fix` for the safe/cosmetic rules) against a
+candidate yourself and get it clean before marking it `TESTED`.
+
+A handful of rules ruff can't auto-fix are also the mistakes generated
+code reproduces most often. Avoid these outright rather than waiting for
+lint to catch them:
+
+- **No mutable default arguments** (`def f(x=[])`, `def f(x={})`). The
+  default object is shared across every call that doesn't pass `x`
+  explicitly — a stale-state bug, not a style nit. Default to `None` and
+  assign the real value inside the function body.
+- **No bare or blanket `except:` / `except Exception:`.** Catch the
+  specific exception type the call can actually raise. A blanket catch
+  swallows bugs the same way an under-declared `effects` field hides
+  side effects — it undermines the next reader's ability to trust what
+  the code does.
+- **Don't close over a loop variable** in a lambda or nested function
+  defined inside the loop. By the time the closure runs, the variable
+  holds whatever the loop left it at, not the value it had when the
+  closure was created. Bind it as a default argument
+  (`lambda x=x: ...`) or capture it explicitly instead.
+- **Datetimes are timezone-aware, always** — `datetime.now(timezone.utc)`,
+  never `datetime.now()` or `datetime.utcnow()`. A naive datetime
+  silently carries no timezone, and any comparison against a
+  `CapabilityMetadata`/`ExecutionResult` timestamp downstream will
+  misbehave the moment the two disagree.
+- **Type-check branches raise `TypeError`**, not a message-only
+  exception, when the input's type is wrong — a caller matching on
+  exception type needs it to actually be `TypeError`.
+
+Everything else ruff flags — `Optional[X]` vs `X | None`, import
+ordering, and similar — is what `ruff check --fix` exists for. Run it and
+move on rather than hand-fixing style.
+
 ## What autonomy a new candidate gets
 
 `AutonomyPolicy`'s defaults apply unless there's a specific reason to
