@@ -257,6 +257,19 @@ def ensure_secret(key: str, nbytes: int, weak: str = "") -> None:
         say(f"{ARROW} {key} already set")
 
 
+def ensure_value(key: str, value: str) -> None:
+    """Fill a non-secret env var with a fixed default if it's blank.
+
+    Mirrors ensure_secret's fill-if-blank contract for values that are
+    defaults rather than generated secrets (e.g. a login username).
+    """
+    if env_value(key) == "":
+        env_set(key, value)
+        say(f"{OK} set {key}={value}")
+    else:
+        say(f"{ARROW} {key} already set")
+
+
 def make_dirs_and_fix_perms() -> None:
     home = os.environ.get("HOME") or os.path.expanduser("~")
 
@@ -791,7 +804,8 @@ def main() -> None:
         say(f"  Default model:   {model}")
         say(f"  Profile:         {args.profile or 'none'}")
         say("  Secrets:         generate any blank/weak of API_SERVER_KEY, WM_DB_PASSWORD, "
-            "HINDSIGHT_DB_PASSWORD, GRAFANA_ADMIN_PASSWORD, BASEROW_*")
+            "HINDSIGHT_DB_PASSWORD, GRAFANA_ADMIN_PASSWORD, BASEROW_*, "
+            "HERMES_DASHBOARD_BASIC_AUTH_*")
         say(f"  Memory:          {yn(not args.no_memory)}" + (f" (remote via {args.provider})" if hs_remote else ""))
         if args.hindsight_model or args.hindsight_base_url:
             say(f"  Hindsight LLM:   model={args.hindsight_model or '<.env>'} base={args.hindsight_base_url or '<.env>'}")
@@ -968,6 +982,11 @@ def main() -> None:
     ensure_secret("DIRECTUS_KEY", 16)
     ensure_secret("DIRECTUS_SECRET", 32)
     ensure_secret("DIRECTUS_ADMIN_PASSWORD", 16)
+    # Dashboard login. The auth gate engages on the container's non-loopback
+    # bind and fails closed without a provider — and s6 then respawns the
+    # dashboard every ~2s, burning a full CPU core.
+    ensure_value("HERMES_DASHBOARD_BASIC_AUTH_USERNAME", "hermes")
+    ensure_secret("HERMES_DASHBOARD_BASIC_AUTH_PASSWORD", 16)
 
     # 6. data dirs + ownership
     make_dirs_and_fix_perms()

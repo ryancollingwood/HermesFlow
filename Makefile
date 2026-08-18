@@ -99,6 +99,14 @@ secrets: ## Generate every required secret in .env that's blank or still a weak 
 	$(call ensure_secret,DIRECTUS_SECRET,openssl rand -hex 32,)
 	$(call ensure_secret,DIRECTUS_ADMIN_PASSWORD,openssl rand -hex 16,)
 	$(call ensure_secret,BASEROW_REDIS_PASSWORD,openssl rand -hex 16,)
+	@# Dashboard login. The auth gate engages on the container's non-loopback
+	@# bind and fails closed without a provider — and s6 then respawns the
+	@# dashboard every ~2s, burning a full CPU core. Username is a plain
+	@# default, not a secret; ensure_secret is reused only for the
+	@# fill-if-blank behaviour.
+	$(call ensure_secret,HERMES_DASHBOARD_BASIC_AUTH_USERNAME,echo hermes,)
+	$(call ensure_secret,HERMES_DASHBOARD_BASIC_AUTH_PASSWORD,openssl rand -hex 16,)
+	@echo "  dashboard login → user $$(grep -E '^HERMES_DASHBOARD_BASIC_AUTH_USERNAME=' $(ENV_FILE) | cut -d= -f2-), password in $(ENV_FILE)"
 
 wizard: ## Run the Hermes first-run setup wizard (interactive; writes ~/.hermes/.env + config)
 	@set -a; . ./$(ENV_FILE); set +a; \
