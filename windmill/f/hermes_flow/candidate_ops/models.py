@@ -30,7 +30,6 @@ Schema versioning follows the same additive-only-within-a-MAJOR rule as
 import hashlib
 import re
 from datetime import datetime, timezone
-from typing import Optional
 
 from pydantic import BaseModel, Field, model_validator
 
@@ -75,33 +74,33 @@ class CandidateRecord(BaseModel):
     path: str = Field(..., min_length=1)
     request_key: str = Field(..., min_length=1)
     reason: str = Field(..., min_length=1, description="Why this candidate was created.")
-    source_path: Optional[str] = Field(
+    source_path: str | None = Field(
         default=None,
         description="Active capability path this candidate was derived from, if any.",
     )
-    base_version: Optional[str] = Field(
+    base_version: str | None = Field(
         default=None,
         description="source_path's Windmill script hash at the time of derivation — lets "
         "a later promotion check detect the base has since changed (stale-base conflict, "
         "HF-013). Required whenever source_path is set.",
     )
-    conversation_id: Optional[str] = Field(default=None)
-    request_id: Optional[str] = Field(default=None)
-    generated_by_capability: Optional[str] = Field(
+    conversation_id: str | None = Field(default=None)
+    request_id: str | None = Field(default=None)
+    generated_by_capability: str | None = Field(
         default=None,
         description="Capability path that generated this candidate's content, if an AI "
         "capability (HF-019) produced it rather than a human.",
     )
-    failed_job_id: Optional[str] = Field(
+    failed_job_id: str | None = Field(
         default=None,
         description="Original failed Windmill job that caused this repair candidate.",
     )
-    repair_context_sha256: Optional[str] = Field(
+    repair_context_sha256: str | None = Field(
         default=None,
         pattern=r"^[0-9a-f]{64}$",
         description="Digest of the exact redacted RepairContext supplied to generation.",
     )
-    generation_trace_id: Optional[str] = Field(
+    generation_trace_id: str | None = Field(
         default=None,
         description="HF-019 lineage trace retaining prompt, input, and model-output artifacts.",
     )

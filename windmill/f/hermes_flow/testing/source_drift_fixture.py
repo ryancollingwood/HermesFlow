@@ -2,15 +2,13 @@
 from __future__ import annotations
 
 import json
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 
 import wmill
-from pydantic import BaseModel, ConfigDict, Field
-
 from f.hermes_flow.candidate_ops.models import is_candidate_path
 from f.hermes_flow.repair.promote_fixture import SourceDriftFixture
 from f.libraries.storage.artifacts import FilesystemArtifactStore
-
+from pydantic import BaseModel, ConfigDict, Field
 
 CAPABILITY_PATH = "f/hermes_flow/testing/source_drift_fixture"
 CAPABILITY_VERSION = "1.0.0"
@@ -22,7 +20,7 @@ class FixtureAssertion(BaseModel):
     path: str
     passed: bool
     expectation: str
-    actual: Optional[Any] = None
+    actual: Any | None = None
 
 
 class SourceDriftFixtureRunResult(BaseModel):
@@ -33,7 +31,7 @@ class SourceDriftFixtureRunResult(BaseModel):
     fixture_id: str
     failed_job_id: str
     candidate_path: str
-    candidate_job_id: Optional[str] = None
+    candidate_job_id: str | None = None
     assertions: list[FixtureAssertion] = Field(default_factory=list)
     details: str
 
@@ -91,7 +89,7 @@ def run_source_drift_fixture(
     candidate_path: str,
     *,
     client=None,
-    store: Optional[FilesystemArtifactStore] = None,
+    store: FilesystemArtifactStore | None = None,
 ) -> SourceDriftFixtureRunResult:
     if not is_candidate_path(candidate_path):
         raise ValueError("source-drift fixtures may execute only isolated candidate paths")

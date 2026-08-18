@@ -13,6 +13,7 @@ Running THIS script directly returns the list of models the gateway serves,
 which doubles as a connectivity test.
 """
 from typing import TypedDict
+
 from openai import OpenAI
 
 

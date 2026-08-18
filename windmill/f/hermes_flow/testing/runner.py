@@ -4,7 +4,7 @@ from __future__ import annotations
 import json
 import time
 from enum import Enum
-from typing import Any, Optional, Protocol
+from typing import Any, Protocol
 
 import wmill
 import yaml
@@ -44,7 +44,7 @@ class TestSpec(BaseModel):
     args: dict[str, Any] = Field(default_factory=dict)
     timeout_seconds: int = Field(default=60, ge=1, le=3600)
     max_data_bytes: int = Field(default=1_000_000, ge=1, le=100_000_000)
-    skip_reason: Optional[str] = None
+    skip_reason: str | None = None
 
 
 class TestManifest(BaseModel):
@@ -67,16 +67,16 @@ class TestEvidence(BaseModel):
     type: TestType
     mode: TestMode
     status: TestStatus
-    job_id: Optional[str] = None
+    job_id: str | None = None
     duration_ms: int = 0
-    details: Optional[str] = None
+    details: str | None = None
     data_bytes: int = 0
 
 
 class TestRunResult(BaseModel):
     schema_version: str = "1.0"
     capability_path: str
-    mode: Optional[TestMode] = None
+    mode: TestMode | None = None
     passed: bool
     evidence: list[TestEvidence]
 
@@ -118,7 +118,7 @@ def discover_tests(
     manifest: TestManifest,
     capability_path: str,
     required_test_ids: list[str],
-    mode: Optional[TestMode] = None,
+    mode: TestMode | None = None,
 ) -> list[TestSpec]:
     by_id = {test.id: test for test in manifest.tests}
     missing = sorted(set(required_test_ids) - set(by_id))
@@ -138,10 +138,10 @@ def run_tests(
     manifest: TestManifest,
     capability_path: str,
     required_test_ids: list[str],
-    mode: Optional[TestMode] = None,
+    mode: TestMode | None = None,
     max_timeout_seconds: int = 300,
     max_data_bytes: int = 5_000_000,
-    executor: Optional[TestExecutor] = None,
+    executor: TestExecutor | None = None,
 ) -> TestRunResult:
     selected = discover_tests(manifest, capability_path, required_test_ids, mode)
     runner = executor or WindmillTestExecutor()

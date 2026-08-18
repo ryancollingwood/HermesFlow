@@ -1,12 +1,8 @@
 """HF-016 dependency-aware regression selection and execution."""
 from __future__ import annotations
 
-from typing import Optional
-
-from pydantic import BaseModel
-
-from f.hermes_flow.candidate_ops.models import is_candidate_path
 from f.hermes_flow.candidate_ops.diff import _consumer_impact
+from f.hermes_flow.candidate_ops.models import is_candidate_path
 from f.hermes_flow.catalogue.models import Catalogue, load_catalogue
 from f.hermes_flow.repair.promote_fixture import SourceDriftFixture
 from f.hermes_flow.testing.runner import (
@@ -18,13 +14,14 @@ from f.hermes_flow.testing.runner import (
     load_test_manifests,
     run_tests,
 )
+from pydantic import BaseModel
 
 
 class SelectionReason(BaseModel):
     capability_path: str
     relationship: str
     distance: int
-    via: Optional[str] = None
+    via: str | None = None
     explanation: str
 
 
@@ -46,8 +43,8 @@ def select_regression_tests(
     catalogue: Catalogue,
     manifest: TestManifest,
     changed_capability: str,
-    promoted_fixtures: Optional[list[SourceDriftFixture | dict]] = None,
-    candidate_path: Optional[str] = None,
+    promoted_fixtures: list[SourceDriftFixture | dict] | None = None,
+    candidate_path: str | None = None,
 ) -> list[SelectedRegressionTest]:
     changed = catalogue.get(changed_capability)
     if changed is None:
@@ -151,9 +148,9 @@ def run_regression_tests(
     changed_capability: str,
     max_timeout_seconds: int = 300,
     max_data_bytes: int = 5_000_000,
-    executor: Optional[TestExecutor] = None,
-    promoted_fixtures: Optional[list[SourceDriftFixture | dict]] = None,
-    candidate_path: Optional[str] = None,
+    executor: TestExecutor | None = None,
+    promoted_fixtures: list[SourceDriftFixture | dict] | None = None,
+    candidate_path: str | None = None,
 ) -> RegressionRunResult:
     selection = select_regression_tests(
         catalogue,
@@ -195,7 +192,7 @@ def main(
     changed_capability: str,
     max_timeout_seconds: int = 300,
     max_data_bytes: int = 5_000_000,
-    promoted_fixtures: Optional[list[dict]] = None,
+    promoted_fixtures: list[dict] | None = None,
     candidate_path: str = "",
 ) -> dict:
     result = run_regression_tests(

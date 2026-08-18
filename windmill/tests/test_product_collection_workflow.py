@@ -13,9 +13,6 @@ from uuid import UUID
 
 import pytest
 import yaml
-from jsonschema import Draft202012Validator
-from pydantic import ValidationError
-
 from f.capabilities.collection.normalise_products import ProductNormalizationResult
 from f.capabilities.collection.product_snapshot_write import persist_product_snapshots
 from f.capabilities.collection.web_fetch import FetchAttempt, WebFetchResult
@@ -23,7 +20,8 @@ from f.libraries.lineage.helpers import enumerate_artifact_chain, write_artifact
 from f.libraries.lineage.models import ArtifactStage
 from f.libraries.results.models import ExecutionType, ResultOutcome
 from f.libraries.storage.artifacts import FilesystemArtifactStore
-
+from jsonschema import Draft202012Validator
+from pydantic import ValidationError
 
 ROOT = Path(__file__).parents[2]
 FLOW_DIR = ROOT / "windmill" / "f" / "workflows" / "product_collection.flow"

@@ -2,8 +2,6 @@
 import json
 from pathlib import Path
 
-from jsonschema import Draft202012Validator
-
 from f.capabilities.collection.extract_products import (
     AIProductPayload,
     ProductExtractionResult,
@@ -12,7 +10,7 @@ from f.capabilities.collection.extract_products import (
 from f.libraries.lineage.helpers import begin_lineage, write_artifact
 from f.libraries.lineage.models import ArtifactStage
 from f.libraries.storage.artifacts import FilesystemArtifactStore
-
+from jsonschema import Draft202012Validator
 
 FIXTURES = Path(__file__).parent / "fixtures" / "product_extraction"
 SCHEMA_PATH = Path(__file__).parents[2] / "docs" / "schemas" / "product_extraction_result.schema.json"

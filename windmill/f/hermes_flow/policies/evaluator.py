@@ -63,11 +63,13 @@ inside Windmill's actual Python environment.
 """
 import json
 from enum import Enum
-from typing import Optional
 
+from f.libraries.capability.models import (
+    AutonomyAction,
+    AutonomyLevel,
+    CapabilityMetadata,
+)
 from pydantic import BaseModel, Field
-
-from f.libraries.capability.models import AutonomyAction, AutonomyLevel, CapabilityMetadata
 
 SCHEMA_VERSION = "1.0"
 
@@ -83,18 +85,18 @@ class PolicyContext(BaseModel):
 
     schema_version: str = Field(default=SCHEMA_VERSION)
     action: AutonomyAction
-    capability: Optional[CapabilityMetadata] = Field(
+    capability: CapabilityMetadata | None = Field(
         default=None,
         description="The target capability's metadata, if known. None means the "
         "requested path has no catalogue entry — fails closed for every action "
         "except discover.",
     )
-    requested_concurrency: Optional[int] = Field(default=None, ge=1)
-    requested_rate_per_minute: Optional[int] = Field(default=None, ge=1)
-    requested_duration_seconds: Optional[int] = Field(default=None, ge=1)
-    requested_response_bytes: Optional[int] = Field(default=None, ge=0)
-    requested_record_count: Optional[int] = Field(default=None, ge=0)
-    requested_cost_usd: Optional[float] = Field(default=None, ge=0)
+    requested_concurrency: int | None = Field(default=None, ge=1)
+    requested_rate_per_minute: int | None = Field(default=None, ge=1)
+    requested_duration_seconds: int | None = Field(default=None, ge=1)
+    requested_response_bytes: int | None = Field(default=None, ge=0)
+    requested_record_count: int | None = Field(default=None, ge=0)
+    requested_cost_usd: float | None = Field(default=None, ge=0)
     destructive: bool = Field(
         default=False,
         description="Caller-supplied flag for a specific invocation known to be "
@@ -106,7 +108,7 @@ class PolicyContext(BaseModel):
 class PolicyDecision(BaseModel):
     schema_version: str = Field(default=SCHEMA_VERSION)
     action: AutonomyAction
-    capability_path: Optional[str] = None
+    capability_path: str | None = None
     outcome: PolicyOutcome
     reason: str = Field(..., min_length=1)
 

@@ -1,12 +1,11 @@
 """HF-030 repair-candidate generation and policy-gate tests."""
 import hashlib
 import json
-from pathlib import Path
 from dataclasses import dataclass, field
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
-
 from f.hermes_flow.candidate_ops.models import CandidateRecord, metadata_variable_path
 from f.hermes_flow.repair.generate_candidate import (
     RepairGenerationError,
@@ -26,7 +25,6 @@ from f.hermes_flow.repair.models import (
     TruncationSummary,
 )
 from f.libraries.storage.artifacts import FilesystemArtifactStore
-
 
 ACTIVE_PATH = "f/capabilities/collection/source_selector"
 ACTIVE_HASH = "active-windmill-hash"

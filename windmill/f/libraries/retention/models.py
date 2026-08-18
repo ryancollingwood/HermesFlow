@@ -41,7 +41,6 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field
 
@@ -77,13 +76,13 @@ class RetentionPolicy(BaseModel):
     schema_version: str = Field(default=SCHEMA_VERSION)
     category: str = Field(..., min_length=1)
     retention_class: RetentionClass
-    max_age_seconds: Optional[int] = Field(
+    max_age_seconds: int | None = Field(
         default=None, gt=0,
         description="Delete once an item is older than this. Unset means no automatic "
         "age-based expiry (typical for long_term/indefinite).",
     )
-    max_size_bytes: Optional[int] = Field(default=None, gt=0)
-    max_record_count: Optional[int] = Field(default=None, gt=0)
+    max_size_bytes: int | None = Field(default=None, gt=0)
+    max_record_count: int | None = Field(default=None, gt=0)
     requires_tombstone: bool = Field(
         default=True,
         description="Whether deletion of this category must preserve a tombstone record "
@@ -156,7 +155,7 @@ def select_expired(
     items: list[tuple[str, datetime]],
     policy: RetentionPolicy,
     *,
-    now: Optional[datetime] = None,
+    now: datetime | None = None,
 ) -> list[str]:
     """Return the ids of `items` (id, created_at) whose age meets or exceeds
     `policy.max_age_seconds`. Pure selection — deletion is the caller's job."""

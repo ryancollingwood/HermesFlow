@@ -3,10 +3,8 @@ import json
 
 import httpx
 import pytest
-
 from f.capabilities.collection.web_fetch import FetchPolicyError, web_fetch
 from f.libraries.storage.artifacts import FilesystemArtifactStore
-
 
 PUBLIC_IP = "93.184.216.34"
 

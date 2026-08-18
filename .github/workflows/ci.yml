@@ -50,7 +50,7 @@ jobs:
           python-version: '3.12'
       - run: pip install ruff pyyaml -r windmill/tests/requirements.txt
       - name: Ruff
-        run: ruff check windmill/ hermes/skills/workflow-orchestration/hermesflow/scripts/
+        run: ruff check --fix windmill/ hermes/skills/workflow-orchestration/hermesflow/scripts/
       - name: py_compile
         run: |
           find windmill -name '*.py' -exec python -m py_compile {} +

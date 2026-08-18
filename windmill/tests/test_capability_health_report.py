@@ -4,7 +4,6 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import yaml
-
 from f.hermes_flow.testing.health_report import (
     CapabilityHealthReport,
     Freshness,
@@ -14,7 +13,6 @@ from f.hermes_flow.testing.health_report import (
     write_prometheus_textfile,
 )
 from f.hermes_flow.testing.scheduled_health import HealthState
-
 
 CATALOGUE = """schema_version: '1.0'
 entries:

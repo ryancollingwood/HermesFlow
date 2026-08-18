@@ -13,7 +13,7 @@ the annotation's name):
         base_url: str
         api_key: str
 """
-from f.hermes.client import hermes_endpoint, chat
+from f.hermes.client import chat, hermes_endpoint
 
 
 def main(

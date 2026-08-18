@@ -3,18 +3,20 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Callable
 from html.parser import HTMLParser
-from typing import Any, Callable, Optional
+from typing import Any
 from urllib.parse import urlsplit, urlunsplit
 
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
-
-from f.capabilities.collection.extract_structured_markup import extract_structured_markup
+from f.capabilities.collection.extract_structured_markup import (
+    extract_structured_markup,
+)
 from f.hermes.client import hermes_endpoint
 from f.libraries.ai.invoke_hermes_structured import invoke_hermes_structured
 from f.libraries.lineage.helpers import LineageState
 from f.libraries.lineage.models import ArtifactRef
 from f.libraries.storage.artifacts import FilesystemArtifactStore
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 CAPABILITY_PATH = "f/capabilities/collection/extract_products"
 CAPABILITY_VERSION = "1.0.0"
@@ -23,11 +25,11 @@ CAPABILITY_VERSION = "1.0.0"
 class ExtractedOffer(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    price: Optional[str]
-    currency: Optional[str]
-    availability: Optional[str]
-    seller: Optional[str]
-    url: Optional[str]
+    price: str | None
+    currency: str | None
+    availability: str | None
+    seller: str | None
+    url: str | None
 
 
 class ProductProvenance(BaseModel):
@@ -35,8 +37,8 @@ class ProductProvenance(BaseModel):
     extractor_version: str = CAPABILITY_VERSION
     source_artifact_id: str
     source_content_hash: str
-    source_url: Optional[str] = None
-    source_type: Optional[str] = None
+    source_url: str | None = None
+    source_type: str | None = None
     evidence_paths: list[str] = Field(default_factory=list)
     structured_candidate_ids: list[str] = Field(default_factory=list)
     ai_artifact_ids: list[str] = Field(default_factory=list)
@@ -45,12 +47,12 @@ class ProductProvenance(BaseModel):
 class ProductRecord(BaseModel):
     product_id: str = Field(..., pattern=r"^[0-9a-f]{64}$")
     name: str = Field(..., min_length=1)
-    brand: Optional[str] = None
-    sku: Optional[str] = None
-    gtin: Optional[str] = None
-    mpn: Optional[str] = None
-    description: Optional[str] = None
-    canonical_url: Optional[str] = None
+    brand: str | None = None
+    sku: str | None = None
+    gtin: str | None = None
+    mpn: str | None = None
+    description: str | None = None
+    canonical_url: str | None = None
     images: list[str] = Field(default_factory=list)
     offers: list[ExtractedOffer] = Field(default_factory=list)
     attributes: dict[str, Any] = Field(default_factory=dict)
@@ -61,13 +63,13 @@ class ProductRecord(BaseModel):
 class ProductExtractionWarning(BaseModel):
     code: str
     message: str
-    evidence_path: Optional[str] = None
+    evidence_path: str | None = None
 
 
 class ProductExtractionResult(BaseModel):
     schema_version: str = "1.0"
     status: str
-    method: Optional[str] = None
+    method: str | None = None
     source_artifact: ArtifactRef
     products: list[ProductRecord]
     warnings: list[ProductExtractionWarning] = Field(default_factory=list)
@@ -78,12 +80,12 @@ class AIProductCandidate(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     name: str = Field(..., min_length=1)
-    brand: Optional[str]
-    sku: Optional[str]
-    gtin: Optional[str]
-    mpn: Optional[str]
-    description: Optional[str]
-    canonical_url: Optional[str]
+    brand: str | None
+    sku: str | None
+    gtin: str | None
+    mpn: str | None
+    description: str | None
+    canonical_url: str | None
     images: list[str]
     offers: list[ExtractedOffer]
 
@@ -100,10 +102,10 @@ class _ProductHtmlParser(HTMLParser):
         super().__init__(convert_charrefs=True)
         self.meta: dict[str, str] = {}
         self.scripts: list[tuple[dict[str, str], str]] = []
-        self._script_attrs: Optional[dict[str, str]] = None
+        self._script_attrs: dict[str, str] | None = None
         self._script_parts: list[str] = []
 
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, Optional[str]]]) -> None:
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         attributes = {key.lower(): (value or "") for key, value in attrs}
         if tag.lower() == "meta":
             key = (attributes.get("property") or attributes.get("name") or "").lower()
@@ -124,7 +126,7 @@ class _ProductHtmlParser(HTMLParser):
             self._script_parts.append(data)
 
 
-def _text(value: Any) -> Optional[str]:
+def _text(value: Any) -> str | None:
     if isinstance(value, str):
         stripped = value.strip()
         return stripped or None
@@ -133,19 +135,19 @@ def _text(value: Any) -> Optional[str]:
     return None
 
 
-def _brand(value: Any) -> Optional[str]:
+def _brand(value: Any) -> str | None:
     if isinstance(value, dict):
         return _text(value.get("name"))
     return _text(value)
 
 
-def _url(value: Any) -> Optional[str]:
+def _url(value: Any) -> str | None:
     if isinstance(value, dict):
         value = value.get("url") or value.get("contentUrl")
     return _text(value)
 
 
-def _canonical_url(value: Any) -> Optional[str]:
+def _canonical_url(value: Any) -> str | None:
     url = _url(value)
     if not url:
         return None
@@ -185,8 +187,8 @@ def _offers(value: Any) -> list[ExtractedOffer]:
 def _source_metadata(
     store: FilesystemArtifactStore,
     artifact: ArtifactRef,
-    supplied: Optional[dict[str, Any]],
-) -> dict[str, Optional[str]]:
+    supplied: dict[str, Any] | None,
+) -> dict[str, str | None]:
     retained = store.read_metadata(artifact.artifact_id).get("metadata", {})
     metadata = supplied or {}
     return {
@@ -197,12 +199,12 @@ def _source_metadata(
 
 def _provenance(
     artifact: ArtifactRef,
-    source: dict[str, Optional[str]],
+    source: dict[str, str | None],
     method: str,
     evidence_paths: list[str],
     *,
-    candidate_ids: Optional[list[str]] = None,
-    ai_artifact_ids: Optional[list[str]] = None,
+    candidate_ids: list[str] | None = None,
+    ai_artifact_ids: list[str] | None = None,
 ) -> ProductProvenance:
     return ProductProvenance(
         extraction_method=method,
@@ -221,7 +223,7 @@ def _record(
     provenance: ProductProvenance,
     *,
     evidence_path: str,
-) -> tuple[Optional[ProductRecord], Optional[ProductExtractionWarning]]:
+) -> tuple[ProductRecord | None, ProductExtractionWarning | None]:
     name = _text(data.get("name") or data.get("title"))
     if not name:
         return None, ProductExtractionWarning(
@@ -297,7 +299,7 @@ def _deduplicate(
 
 def _structured_products(
     artifact: ArtifactRef,
-    source: dict[str, Optional[str]],
+    source: dict[str, str | None],
     markup_result,
     warnings: list[ProductExtractionWarning],
 ) -> list[ProductRecord]:
@@ -333,7 +335,7 @@ def _json_scripts(parser: _ProductHtmlParser, predicate: Callable[[dict[str, str
 def _shopify_products(
     parser: _ProductHtmlParser,
     artifact: ArtifactRef,
-    source: dict[str, Optional[str]],
+    source: dict[str, str | None],
     warnings: list[ProductExtractionWarning],
 ) -> list[ProductRecord]:
     products = []
@@ -384,7 +386,7 @@ def _shopify_products(
 def _nextjs_products(
     parser: _ProductHtmlParser,
     artifact: ArtifactRef,
-    source: dict[str, Optional[str]],
+    source: dict[str, str | None],
     warnings: list[ProductExtractionWarning],
 ) -> list[ProductRecord]:
     products = []
@@ -418,7 +420,7 @@ def _nextjs_products(
 def _opengraph_products(
     parser: _ProductHtmlParser,
     artifact: ArtifactRef,
-    source: dict[str, Optional[str]],
+    source: dict[str, str | None],
     warnings: list[ProductExtractionWarning],
 ) -> list[ProductRecord]:
     meta = parser.meta
@@ -449,7 +451,7 @@ def _opengraph_products(
 
 def _ai_products(
     artifact: ArtifactRef,
-    source: dict[str, Optional[str]],
+    source: dict[str, str | None],
     html: str,
     ai_conn: dict,
     store: FilesystemArtifactStore,
@@ -524,11 +526,11 @@ def _ai_products(
 
 def extract_products(
     raw_artifact: ArtifactRef,
-    source_metadata: Optional[dict[str, Any]] = None,
+    source_metadata: dict[str, Any] | None = None,
     *,
-    lineage: Optional[LineageState] = None,
-    store: Optional[FilesystemArtifactStore] = None,
-    ai_conn: Optional[dict] = None,
+    lineage: LineageState | None = None,
+    store: FilesystemArtifactStore | None = None,
+    ai_conn: dict | None = None,
     ai_invoker=None,
     max_html_bytes: int = 10_000_000,
     max_products: int = 100,

@@ -2,14 +2,12 @@
 from datetime import datetime, timedelta, timezone
 
 import pytest
-
 from f.hermes_flow.testing.scheduled_health import (
     build_schedule_definitions,
     reconcile_schedules,
     run_scheduled_health,
     state_path,
 )
-
 
 CATALOGUE = """
 schema_version: "1.0"

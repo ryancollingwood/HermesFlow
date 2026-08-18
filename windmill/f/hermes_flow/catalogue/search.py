@@ -49,12 +49,15 @@ results, doubling as an integration test that this module's ranking logic
 runs correctly inside Windmill's actual Python environment.
 """
 import re
-from typing import Optional
 
-from pydantic import BaseModel, Field
-
-from f.hermes_flow.catalogue.models import CapabilityKind, Catalogue, CatalogueEntry, load_catalogue
+from f.hermes_flow.catalogue.models import (
+    CapabilityKind,
+    Catalogue,
+    CatalogueEntry,
+    load_catalogue,
+)
 from f.libraries.capability.models import CapabilityEffects, CapabilityMaturity
+from pydantic import BaseModel, Field
 
 SCHEMA_VERSION = "1.0"
 
@@ -82,7 +85,7 @@ class SearchQuery(BaseModel):
     """What to search for. See module docstring for filter vs. score semantics."""
 
     schema_version: str = Field(default=SCHEMA_VERSION)
-    task: Optional[str] = Field(
+    task: str | None = Field(
         default=None,
         description="Free-text task description, matched by keyword overlap against "
         "each entry's summary/inputs_summary/outputs_summary/tags. Deterministic "
@@ -91,12 +94,12 @@ class SearchQuery(BaseModel):
     tags: list[str] = Field(default_factory=list, description="Exact-match tags, scored not filtered.")
     required_input_kinds: list[str] = Field(default_factory=list)
     required_output_kinds: list[str] = Field(default_factory=list)
-    max_effects: Optional[CapabilityEffects] = Field(
+    max_effects: CapabilityEffects | None = Field(
         default=None,
         description="Ceiling on acceptable effects — an entry with any effect True "
         "where max_effects has it False is excluded entirely, not just ranked lower.",
     )
-    kind: Optional[CapabilityKind] = Field(default=None, description="Restrict to script or flow only.")
+    kind: CapabilityKind | None = Field(default=None, description="Restrict to script or flow only.")
     include_deprecated: bool = Field(default=False)
 
 
@@ -189,7 +192,7 @@ def search(catalogue: Catalogue, query: SearchQuery) -> SearchResponse:
     return SearchResponse(query=query, results=results)
 
 
-def main(catalogue_yaml: str, task: str = "", tags: Optional[list[str]] = None) -> dict:
+def main(catalogue_yaml: str, task: str = "", tags: list[str] | None = None) -> dict:
     """Self-test / integration check: search the given catalogue text."""
     catalogue = load_catalogue(catalogue_yaml)
     query = SearchQuery(task=task or None, tags=tags or [])

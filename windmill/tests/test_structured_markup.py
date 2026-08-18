@@ -3,7 +3,6 @@ import json
 from pathlib import Path
 
 import pytest
-
 from f.capabilities.collection.extract_structured_markup import (
     StructuredMarkupResult,
     extract_structured_markup,
@@ -11,7 +10,6 @@ from f.capabilities.collection.extract_structured_markup import (
 from f.libraries.lineage.helpers import begin_lineage, write_artifact
 from f.libraries.lineage.models import ArtifactStage
 from f.libraries.storage.artifacts import FilesystemArtifactStore
-
 
 FIXTURES = Path(__file__).parent / "fixtures" / "structured_markup"
 SCHEMA_PATH = Path(__file__).parents[2] / "docs" / "schemas" / "structured_markup_result.schema.json"

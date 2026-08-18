@@ -3,13 +3,11 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
-from typing import Any, Optional
+from typing import Any
 from urllib.parse import quote
 
 import wmill
 import yaml
-from pydantic import BaseModel, Field
-
 from f.hermes_flow.candidate_ops.diff import _consumer_impact, _get_script
 from f.hermes_flow.candidate_ops.promote import (
     PromotionConflict,
@@ -20,6 +18,7 @@ from f.hermes_flow.candidate_ops.promote import (
 )
 from f.hermes_flow.catalogue.models import Catalogue, load_catalogue
 from f.libraries.capability.models import CapabilityMaturity
+from pydantic import BaseModel, Field
 
 
 class DeprecationRecord(BaseModel):
@@ -88,7 +87,7 @@ def deprecate_capability(
     capability_path: str,
     reason: str,
     initiating_job_id: str,
-    client: Optional[WindmillPromotionClient] = None,
+    client: WindmillPromotionClient | None = None,
 ) -> dict:
     w = client or wmill.Windmill()
     catalogue = load_catalogue(catalogue_yaml)
@@ -131,8 +130,8 @@ def rollback_capability(
     reason: str,
     initiating_job_id: str,
     test_results: list[dict],
-    expected_current_version: Optional[str] = None,
-    client: Optional[WindmillPromotionClient] = None,
+    expected_current_version: str | None = None,
+    client: WindmillPromotionClient | None = None,
 ) -> dict:
     w = client or wmill.Windmill()
     catalogue = load_catalogue(catalogue_yaml)

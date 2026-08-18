@@ -3,8 +3,11 @@ import json
 import pathlib
 
 import pytest
-
-from f.hermes_flow.policies.evaluator import PolicyContext, PolicyOutcome, evaluate_policy
+from f.hermes_flow.policies.evaluator import (
+    PolicyContext,
+    PolicyOutcome,
+    evaluate_policy,
+)
 from f.libraries.capability.models import (
     AutonomyAction,
     AutonomyLevel,

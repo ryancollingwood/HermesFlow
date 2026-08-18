@@ -24,7 +24,6 @@ by docs/CI (`windmill/tests/test_lineage_models.py` asserts they match).
 """
 from datetime import datetime, timezone
 from enum import Enum
-from typing import Optional
 from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field, field_validator
@@ -55,16 +54,16 @@ class ExecutionContext(BaseModel):
         default_factory=uuid4,
         description="Unique ID for this execution.",
     )
-    parent_trace_id: Optional[UUID] = Field(
+    parent_trace_id: UUID | None = Field(
         default=None,
         description="trace_id of the execution that spawned this one, if any "
         "(e.g. a flow step's sub-run). Absent for a top-level execution.",
     )
-    conversation_id: Optional[str] = Field(
+    conversation_id: str | None = Field(
         default=None,
         description="Hermes conversation/session this execution was requested from, if any.",
     )
-    request_id: Optional[str] = Field(
+    request_id: str | None = Field(
         default=None,
         description="Caller-supplied idempotency/correlation key for this specific request, if any.",
     )
@@ -91,8 +90,8 @@ class ExecutionContext(BaseModel):
     @field_validator("parent_trace_id")
     @classmethod
     def _parent_must_differ_from_self(
-        cls, v: Optional[UUID], info
-    ) -> Optional[UUID]:
+        cls, v: UUID | None, info
+    ) -> UUID | None:
         trace_id = info.data.get("trace_id")
         if v is not None and trace_id is not None and v == trace_id:
             raise ValueError(
@@ -131,13 +130,13 @@ class ArtifactRef(BaseModel):
         description="Where the content lives, e.g. "
         "file:///shared/artifacts/<hash[:2]>/<hash>.",
     )
-    size_bytes: Optional[int] = Field(
+    size_bytes: int | None = Field(
         default=None,
         ge=0,
         description="Artifact content size in bytes. HF-017 storage adapters always populate it; "
         "optional for backward compatibility with pre-HF-017 references.",
     )
-    media_type: Optional[str] = Field(
+    media_type: str | None = Field(
         default=None,
         min_length=1,
         description="IANA media type of the stored content. HF-017 adapters always populate it; "

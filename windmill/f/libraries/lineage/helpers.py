@@ -2,13 +2,11 @@
 from __future__ import annotations
 
 import json
-from typing import Optional
 from uuid import UUID
-
-from pydantic import BaseModel, Field
 
 from f.libraries.lineage.models import ArtifactRef, ArtifactStage, ExecutionContext
 from f.libraries.storage.artifacts import FilesystemArtifactStore
+from pydantic import BaseModel, Field
 
 
 class LineageError(ValueError):
@@ -27,18 +25,18 @@ class LineageState(BaseModel):
         return self.model_dump_json()
 
     @classmethod
-    def from_json(cls, value: str) -> "LineageState":
+    def from_json(cls, value: str) -> LineageState:
         return cls.model_validate_json(value)
 
 
 def begin_lineage(
-    context: Optional[ExecutionContext] = None,
+    context: ExecutionContext | None = None,
     *,
-    capability: Optional[str] = None,
-    capability_version: Optional[str] = None,
-    initiating_actor: Optional[str] = None,
-    conversation_id: Optional[str] = None,
-    request_id: Optional[str] = None,
+    capability: str | None = None,
+    capability_version: str | None = None,
+    initiating_actor: str | None = None,
+    conversation_id: str | None = None,
+    request_id: str | None = None,
 ) -> tuple[LineageState, ExecutionContext]:
     """Create missing context exactly once, at the workflow boundary."""
     if context is None:
@@ -64,7 +62,7 @@ def begin_lineage(
     return state, context
 
 
-def require_step_context(context: Optional[ExecutionContext]) -> ExecutionContext:
+def require_step_context(context: ExecutionContext | None) -> ExecutionContext:
     """Steps fail closed instead of independently inventing a new trace."""
     if context is None:
         raise LineageError(
@@ -79,7 +77,7 @@ def child_context(
     *,
     capability: str,
     capability_version: str,
-    initiating_actor: Optional[str] = None,
+    initiating_actor: str | None = None,
 ) -> ExecutionContext:
     require_step_context(parent)
     registered = state.contexts.get(parent.trace_id)
@@ -122,9 +120,9 @@ def write_artifact(
     content: bytes | str,
     *,
     stage: ArtifactStage,
-    media_type: Optional[str] = None,
-    inputs: Optional[list[ArtifactRef]] = None,
-    metadata: Optional[dict] = None,
+    media_type: str | None = None,
+    inputs: list[ArtifactRef] | None = None,
+    metadata: dict | None = None,
 ) -> ArtifactRef:
     upstream = inputs or []
     for artifact in upstream:

@@ -5,9 +5,13 @@ import pathlib
 from uuid import uuid4
 
 import pytest
+from f.libraries.lineage.models import (
+    ArtifactRef,
+    ArtifactStage,
+    ArtifactTombstone,
+    ExecutionContext,
+)
 from pydantic import ValidationError
-
-from f.libraries.lineage.models import ArtifactRef, ArtifactStage, ArtifactTombstone, ExecutionContext
 
 SHA256_OF_EMPTY = hashlib.sha256(b"").hexdigest()
 SCHEMAS_DIR = pathlib.Path(__file__).parent.parent.parent / "docs" / "schemas"

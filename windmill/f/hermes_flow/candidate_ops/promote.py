@@ -8,12 +8,10 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
-from typing import Any, Optional, Protocol
+from typing import Any, Protocol
 
 import wmill
-from pydantic import BaseModel, Field
-
-from f.hermes_flow.candidate_ops.diff import analyse_candidate, _get_script
+from f.hermes_flow.candidate_ops.diff import _get_script, analyse_candidate
 from f.hermes_flow.candidate_ops.models import CandidateRecord, metadata_variable_path
 from f.hermes_flow.catalogue.models import load_catalogue
 from f.hermes_flow.policies.evaluator import (
@@ -23,6 +21,7 @@ from f.hermes_flow.policies.evaluator import (
     evaluate_policy,
 )
 from f.libraries.capability.models import AutonomyAction
+from pydantic import BaseModel, Field
 
 
 class PromotionError(ValueError):
@@ -50,8 +49,8 @@ class WindmillPromotionClient(Protocol):
 class TestResult(BaseModel):
     test: str = Field(..., min_length=1)
     passed: bool
-    job_id: Optional[str] = None
-    details: Optional[str] = None
+    job_id: str | None = None
+    details: str | None = None
 
 
 class PromotionRecord(BaseModel):
@@ -62,7 +61,7 @@ class PromotionRecord(BaseModel):
     base_version: str
     promoted_version: str
     rollback_target: str
-    approved_by: Optional[str] = None
+    approved_by: str | None = None
     policy: dict
     required_tests: list[TestResult]
     promoted_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
@@ -100,8 +99,8 @@ def prepare_promotion(
     candidate_id: str,
     catalogue_yaml: str,
     test_results: list[dict],
-    candidate_capability_metadata: Optional[dict] = None,
-    client: Optional[WindmillPromotionClient] = None,
+    candidate_capability_metadata: dict | None = None,
+    client: WindmillPromotionClient | None = None,
 ) -> dict:
     w = client or wmill.Windmill()
     record = _candidate_record(w, candidate_id)
@@ -143,8 +142,8 @@ def prepare_promotion(
 def finalize_promotion(
     prepared: dict,
     approval_granted: bool,
-    approved_by: Optional[str] = None,
-    client: Optional[WindmillPromotionClient] = None,
+    approved_by: str | None = None,
+    client: WindmillPromotionClient | None = None,
 ) -> dict:
     w = client or wmill.Windmill()
     record = CandidateRecord.model_validate(prepared["candidate"])

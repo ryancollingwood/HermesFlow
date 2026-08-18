@@ -3,12 +3,10 @@ from __future__ import annotations
 
 import re
 from datetime import datetime, timedelta, timezone
-from typing import Any, Optional, Protocol
+from typing import Any, Protocol
 from urllib.parse import quote
 
 import wmill
-from pydantic import BaseModel, Field
-
 from f.hermes_flow.catalogue.models import Catalogue, CatalogueEntry, load_catalogue
 from f.hermes_flow.testing.runner import (
     TestExecutor,
@@ -20,6 +18,7 @@ from f.hermes_flow.testing.runner import (
     load_test_manifests,
     run_tests,
 )
+from pydantic import BaseModel, Field
 
 RUNNER_PATH = "f/hermes_flow/testing/scheduled_health"
 REPORT_PATH = "f/hermes_flow/testing/health_report"
@@ -32,8 +31,8 @@ class HealthState(BaseModel):
     active_version: str
     run_count: int = 0
     consecutive_failures: int = 0
-    last_status: Optional[str] = None
-    last_run_at: Optional[datetime] = None
+    last_status: str | None = None
+    last_run_at: datetime | None = None
     last_test_ids: list[str] = Field(default_factory=list)
     last_job_ids: list[str] = Field(default_factory=list)
     recent_statuses: list[str] = Field(default_factory=list, max_length=10)
@@ -58,13 +57,13 @@ class ScheduledHealthResult(BaseModel):
     consecutive_failures: int
     escalation_required: bool = False
     auto_disabled: bool = False
-    test_run: Optional[TestRunResult] = None
-    failure_record: Optional[HealthFailureRecord] = None
-    details: Optional[str] = None
+    test_run: TestRunResult | None = None
+    failure_record: HealthFailureRecord | None = None
+    details: str | None = None
 
 
 class HealthStateStore(Protocol):
-    def load(self, capability_path: str) -> Optional[HealthState]: ...
+    def load(self, capability_path: str) -> HealthState | None: ...
     def save(self, state: HealthState) -> None: ...
     def save_failure(self, state: HealthState, record: HealthFailureRecord) -> None: ...
 
@@ -107,7 +106,7 @@ class WindmillHealthStateStore:
         if response.status_code not in (200, 201):
             raise RuntimeError(f"failed to persist health state at {path}: {response.status_code}")
 
-    def load(self, capability_path: str) -> Optional[HealthState]:
+    def load(self, capability_path: str) -> HealthState | None:
         path = state_path(capability_path)
         response = self.client.get(
             f"/w/{self.client.workspace}/variables/get/{quote(path, safe='/')}",
@@ -235,9 +234,9 @@ def run_scheduled_health(
     manifest_yaml: str,
     capability_path: str,
     *,
-    store: Optional[HealthStateStore] = None,
-    executor: Optional[TestExecutor] = None,
-    now: Optional[datetime] = None,
+    store: HealthStateStore | None = None,
+    executor: TestExecutor | None = None,
+    now: datetime | None = None,
 ) -> ScheduledHealthResult:
     catalogue: Catalogue = load_catalogue(catalogue_yaml)
     entry = catalogue.get(capability_path)

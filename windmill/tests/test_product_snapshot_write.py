@@ -6,8 +6,6 @@ from urllib.parse import urlsplit
 from uuid import UUID
 
 import pytest
-from jsonschema import Draft202012Validator
-
 from f.capabilities.collection.extract_products import ProductProvenance
 from f.capabilities.collection.normalise_products import (
     NormalizedIdentifiers,
@@ -19,7 +17,7 @@ from f.capabilities.collection.product_snapshot_write import (
     persist_product_snapshots,
 )
 from f.libraries.lineage.models import ArtifactRef, ArtifactStage, ExecutionContext
-
+from jsonschema import Draft202012Validator
 
 ROOT = Path(__file__).parents[2]
 UP = ROOT / "collection_db" / "migrations" / "001_product_snapshots.up.sql"

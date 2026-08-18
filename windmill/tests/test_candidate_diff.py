@@ -2,9 +2,8 @@
 from copy import deepcopy
 
 from f.hermes_flow.candidate_ops.diff import analyse_candidate
-from f.hermes_flow.catalogue.models import Catalogue
-from f.libraries.capability.models import CapabilityMetadata, CapabilityMaturity
-from f.hermes_flow.catalogue.models import CapabilityKind, CatalogueEntry
+from f.hermes_flow.catalogue.models import CapabilityKind, Catalogue, CatalogueEntry
+from f.libraries.capability.models import CapabilityMaturity, CapabilityMetadata
 
 
 def entry(path, dependencies=(), tests=()):

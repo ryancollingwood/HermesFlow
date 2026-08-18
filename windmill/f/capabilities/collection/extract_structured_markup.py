@@ -4,13 +4,12 @@ from __future__ import annotations
 import hashlib
 import json
 from html.parser import HTMLParser
-from typing import Any, Optional
-
-from pydantic import BaseModel, Field, field_validator
+from typing import Any
 
 from f.libraries.lineage.helpers import LineageState
 from f.libraries.lineage.models import ArtifactRef
 from f.libraries.storage.artifacts import FilesystemArtifactStore
+from pydantic import BaseModel, Field, field_validator
 
 CAPABILITY_PATH = "f/capabilities/collection/extract_structured_markup"
 CAPABILITY_VERSION = "1.0.0"
@@ -21,7 +20,7 @@ class ExtractionProvenance(BaseModel):
     parser_version: str = CAPABILITY_VERSION
     source_artifact_id: str
     source_content_hash: str
-    source_url: Optional[str] = None
+    source_url: str | None = None
     block_index: int = Field(..., ge=0)
     source_path: str
 
@@ -29,9 +28,9 @@ class ExtractionProvenance(BaseModel):
 class StructuredCandidate(BaseModel):
     candidate_id: str = Field(..., pattern=r"^[0-9a-f]{64}$")
     types: list[str] = Field(default_factory=list)
-    identifier: Optional[str] = None
-    name: Optional[str] = None
-    url: Optional[str] = None
+    identifier: str | None = None
+    name: str | None = None
+    url: str | None = None
     data: dict[str, Any]
     provenance: ExtractionProvenance
 
@@ -42,7 +41,7 @@ class StructuredCandidate(BaseModel):
 
 
 class ExtractionWarning(BaseModel):
-    block_index: Optional[int] = None
+    block_index: int | None = None
     code: str
     message: str
 
@@ -67,7 +66,7 @@ class _JsonLdParser(HTMLParser):
         self._capturing = False
         self._parts: list[str] = []
 
-    def handle_starttag(self, tag: str, attrs: list[tuple[str, Optional[str]]]) -> None:
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         if tag.lower() != "script" or self._capturing:
             return
         attributes = {key.lower(): (value or "") for key, value in attrs}
@@ -96,7 +95,7 @@ def _types(value: Any) -> list[str]:
     return []
 
 
-def _optional_string(value: Any) -> Optional[str]:
+def _optional_string(value: Any) -> str | None:
     return value if isinstance(value, str) and value else None
 
 
@@ -112,7 +111,7 @@ def _candidate_id(data: dict[str, Any], provenance: ExtractionProvenance) -> str
     return hashlib.sha256(canonical.encode()).hexdigest()
 
 
-def _nodes(value: Any) -> tuple[list[tuple[dict[str, Any], str]], Optional[str]]:
+def _nodes(value: Any) -> tuple[list[tuple[dict[str, Any], str]], str | None]:
     if isinstance(value, dict):
         graph = value.get("@graph")
         if graph is None:
@@ -137,7 +136,7 @@ def _nodes(value: Any) -> tuple[list[tuple[dict[str, Any], str]], Optional[str]]
     return [], "JSON-LD root must be an object or array of objects"
 
 
-def _artifact_source_url(store: FilesystemArtifactStore, artifact: ArtifactRef) -> Optional[str]:
+def _artifact_source_url(store: FilesystemArtifactStore, artifact: ArtifactRef) -> str | None:
     metadata = store.read_metadata(artifact.artifact_id).get("metadata", {})
     return _optional_string(metadata.get("url"))
 
@@ -145,8 +144,8 @@ def _artifact_source_url(store: FilesystemArtifactStore, artifact: ArtifactRef) 
 def extract_structured_markup(
     raw_artifact: ArtifactRef,
     *,
-    lineage: Optional[LineageState] = None,
-    store: Optional[FilesystemArtifactStore] = None,
+    lineage: LineageState | None = None,
+    store: FilesystemArtifactStore | None = None,
     max_html_bytes: int = 10_000_000,
     max_json_bytes: int = 1_000_000,
     max_blocks: int = 100,

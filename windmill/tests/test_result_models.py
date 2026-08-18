@@ -4,8 +4,6 @@ import pathlib
 from uuid import UUID
 
 import pytest
-from pydantic import ValidationError
-
 from f.libraries.lineage.models import ArtifactStage
 from f.libraries.results.models import (
     ArtifactSummary,
@@ -17,6 +15,7 @@ from f.libraries.results.models import (
     WindmillJobRef,
     render_summary,
 )
+from pydantic import ValidationError
 
 SCHEMAS_DIR = pathlib.Path(__file__).parent.parent.parent / "docs" / "schemas"
 FIXED_ARTIFACT_ID = UUID("00000000-0000-0000-0000-000000000001")

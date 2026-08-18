@@ -20,12 +20,10 @@ from __future__ import annotations
 
 import json
 from datetime import datetime, timezone
-from typing import Any, Literal, Optional, Protocol
+from typing import Any, Literal, Protocol
 from urllib.parse import quote
 
 import wmill
-from pydantic import BaseModel, Field
-
 from f.hermes_flow.candidate_ops.diff import _get_script
 from f.hermes_flow.candidate_ops.lifecycle import _impact, rollback_capability
 from f.hermes_flow.candidate_ops.promote import WindmillPromotionClient
@@ -40,6 +38,7 @@ from f.hermes_flow.testing.scheduled_health import (
     WindmillHealthStateStore,
     _safe_path,
 )
+from pydantic import BaseModel, Field
 
 
 class RollbackRecommendationError(ValueError):
@@ -53,8 +52,8 @@ class HealthStateReader(Protocol):
 class HealthEvidenceSnapshot(BaseModel):
     run_count: int = Field(ge=1)
     consecutive_failures: int = Field(ge=0)
-    failure_category: Optional[str] = None
-    recorded_at: Optional[datetime] = None
+    failure_category: str | None = None
+    recorded_at: datetime | None = None
     test_ids: list[str] = Field(default_factory=list)
 
 
@@ -69,7 +68,7 @@ class RollbackRecommendation(BaseModel):
     transient_only: bool
     recommended: bool
     reason: str
-    current_evidence: Optional[HealthEvidenceSnapshot] = None
+    current_evidence: HealthEvidenceSnapshot | None = None
     previous_evidence: list[HealthEvidenceSnapshot] = Field(default_factory=list)
     required_tests: list[str] = Field(default_factory=list)
     affected_workflows: list[str] = Field(default_factory=list)
@@ -85,14 +84,14 @@ class RollbackExecutionRecord(BaseModel):
         "approval_rejected", "rollback_succeeded", "verification_failed",
     ]
     capability_path: str
-    restore_version: Optional[str] = None
+    restore_version: str | None = None
     reason: str
     initiating_job_id: str
-    approved_by: Optional[str] = None
-    rollback: Optional[dict] = None
-    verification: Optional[dict] = None
-    verification_passed: Optional[bool] = None
-    details: Optional[str] = None
+    approved_by: str | None = None
+    rollback: dict | None = None
+    verification: dict | None = None
+    verification_passed: bool | None = None
+    details: str | None = None
     executed_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -109,7 +108,7 @@ def _failure_record_path(capability_path: str, run_count: int) -> str:
 
 def _load_failure_record(
     client: WindmillPromotionClient, path: str
-) -> Optional[HealthFailureRecord]:
+) -> HealthFailureRecord | None:
     response = client.get(
         f"/w/{client.workspace}/variables/get/{quote(path, safe='/')}", raise_for_status=False
     )
@@ -151,8 +150,8 @@ def recommend_rollback(
     catalogue_yaml: str,
     capability_path: str,
     *,
-    health_store: Optional[HealthStateReader] = None,
-    client: Optional[WindmillPromotionClient] = None,
+    health_store: HealthStateReader | None = None,
+    client: WindmillPromotionClient | None = None,
     failure_lookback: int = 10,
 ) -> RollbackRecommendation:
     w = client or wmill.Windmill()
@@ -269,12 +268,12 @@ def execute_approved_rollback(
     initiating_job_id: str,
     test_results: list[dict],
     approval_granted: bool,
-    approved_by: Optional[str] = None,
+    approved_by: str | None = None,
     *,
     acknowledge_side_effects: bool = False,
-    expected_current_version: Optional[str] = None,
-    executor: Optional[TestExecutor] = None,
-    client: Optional[WindmillPromotionClient] = None,
+    expected_current_version: str | None = None,
+    executor: TestExecutor | None = None,
+    client: WindmillPromotionClient | None = None,
 ) -> dict:
     w = client or wmill.Windmill()
     rec = (

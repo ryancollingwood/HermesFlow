@@ -4,15 +4,14 @@ from __future__ import annotations
 import json
 import os
 import time
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Optional, TypedDict
+from typing import Any, TypedDict
 
 import jsonschema  # noqa: F401 -- required by imported structured-output validation
 import psycopg2  # noqa: F401 -- required by imported persistence/comparison capabilities
-from pydantic import BaseModel, ConfigDict, Field, field_validator
-
 from f.capabilities.collection.compare_product_snapshots import (
     ProductComparisonResult,
     compare_from_database,
@@ -26,7 +25,12 @@ from f.capabilities.collection.product_snapshot_write import (
 from f.capabilities.collection.render_product_report import store_product_report
 from f.capabilities.collection.web_fetch import web_fetch
 from f.hermes.client import hermes_endpoint
-from f.libraries.lineage.helpers import LineageState, begin_lineage, child_context, write_artifact
+from f.libraries.lineage.helpers import (
+    LineageState,
+    begin_lineage,
+    child_context,
+    write_artifact,
+)
 from f.libraries.lineage.models import ArtifactRef, ArtifactStage, ExecutionContext
 from f.libraries.results.models import (
     ArtifactSummary,
@@ -36,6 +40,7 @@ from f.libraries.results.models import (
     WindmillJobRef,
 )
 from f.libraries.storage.artifacts import FilesystemArtifactStore
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 WORKFLOW_PATH = "f/workflows/product_collection"
 WORKFLOW_VERSION = "1.0.0"
@@ -69,9 +74,9 @@ class ProductSource(BaseModel):
     label: str = Field(..., min_length=1, max_length=200)
     url: str = Field(..., min_length=1)
     allowed_domains: list[str] = Field(..., min_length=1, max_length=20)
-    source_type: Optional[str] = None
+    source_type: str | None = None
     headers: dict[str, str] = Field(default_factory=dict)
-    enable_ai_fallback: Optional[bool] = None
+    enable_ai_fallback: bool | None = None
 
 
 class SourceStatus(str, Enum):
@@ -89,13 +94,13 @@ class SourceRunResult(BaseModel):
     status: SourceStatus
     fetch_trace_id: str
     persistence_trace_id: str
-    raw_artifact: Optional[ArtifactRef] = None
-    normalized_artifact: Optional[ArtifactRef] = None
-    extraction_method: Optional[str] = None
+    raw_artifact: ArtifactRef | None = None
+    normalized_artifact: ArtifactRef | None = None
+    extraction_method: str | None = None
     product_count: int = Field(default=0, ge=0)
-    persistence: Optional[ProductSnapshotWriteResult] = None
+    persistence: ProductSnapshotWriteResult | None = None
     warnings: list[str] = Field(default_factory=list)
-    error: Optional[str] = None
+    error: str | None = None
 
 
 class ProductCollectionWorkflowResult(BaseModel):
@@ -108,9 +113,9 @@ class ProductCollectionWorkflowResult(BaseModel):
     ai_fallback_enabled: bool
     capability_versions: dict[str, str]
     sources: list[SourceRunResult]
-    comparison: Optional[ProductComparisonResult] = None
-    dataset_artifact: Optional[ArtifactRef] = None
-    report_artifact: Optional[ArtifactRef] = None
+    comparison: ProductComparisonResult | None = None
+    dataset_artifact: ArtifactRef | None = None
+    report_artifact: ArtifactRef | None = None
     execution_result: ExecutionResult
     lineage: LineageState
 
@@ -178,7 +183,7 @@ def _process_source(
     state: LineageState,
     store: FilesystemArtifactStore,
     db: postgresql,
-    hermes_conn: Optional[dict],
+    hermes_conn: dict | None,
     workflow_input: WorkflowInput,
     fetcher: Callable,
     extractor: Callable,
@@ -288,16 +293,16 @@ def run_product_collection(
     sources: list[dict[str, Any] | ProductSource],
     db: postgresql,
     *,
-    hermes_conn: Optional[dict] = None,
+    hermes_conn: dict | None = None,
     enable_ai_fallback: bool = False,
     max_concurrency: int = 4,
     timeout_seconds: float = 30,
     max_size_bytes: int = 5_000_000,
     max_retries: int = 2,
     max_products_per_source: int = 100,
-    job_id: Optional[str] = None,
+    job_id: str | None = None,
     workspace: str = "main",
-    store: Optional[FilesystemArtifactStore] = None,
+    store: FilesystemArtifactStore | None = None,
     fetcher: Callable = web_fetch,
     extractor: Callable = extract_products,
     normalizer: Callable = normalise_products,

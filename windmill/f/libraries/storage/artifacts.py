@@ -16,7 +16,7 @@ import json
 import os
 import tempfile
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 from urllib.parse import unquote, urlparse
 from uuid import UUID
 
@@ -93,9 +93,9 @@ class FilesystemArtifactStore:
         stage: ArtifactStage,
         creator_capability: str,
         creator_capability_version: str,
-        media_type: Optional[str] = None,
-        derived_from: Optional[list[UUID]] = None,
-        metadata: Optional[dict[str, Any]] = None,
+        media_type: str | None = None,
+        derived_from: list[UUID] | None = None,
+        metadata: dict[str, Any] | None = None,
     ) -> ArtifactRef:
         if isinstance(content, str):
             raw = content.encode("utf-8")

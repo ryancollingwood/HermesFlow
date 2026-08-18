@@ -5,7 +5,6 @@ import pathlib
 
 import pytest
 import yaml
-
 from f.hermes_flow.catalogue.models import (
     CapabilityKind,
     Catalogue,

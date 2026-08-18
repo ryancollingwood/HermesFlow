@@ -3,17 +3,15 @@ from __future__ import annotations
 
 import hashlib
 import html
-from html.parser import HTMLParser
 import json
 import re
-from typing import Any, Literal, Optional
+from html.parser import HTMLParser
+from typing import Any, Literal
 from uuid import UUID, uuid4
-
-from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from f.libraries.lineage.models import ArtifactRef, ArtifactStage
 from f.libraries.storage.artifacts import FilesystemArtifactStore
-
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 CAPABILITY_PATH = "f/hermes_flow/repair/promote_fixture"
 CAPABILITY_VERSION = "1.0.0"
@@ -54,7 +52,7 @@ class FixtureExpectedBehavior(BaseModel):
     minimum_item_counts: dict[str, int] = Field(default_factory=dict)
 
     @model_validator(mode="after")
-    def _has_machine_checkable_expectation(self) -> "FixtureExpectedBehavior":
+    def _has_machine_checkable_expectation(self) -> FixtureExpectedBehavior:
         if not (self.required_paths or self.expected_values or self.minimum_item_counts):
             raise ValueError("expected behavior must declare at least one assertion")
         if any(value < 0 for value in self.minimum_item_counts.values()):
@@ -86,7 +84,7 @@ class FixtureBinding(BaseModel):
     max_data_bytes: int = Field(default=1_000_000, ge=1, le=100_000_000)
 
     @model_validator(mode="after")
-    def _fixture_argument_is_reserved_for_fixture(self) -> "FixtureBinding":
+    def _fixture_argument_is_reserved_for_fixture(self) -> FixtureBinding:
         if self.fixture_argument in self.candidate_args:
             raise ValueError("candidate_args must not override fixture_argument")
         if _metadata_contains_secret(self.candidate_args):
@@ -109,7 +107,7 @@ class SanitizationRules(BaseModel):
     drop_html_comments: bool = True
 
     @model_validator(mode="after")
-    def _field_rules_do_not_conflict(self) -> "SanitizationRules":
+    def _field_rules_do_not_conflict(self) -> SanitizationRules:
         if any(not item.strip() for item in [*self.redact_fields, *self.remove_fields]):
             raise ValueError("sanitization field names must not be blank")
         overlap = sorted(
@@ -150,7 +148,7 @@ class SourceDriftFixture(BaseModel):
     promotion_trace_id: UUID
 
     @model_validator(mode="after")
-    def _fixture_identity_matches_artifact(self) -> "SourceDriftFixture":
+    def _fixture_identity_matches_artifact(self) -> SourceDriftFixture:
         if self.fixture_artifact.content_hash not in self.fixture_id:
             raise ValueError("fixture_id must contain the sanitised artifact content hash")
         if self.fixture_artifact.trace_id != self.promotion_trace_id:
@@ -203,7 +201,7 @@ def _metadata_contains_secret(value: Any) -> bool:
     return False
 
 
-def _field_action(name: str, rules: SanitizationRules) -> Optional[str]:
+def _field_action(name: str, rules: SanitizationRules) -> str | None:
     normalised = _normalise_name(name)
     remove = {_normalise_name(item) for item in rules.remove_fields}
     redact = {_normalise_name(item) for item in rules.redact_fields}
@@ -261,7 +259,7 @@ class _SanitizingHTMLParser(HTMLParser):
         self.removed_fields: list[str] = []
         self.json_script_depth = 0
 
-    def _attributes(self, tag: str, attrs: list[tuple[str, Optional[str]]]) -> str:
+    def _attributes(self, tag: str, attrs: list[tuple[str, str | None]]) -> str:
         marker_sensitive = any(
             name.lower() in {"name", "property", "id"}
             and value is not None
@@ -378,7 +376,7 @@ def sanitize_fixture(
     )
 
 
-def _infer_format(media_type: Optional[str]) -> Literal["html", "json"]:
+def _infer_format(media_type: str | None) -> Literal["html", "json"]:
     resolved = (media_type or "").split(";", 1)[0].strip().lower()
     if resolved in {"text/html", "application/xhtml+xml"}:
         return "html"
@@ -397,8 +395,8 @@ def promote_source_drift_fixture(
     *,
     binding: FixtureBinding | dict | None = None,
     sanitization_rules: SanitizationRules | dict | None = None,
-    fixture_format: Optional[Literal["html", "json"]] = None,
-    store: Optional[FilesystemArtifactStore] = None,
+    fixture_format: Literal["html", "json"] | None = None,
+    store: FilesystemArtifactStore | None = None,
 ) -> SourceDriftFixture:
     if not failed_job_id or len(failed_job_id) > 200:
         raise FixturePromotionError("failed_job_id must contain 1 to 200 characters")
@@ -473,8 +471,8 @@ def main(
     failed_job_id: str,
     capability_path: str,
     expected_behavior: dict,
-    binding: Optional[dict] = None,
-    sanitization_rules: Optional[dict] = None,
+    binding: dict | None = None,
+    sanitization_rules: dict | None = None,
     fixture_format: str = "",
 ) -> dict:
     result = promote_source_drift_fixture(

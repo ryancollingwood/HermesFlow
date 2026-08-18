@@ -34,12 +34,10 @@ doubles as a self-test — see `docs/schemas/` for the checked-in copy used by
 docs/CI (`windmill/tests/test_result_models.py` asserts it matches).
 """
 from enum import Enum
-from typing import Optional
 from uuid import UUID
 
-from pydantic import BaseModel, Field, model_validator
-
 from f.libraries.lineage.models import ArtifactStage
+from pydantic import BaseModel, Field, model_validator
 
 SCHEMA_VERSION = "1.0"
 
@@ -84,7 +82,7 @@ class ArtifactSummary(BaseModel):
     artifact_id: UUID
     stage: ArtifactStage
     storage_uri: str = Field(..., min_length=1)
-    description: Optional[str] = Field(
+    description: str | None = Field(
         default=None, description="Short, human-facing description of what this artifact is."
     )
 
@@ -100,7 +98,7 @@ class CapabilityChange(BaseModel):
 
     path: str = Field(..., min_length=1)
     kind: CapabilityChangeKind
-    from_version: Optional[str] = None
+    from_version: str | None = None
     to_version: str = Field(..., min_length=1)
 
 
@@ -113,27 +111,27 @@ class ExecutionResult(BaseModel):
     )
     outcome: ResultOutcome
     execution_type: ExecutionType
-    workflow_path: Optional[str] = Field(
+    workflow_path: str | None = Field(
         default=None,
         description="Windmill script/flow path that ran. Required when execution_type "
         "is windmill_job; always None for conversational results.",
     )
-    capability_version: Optional[str] = Field(
+    capability_version: str | None = Field(
         default=None,
         description="Version of workflow_path that ran, if known.",
     )
-    job: Optional[WindmillJobRef] = Field(
+    job: WindmillJobRef | None = Field(
         default=None,
         description="The Windmill job that proves this ran. Required whenever outcome "
         "is success or partial for a windmill_job result. May be absent for a failure "
         "that occurred before a job could be submitted (e.g. Windmill unreachable) or "
         "for a conversational result, where it must always be absent.",
     )
-    duration_seconds: Optional[float] = Field(default=None, ge=0)
+    duration_seconds: float | None = Field(default=None, ge=0)
     artifacts: list[ArtifactSummary] = Field(default_factory=list)
     warnings: list[str] = Field(default_factory=list)
     capability_changes: list[CapabilityChange] = Field(default_factory=list)
-    failure_summary: Optional[str] = Field(
+    failure_summary: str | None = Field(
         default=None,
         description="Actionable explanation of what went wrong and, where possible, what "
         "to do about it. Required when outcome is failure.",

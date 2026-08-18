@@ -8,8 +8,6 @@ import pathlib
 from dataclasses import dataclass, field
 
 import pytest
-from pydantic import ValidationError
-
 from f.hermes_flow.candidate_ops.create import CandidateCreationError, create_candidate
 from f.hermes_flow.candidate_ops.models import (
     CANDIDATES_ROOT,
@@ -18,6 +16,7 @@ from f.hermes_flow.candidate_ops.models import (
     compute_candidate_path,
     metadata_variable_path,
 )
+from pydantic import ValidationError
 
 SCHEMAS_DIR = pathlib.Path(__file__).parent.parent.parent / "docs" / "schemas"
 

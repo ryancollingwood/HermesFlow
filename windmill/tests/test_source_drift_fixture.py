@@ -4,23 +4,24 @@ from pathlib import Path
 from uuid import uuid4
 
 import pytest
-
 from f.hermes_flow.catalogue.models import CapabilityKind, Catalogue, CatalogueEntry
 from f.hermes_flow.repair.promote_fixture import (
     FixturePromotionError,
     SourceDriftFixture,
     promote_source_drift_fixture,
 )
-from f.hermes_flow.testing.regression import run_regression_tests, select_regression_tests
+from f.hermes_flow.testing.regression import (
+    run_regression_tests,
+    select_regression_tests,
+)
 from f.hermes_flow.testing.runner import TestManifest as RunnerManifest
 from f.hermes_flow.testing.source_drift_fixture import (
     SourceDriftFixtureRunResult,
     run_source_drift_fixture,
 )
-from f.libraries.capability.models import CapabilityMetadata, CapabilityMaturity
+from f.libraries.capability.models import CapabilityMaturity, CapabilityMetadata
 from f.libraries.lineage.models import ArtifactStage
 from f.libraries.storage.artifacts import FilesystemArtifactStore
-
 
 CAPABILITY = "f/capabilities/collection/source_selector"
 CANDIDATE = "f/hermes_flow/candidates/aaaaaaaaaaaaaaaa"

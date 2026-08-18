@@ -28,7 +28,6 @@ doubles as a self-test — see `docs/schemas/` for the checked-in copies used
 by docs/CI (`windmill/tests/test_capability_models.py` asserts they match).
 """
 from enum import Enum
-from typing import Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -138,19 +137,19 @@ class CapabilityLimits(BaseModel):
     expects (``PolicyContext.requested_*``) against the declared bound.
     """
 
-    timeout_seconds: Optional[int] = Field(default=None, gt=0)
-    max_concurrency: Optional[int] = Field(default=None, gt=0)
-    rate_limit_per_minute: Optional[int] = Field(default=None, gt=0)
-    max_response_bytes: Optional[int] = Field(
+    timeout_seconds: int | None = Field(default=None, gt=0)
+    max_concurrency: int | None = Field(default=None, gt=0)
+    rate_limit_per_minute: int | None = Field(default=None, gt=0)
+    max_response_bytes: int | None = Field(
         default=None, gt=0,
         description="Largest response/output size this capability may return, in bytes.",
     )
-    max_record_count: Optional[int] = Field(
+    max_record_count: int | None = Field(
         default=None, gt=0,
         description="Largest number of records (rows, items, documents) one invocation may "
         "produce or process, e.g. a dataset extraction's row count.",
     )
-    max_cost_usd: Optional[float] = Field(
+    max_cost_usd: float | None = Field(
         default=None, gt=0,
         description="Largest estimated model/inference cost, in USD, one invocation may incur. "
         "See f.libraries.retention.models.estimate_cost_usd for the caller-side estimate this "

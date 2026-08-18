@@ -1,0 +1,37 @@
+#!/usr/bin/env bash
+#
+# Auto-fixes staged Python files with ruff before they're committed. Scope
+# matches CI's ruff step (windmill/ + the hermesflow MCP scripts) — see
+# .github/workflows/ci.yml.
+#
+# Errors ruff can't fix automatically still block the commit; fix them by
+# hand, or review unsafe fixes yourself with
+# `ruff check --fix --unsafe-fixes --diff`.
+#
+# Installed via `make install-hooks` (sets core.hooksPath to .githooks).
+
+if ! command -v ruff >/dev/null 2>&1; then
+  echo "pre-commit: ruff not on PATH, skipping autofix (nothing was linted)" >&2
+  exit 0
+fi
+
+files=()
+while IFS= read -r f; do
+  files+=("$f")
+done < <(git diff --cached --name-only --diff-filter=ACM \
+  | grep -E '^(windmill/|hermes/skills/workflow-orchestration/hermesflow/scripts/).*\.py$')
+
+if [ ${#files[@]} -eq 0 ]; then
+  exit 0
+fi
+
+ruff check --fix -- "${files[@]}"
+git add -- "${files[@]}"
+
+if ! ruff check -- "${files[@]}"; then
+  echo >&2
+  echo "pre-commit: ruff found errors it can't auto-fix (see above)." >&2
+  echo "Fix them by hand, or review unsafe fixes first with:" >&2
+  echo "  ruff check --fix --unsafe-fixes --diff -- <file>" >&2
+  exit 1
+fi

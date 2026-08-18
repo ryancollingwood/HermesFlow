@@ -8,21 +8,27 @@ from uuid import uuid4
 
 import pytest
 import yaml
-
 from f.hermes_flow.candidate_ops.models import CandidateRecord, metadata_variable_path
 from f.hermes_flow.repair.finalize_retry import RetryRecord, finalize_and_retry
 from f.hermes_flow.repair.models import (
-    ActiveCapabilityEvidence, BoundedDocument, FailureCategory,
-    FailureClassification, OriginalJob, RedactionSummary, RepairContext,
-    RepairContextLimits, TruncationSummary,
+    ActiveCapabilityEvidence,
+    BoundedDocument,
+    FailureCategory,
+    FailureClassification,
+    OriginalJob,
+    RedactionSummary,
+    RepairContext,
+    RepairContextLimits,
+    TruncationSummary,
 )
 from f.hermes_flow.repair.orchestrate import (
-    AttemptLimitExceeded, RepairPreparation, prepare_adaptive_repair,
+    AttemptLimitExceeded,
+    RepairPreparation,
+    prepare_adaptive_repair,
 )
 from f.hermes_flow.testing.source_drift_fixture import run_source_drift_fixture
 from f.libraries.lineage.models import ArtifactStage, ExecutionContext
 from f.libraries.storage.artifacts import FilesystemArtifactStore
-
 
 ACTIVE = "f/capabilities/retail/select_products"
 CONSUMER = "f/workflows/retail_collection"
