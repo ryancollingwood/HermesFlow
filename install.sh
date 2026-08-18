@@ -632,7 +632,7 @@ if [ "$DRY_RUN" -eq 1 ]; then
   echo "  Provider:        $PROVIDER (api key: $([ -n "$API_KEY" ] && echo present || echo ABSENT))"
   echo "  Default model:   $MODEL"
   echo "  Profile:         ${PROFILE:-none}"
-  echo "  Secrets:         generate any blank/weak of API_SERVER_KEY, WM_DB_PASSWORD, HINDSIGHT_DB_PASSWORD, GRAFANA_ADMIN_PASSWORD, COLLECTION_DB_ADMIN_PASSWORD, BASEROW_*, DIRECTUS_*, WINDMILL_COLLECTION_DB_PASSWORD"
+  echo "  Secrets:         generate any blank/weak of API_SERVER_KEY, WM_DB_PASSWORD, HINDSIGHT_DB_PASSWORD, GRAFANA_ADMIN_PASSWORD, COLLECTION_DB_ADMIN_PASSWORD, BASEROW_*, DIRECTUS_*, WINDMILL_COLLECTION_DB_PASSWORD, HERMES_DASHBOARD_BASIC_AUTH_*"
   echo "  Memory:          $(yn $WITH_MEMORY)$([ "$HS_REMOTE" -eq 1 ] && echo " (remote via $PROVIDER)")"
   [ -n "$HS_MODEL$HS_BASE_URL" ] && echo "  Hindsight LLM:   model=${HS_MODEL:-<.env>} base=${HS_BASE_URL:-<.env>}"
   echo "  Windmill:        $(yn $WITH_WINDMILL)"
@@ -927,6 +927,15 @@ echo
 echo "Done. Services:"
 echo "  Windmill:        http://windmill.localhost"
 echo "  Hermes dash:     http://hermes.localhost"
+# `|| true` on both: under `set -e -o pipefail` a non-matching grep would abort
+# the installer on a legacy .env that predates these keys. Same reason the echo
+# is an if-block rather than a `[ -n ... ] && echo` list, which exits 1 when the
+# test fails and would likewise trip set -e.
+DASH_USER=$(grep -E '^HERMES_DASHBOARD_BASIC_AUTH_USERNAME=' .env 2>/dev/null | head -1 | cut -d= -f2- || true)
+DASH_PASS=$(grep -E '^HERMES_DASHBOARD_BASIC_AUTH_PASSWORD=' .env 2>/dev/null | head -1 | cut -d= -f2- || true)
+if [ -n "$DASH_USER" ]; then
+  echo "                   login: $DASH_USER / $DASH_PASS  (also in .env)"
+fi
 echo "  Hindsight UI:    http://hindsight.localhost"
 echo "  Headroom stats:  http://headroom.localhost/stats"
 echo

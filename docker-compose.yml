@@ -107,6 +107,10 @@ services:
       - HERMES_DASHBOARD_HOST=${HERMES_DASHBOARD_HOST:-0.0.0.0}
       - HERMES_DASHBOARD_PORT=${HERMES_DASHBOARD_PORT:-9119}
       - HERMES_DASHBOARD_INSECURE=${HERMES_DASHBOARD_INSECURE:-}
+      # Auth provider for the dashboard. The gate engages on any non-loopback
+      # bind and fails closed without a provider — which s6 then respawn-loops.
+      - HERMES_DASHBOARD_BASIC_AUTH_USERNAME=${HERMES_DASHBOARD_BASIC_AUTH_USERNAME:-}
+      - HERMES_DASHBOARD_BASIC_AUTH_PASSWORD=${HERMES_DASHBOARD_BASIC_AUTH_PASSWORD:-}
       # OpenAI-compatible API server. Needed for the dashboard / external tools
       # (e.g. Windmill) to reach the gateway. If enabled, API_SERVER_KEY must be
       # >= 8 chars — generate with: openssl rand -hex 32
