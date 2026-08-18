@@ -5,7 +5,6 @@ import json
 from uuid import uuid4
 
 import pytest
-
 from f.libraries.lineage.models import ArtifactRef, ArtifactStage
 from f.libraries.storage.artifacts import (
     ArtifactIntegrityError,

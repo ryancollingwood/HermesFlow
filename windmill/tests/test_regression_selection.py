@@ -1,9 +1,12 @@
 """HF-016 dependency-aware regression selection tests."""
 from f.hermes_flow.catalogue.models import CapabilityKind, Catalogue, CatalogueEntry
-from f.hermes_flow.testing.regression import run_regression_tests, select_regression_tests
+from f.hermes_flow.testing.regression import (
+    run_regression_tests,
+    select_regression_tests,
+)
 from f.hermes_flow.testing.runner import TestManifest as RunnerManifest
 from f.hermes_flow.testing.runner import TestSpec as RunnerSpec
-from f.libraries.capability.models import CapabilityMetadata, CapabilityMaturity
+from f.libraries.capability.models import CapabilityMaturity, CapabilityMetadata
 
 
 def entry(path, dependencies=(), tests=(), kind=CapabilityKind.script):

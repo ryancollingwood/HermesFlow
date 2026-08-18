@@ -9,10 +9,9 @@ from __future__ import annotations
 
 import difflib
 from collections import deque
-from typing import Any, Optional, Protocol
+from typing import Any, Protocol
 
 import wmill
-
 from f.hermes_flow.candidate_ops.models import CandidateRecord, metadata_variable_path
 from f.hermes_flow.catalogue.models import Catalogue, load_catalogue
 
@@ -111,7 +110,7 @@ def analyse_candidate(
     candidate_path: str,
     active_path: str,
     catalogue: Catalogue,
-    candidate_capability_metadata: Optional[dict] = None,
+    candidate_capability_metadata: dict | None = None,
 ) -> dict:
     """Compare snapshots and return the HF-012 promotion evidence envelope."""
     active_entry = catalogue.get(active_path)
@@ -194,8 +193,8 @@ def _get_script(client: WindmillReadClient, path: str) -> dict:
 def analyse_candidate_from_windmill(
     candidate_id: str,
     catalogue_yaml: str,
-    candidate_capability_metadata: Optional[dict] = None,
-    client: Optional[WindmillReadClient] = None,
+    candidate_capability_metadata: dict | None = None,
+    client: WindmillReadClient | None = None,
 ) -> dict:
     w = client or wmill.Windmill()
     response = w.get(
@@ -217,7 +216,7 @@ def analyse_candidate_from_windmill(
     )
 
 
-def main(candidate_id: str, catalogue_yaml: str, candidate_capability_metadata: Optional[dict] = None) -> dict:
+def main(candidate_id: str, catalogue_yaml: str, candidate_capability_metadata: dict | None = None) -> dict:
     return analyse_candidate_from_windmill(
         candidate_id, catalogue_yaml, candidate_capability_metadata=candidate_capability_metadata
     )

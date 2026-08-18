@@ -36,12 +36,10 @@ Python environment, not just under local pytest.
 """
 from collections import Counter
 from enum import Enum
-from typing import Optional
 
 import yaml
-from pydantic import BaseModel, Field, ValidationError, field_validator
-
 from f.libraries.capability.models import CapabilityMetadata
+from pydantic import BaseModel, Field, ValidationError, field_validator
 
 SCHEMA_VERSION = "1.0"
 
@@ -115,7 +113,7 @@ class Catalogue(BaseModel):
     def list_flows(self) -> list[CatalogueEntry]:
         return [e for e in self.entries if e.kind is CapabilityKind.flow]
 
-    def get(self, path: str) -> Optional[CatalogueEntry]:
+    def get(self, path: str) -> CatalogueEntry | None:
         return next((e for e in self.entries if e.metadata.path == path), None)
 
 

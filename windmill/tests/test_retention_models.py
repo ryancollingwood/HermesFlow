@@ -4,7 +4,6 @@ import pathlib
 from datetime import datetime, timedelta, timezone
 
 import pytest
-
 from f.libraries.retention.models import (
     DEFAULT_RETENTION_POLICIES,
     RetentionClass,

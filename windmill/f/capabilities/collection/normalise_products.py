@@ -7,15 +7,14 @@ import re
 import unicodedata
 from decimal import Decimal, InvalidOperation
 from enum import Enum
-from typing import Any, Optional
-
-from pydantic import BaseModel, ConfigDict, Field
+from typing import Any
 
 from f.capabilities.collection.extract_products import (
     ProductExtractionResult,
     ProductProvenance,
 )
 from f.libraries.lineage.models import ArtifactRef
+from pydantic import BaseModel, ConfigDict, Field
 
 CAPABILITY_PATH = "f/capabilities/collection/normalise_products"
 CAPABILITY_VERSION = "1.0.0"
@@ -64,14 +63,14 @@ class OriginalOffer(BaseModel):
 class NormalizedOffer(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    amount: Optional[str] = Field(default=None, pattern=r"^(0|[1-9][0-9]*)(\.[0-9]+)?$")
+    amount: str | None = Field(default=None, pattern=r"^(0|[1-9][0-9]*)(\.[0-9]+)?$")
     price_status: ValueStatus
-    currency: Optional[str] = Field(default=None, pattern=r"^[A-Z]{3}$")
+    currency: str | None = Field(default=None, pattern=r"^[A-Z]{3}$")
     currency_status: CurrencyStatus
     availability: Availability
     availability_status: AvailabilityStatus
-    seller: Optional[str] = None
-    url: Optional[str] = None
+    seller: str | None = None
+    url: str | None = None
     source_offer_index: int = Field(..., ge=0)
     original: OriginalOffer
     warnings: list[str] = Field(default_factory=list)
@@ -80,9 +79,9 @@ class NormalizedOffer(BaseModel):
 class NormalizedIdentifiers(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    sku: Optional[str] = None
-    gtin: Optional[str] = Field(default=None, pattern=r"^[0-9]{8,14}$")
-    mpn: Optional[str] = None
+    sku: str | None = None
+    gtin: str | None = Field(default=None, pattern=r"^[0-9]{8,14}$")
+    mpn: str | None = None
     missing: list[str] = Field(default_factory=list)
     invalid: list[str] = Field(default_factory=list)
 
@@ -93,9 +92,9 @@ class NormalizedProduct(BaseModel):
     normalized_product_id: str = Field(..., pattern=r"^[0-9a-f]{64}$")
     source_product_id: str = Field(..., pattern=r"^[0-9a-f]{64}$")
     name: str = Field(..., min_length=1)
-    brand: Optional[str] = None
-    description: Optional[str] = None
-    canonical_url: Optional[str] = None
+    brand: str | None = None
+    description: str | None = None
+    canonical_url: str | None = None
     images: list[str] = Field(default_factory=list)
     identifiers: NormalizedIdentifiers
     offers: list[NormalizedOffer] = Field(default_factory=list)
@@ -127,18 +126,7 @@ _CURRENCY_ALIASES = {
     "€": "EUR", "£": "GBP",
 }
 _AMBIGUOUS_SYMBOLS = {"$", "¥"}
-_ISO_4217_CODES = frozenset("""
-AED AFN ALL AMD ANG AOA ARS AUD AWG AZN BAM BBD BDT BGN BHD BIF BMD BND BOB
-BOV BRL BSD BTN BWP BYN BZD CAD CDF CHE CHF CHW CLF CLP CNY COP COU CRC CUC
-CUP CVE CZK DJF DKK DOP DZD EGP ERN ETB EUR FJD FKP GBP GEL GHS GIP GMD GNF
-GTQ GYD HKD HNL HTG HUF IDR ILS INR IQD IRR ISK JMD JOD JPY KES KGS KHR
-KMF KPW KRW KWD KYD KZT LAK LBP LKR LRD LSL LYD MAD MDL MGA MKD MMK MNT
-MOP MRU MUR MVR MWK MXN MXV MYR MZN NAD NGN NIO NOK NPR NZD OMR PAB PEN
-PGK PHP PKR PLN PYG QAR RON RSD RUB RWF SAR SBD SCR SDG SEK SGD SHP SLE SLL
-SOS SRD SSP STN SVC SYP SZL THB TJS TMT TND TOP TRY TTD TWD TZS UAH UGX
-USD USN UYI UYU UYW UZS VED VES VND VUV WST XAF XAG XAU XBA XBB XBC XBD
-XCD XCG XDR XOF XPD XPF XPT XSU XTS XUA XXX YER ZAR ZMW ZWG
-""".split())
+_ISO_4217_CODES = frozenset(["AED", "AFN", "ALL", "AMD", "ANG", "AOA", "ARS", "AUD", "AWG", "AZN", "BAM", "BBD", "BDT", "BGN", "BHD", "BIF", "BMD", "BND", "BOB", "BOV", "BRL", "BSD", "BTN", "BWP", "BYN", "BZD", "CAD", "CDF", "CHE", "CHF", "CHW", "CLF", "CLP", "CNY", "COP", "COU", "CRC", "CUC", "CUP", "CVE", "CZK", "DJF", "DKK", "DOP", "DZD", "EGP", "ERN", "ETB", "EUR", "FJD", "FKP", "GBP", "GEL", "GHS", "GIP", "GMD", "GNF", "GTQ", "GYD", "HKD", "HNL", "HTG", "HUF", "IDR", "ILS", "INR", "IQD", "IRR", "ISK", "JMD", "JOD", "JPY", "KES", "KGS", "KHR", "KMF", "KPW", "KRW", "KWD", "KYD", "KZT", "LAK", "LBP", "LKR", "LRD", "LSL", "LYD", "MAD", "MDL", "MGA", "MKD", "MMK", "MNT", "MOP", "MRU", "MUR", "MVR", "MWK", "MXN", "MXV", "MYR", "MZN", "NAD", "NGN", "NIO", "NOK", "NPR", "NZD", "OMR", "PAB", "PEN", "PGK", "PHP", "PKR", "PLN", "PYG", "QAR", "RON", "RSD", "RUB", "RWF", "SAR", "SBD", "SCR", "SDG", "SEK", "SGD", "SHP", "SLE", "SLL", "SOS", "SRD", "SSP", "STN", "SVC", "SYP", "SZL", "THB", "TJS", "TMT", "TND", "TOP", "TRY", "TTD", "TWD", "TZS", "UAH", "UGX", "USD", "USN", "UYI", "UYU", "UYW", "UZS", "VED", "VES", "VND", "VUV", "WST", "XAF", "XAG", "XAU", "XBA", "XBB", "XBC", "XBD", "XCD", "XCG", "XDR", "XOF", "XPD", "XPF", "XPT", "XSU", "XTS", "XUA", "XXX", "YER", "ZAR", "ZMW", "ZWG"])
 _AVAILABILITY = {
     "instock": Availability.in_stock,
     "limitedavailability": Availability.in_stock,
@@ -151,7 +139,7 @@ _AVAILABILITY = {
 }
 
 
-def _text(value: Any) -> Optional[str]:
+def _text(value: Any) -> str | None:
     if value is None:
         return None
     text = unicodedata.normalize("NFC", str(value))
@@ -159,12 +147,12 @@ def _text(value: Any) -> Optional[str]:
     return text or None
 
 
-def _identifier(value: Any) -> Optional[str]:
+def _identifier(value: Any) -> str | None:
     text = _text(value)
     return text.upper() if text else None
 
 
-def _gtin(value: Any) -> tuple[Optional[str], bool]:
+def _gtin(value: Any) -> tuple[str | None, bool]:
     text = _text(value)
     if not text:
         return None, False
@@ -174,7 +162,7 @@ def _gtin(value: Any) -> tuple[Optional[str], bool]:
     return None, True
 
 
-def _currency_token(value: Any) -> tuple[Optional[str], CurrencyStatus]:
+def _currency_token(value: Any) -> tuple[str | None, CurrencyStatus]:
     text = _text(value)
     if not text:
         return None, CurrencyStatus.missing
@@ -191,7 +179,7 @@ def _currency_token(value: Any) -> tuple[Optional[str], CurrencyStatus]:
     return None, CurrencyStatus.invalid
 
 
-def _embedded_currency(text: str) -> tuple[Optional[str], CurrencyStatus, str]:
+def _embedded_currency(text: str) -> tuple[str | None, CurrencyStatus, str]:
     working = text
     for token in sorted(_CURRENCY_ALIASES, key=len, reverse=True):
         if token.upper() in working.upper():
@@ -211,7 +199,7 @@ def _embedded_currency(text: str) -> tuple[Optional[str], CurrencyStatus, str]:
     return None, CurrencyStatus.missing, working
 
 
-def _decimal_string(value: Any) -> tuple[Optional[str], ValueStatus, Optional[str], CurrencyStatus]:
+def _decimal_string(value: Any) -> tuple[str | None, ValueStatus, str | None, CurrencyStatus]:
     if value is None or (isinstance(value, str) and not value.strip()):
         return None, ValueStatus.missing, None, CurrencyStatus.missing
     if isinstance(value, bool):
@@ -263,9 +251,9 @@ def _decimal_string(value: Any) -> tuple[Optional[str], ValueStatus, Optional[st
 
 def _normalise_currency(
     raw_currency: Any,
-    embedded_code: Optional[str],
+    embedded_code: str | None,
     embedded_status: CurrencyStatus,
-) -> tuple[Optional[str], CurrencyStatus]:
+) -> tuple[str | None, CurrencyStatus]:
     explicit_code, explicit_status = _currency_token(raw_currency)
     if explicit_status == CurrencyStatus.missing:
         return embedded_code, embedded_status

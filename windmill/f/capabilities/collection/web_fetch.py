@@ -4,12 +4,10 @@ from __future__ import annotations
 import ipaddress
 import socket
 import time
-from typing import Callable, Optional
+from collections.abc import Callable
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import httpx
-from pydantic import BaseModel, Field
-
 from f.libraries.lineage.helpers import (
     LineageState,
     begin_lineage,
@@ -18,6 +16,7 @@ from f.libraries.lineage.helpers import (
 )
 from f.libraries.lineage.models import ArtifactRef, ArtifactStage, ExecutionContext
 from f.libraries.storage.artifacts import FilesystemArtifactStore
+from pydantic import BaseModel, Field
 
 CAPABILITY_PATH = "f/capabilities/collection/web_fetch"
 CAPABILITY_VERSION = "1.0.0"
@@ -37,23 +36,23 @@ class FetchPolicyError(ValueError):
 class FetchAttempt(BaseModel):
     attempt: int
     status: str
-    status_code: Optional[int] = None
-    error: Optional[str] = None
+    status_code: int | None = None
+    error: str | None = None
 
 
 class WebFetchResult(BaseModel):
     schema_version: str = "1.0"
     status: str
     requested_url: str
-    final_url: Optional[str] = None
-    status_code: Optional[int] = None
-    content_type: Optional[str] = None
+    final_url: str | None = None
+    status_code: int | None = None
+    content_type: str | None = None
     headers_summary: dict[str, str] = Field(default_factory=dict)
-    raw_artifact: Optional[ArtifactRef] = None
+    raw_artifact: ArtifactRef | None = None
     attempts: list[FetchAttempt]
     redirects: list[str] = Field(default_factory=list)
     retryable: bool = False
-    error: Optional[str] = None
+    error: str | None = None
     lineage: LineageState
 
 
@@ -133,7 +132,7 @@ def _headers_summary(headers: httpx.Headers) -> dict[str, str]:
     }
 
 
-def _content_type(headers: httpx.Headers) -> Optional[str]:
+def _content_type(headers: httpx.Headers) -> str | None:
     value = headers.get("content-type")
     return value.split(";", 1)[0].strip().lower() if value else None
 
@@ -169,18 +168,18 @@ def _read_bounded(response: httpx.Response, max_size_bytes: int) -> bytes:
 def web_fetch(
     url: str,
     allowed_domains: list[str],
-    headers: Optional[dict[str, str]] = None,
+    headers: dict[str, str] | None = None,
     timeout_seconds: float = 30,
     max_size_bytes: int = 5_000_000,
     max_retries: int = 2,
     max_redirects: int = 5,
     retry_backoff_seconds: float = 0.25,
     *,
-    context: Optional[ExecutionContext] = None,
-    lineage: Optional[LineageState] = None,
-    store: Optional[FilesystemArtifactStore] = None,
-    client: Optional[httpx.Client] = None,
-    resolver: Optional[Callable[[str, int], list[str]]] = None,
+    context: ExecutionContext | None = None,
+    lineage: LineageState | None = None,
+    store: FilesystemArtifactStore | None = None,
+    client: httpx.Client | None = None,
+    resolver: Callable[[str, int], list[str]] | None = None,
     sleeper: Callable[[float], None] = time.sleep,
 ) -> WebFetchResult:
     if timeout_seconds <= 0 or timeout_seconds > 300:

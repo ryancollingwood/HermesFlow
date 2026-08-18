@@ -3,7 +3,6 @@ import json
 from dataclasses import dataclass, field
 
 import pytest
-
 from f.hermes_flow.candidate_ops.models import CandidateRecord, metadata_variable_path
 from f.hermes_flow.candidate_ops.promote import (
     PromotionConflict,

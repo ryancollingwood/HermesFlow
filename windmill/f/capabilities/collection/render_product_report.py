@@ -2,9 +2,6 @@
 from __future__ import annotations
 
 import json
-from typing import Optional
-
-from pydantic import BaseModel, ConfigDict
 
 from f.capabilities.collection.compare_product_snapshots import ProductComparisonResult
 from f.libraries.lineage.helpers import LineageState, write_artifact
@@ -17,6 +14,7 @@ from f.libraries.results.models import (
     WindmillJobRef,
 )
 from f.libraries.storage.artifacts import FilesystemArtifactStore
+from pydantic import BaseModel, ConfigDict
 
 CAPABILITY_PATH = "f/capabilities/collection/render_product_report"
 CAPABILITY_VERSION = "1.0.0"
@@ -147,8 +145,8 @@ def store_product_report(
     execution_context: ExecutionContext | dict,
     job: WindmillJobRef | dict,
     *,
-    store: Optional[FilesystemArtifactStore] = None,
-    duration_seconds: Optional[float] = None,
+    store: FilesystemArtifactStore | None = None,
+    duration_seconds: float | None = None,
 ) -> ProductReportResult:
     result = ProductComparisonResult.model_validate(comparison)
     state = LineageState.model_validate(lineage)

@@ -54,10 +54,9 @@ working fine under local pytest (which never calls `_real_client()` when a
 fake `client` is injected). Caught by actually deploying and running this
 script live, not just by local tests passing.
 """
-from typing import Optional, Protocol
+from typing import Protocol
 
 import wmill
-
 from f.hermes_flow.candidate_ops.models import (
     CANDIDATES_ROOT,
     CandidateRecord,
@@ -106,16 +105,16 @@ def create_candidate(
     reason: str,
     content: str,
     language: str = "python3",
-    source_path: Optional[str] = None,
-    base_version: Optional[str] = None,
-    conversation_id: Optional[str] = None,
-    request_id: Optional[str] = None,
-    generated_by_capability: Optional[str] = None,
-    failed_job_id: Optional[str] = None,
-    repair_context_sha256: Optional[str] = None,
-    generation_trace_id: Optional[str] = None,
-    generation_artifact_ids: Optional[list[str]] = None,
-    client: Optional[WindmillAdminClient] = None,
+    source_path: str | None = None,
+    base_version: str | None = None,
+    conversation_id: str | None = None,
+    request_id: str | None = None,
+    generated_by_capability: str | None = None,
+    failed_job_id: str | None = None,
+    repair_context_sha256: str | None = None,
+    generation_trace_id: str | None = None,
+    generation_artifact_ids: list[str] | None = None,
+    client: WindmillAdminClient | None = None,
 ) -> dict:
     """Create (or idempotently return) a candidate. Returns a dict with an
     "idempotent" bool plus the CandidateRecord's fields."""
@@ -218,7 +217,7 @@ def main(
     failed_job_id: str = "",
     repair_context_sha256: str = "",
     generation_trace_id: str = "",
-    generation_artifact_ids: Optional[list[str]] = None,
+    generation_artifact_ids: list[str] | None = None,
 ) -> dict:
     """Windmill entrypoint. Empty-string optionals (Windmill has no None in its UI
     forms) are normalized to None before delegating to create_candidate()."""

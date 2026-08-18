@@ -2,7 +2,6 @@
 from uuid import uuid4
 
 import pytest
-
 from f.libraries.lineage.helpers import (
     LineageError,
     LineageState,

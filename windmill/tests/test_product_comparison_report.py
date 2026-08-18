@@ -6,8 +6,6 @@ from urllib.parse import urlsplit
 from uuid import UUID
 
 import pytest
-from jsonschema import Draft202012Validator
-
 from f.capabilities.collection.compare_product_snapshots import (
     ProductComparisonResult,
     SnapshotRow,
@@ -38,7 +36,7 @@ from f.libraries.lineage.helpers import (
 )
 from f.libraries.lineage.models import ArtifactStage
 from f.libraries.storage.artifacts import FilesystemArtifactStore
-
+from jsonschema import Draft202012Validator
 
 FIXTURES = Path(__file__).parent / "fixtures" / "product_comparison"
 SCHEMAS = Path(__file__).parents[2] / "docs" / "schemas"

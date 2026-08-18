@@ -2,10 +2,9 @@
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Optional
+from typing import Any
 
 from pydantic import BaseModel, Field
-
 
 SCHEMA_VERSION = "1.0"
 
@@ -47,8 +46,8 @@ class OriginalJob(BaseModel):
 
 class ActiveCapabilityEvidence(BaseModel):
     path: str = Field(..., min_length=1, max_length=500)
-    capability_version: Optional[str] = Field(default=None, max_length=200)
-    windmill_hash: Optional[str] = Field(
+    capability_version: str | None = Field(default=None, max_length=200)
+    windmill_hash: str | None = Field(
         default=None,
         max_length=500,
         description="Windmill's immutable active-script hash captured during inspection.",
@@ -64,26 +63,26 @@ class FailureClassification(BaseModel):
 
 
 class ArtifactEvidence(BaseModel):
-    artifact_id: Optional[str] = Field(default=None, max_length=200)
-    stage: Optional[str] = Field(default=None, max_length=100)
-    storage_uri: Optional[str] = Field(default=None, max_length=2000)
-    description: Optional[str] = Field(default=None, max_length=1000)
+    artifact_id: str | None = Field(default=None, max_length=200)
+    stage: str | None = Field(default=None, max_length=100)
+    storage_uri: str | None = Field(default=None, max_length=2000)
+    description: str | None = Field(default=None, max_length=1000)
 
 
 class DependencyEvidence(BaseModel):
     path: str = Field(..., min_length=1, max_length=500)
     relationship: str = Field(..., min_length=1, max_length=50)
     distance: int = Field(ge=1)
-    via: Optional[str] = Field(default=None, max_length=500)
+    via: str | None = Field(default=None, max_length=500)
     tests: list[str] = Field(default_factory=list, max_length=50)
 
 
 class RecentTestEvidence(BaseModel):
     test: str = Field(..., min_length=1, max_length=500)
     status: str = Field(..., min_length=1, max_length=50)
-    job_id: Optional[str] = Field(default=None, max_length=200)
-    recorded_at: Optional[str] = Field(default=None, max_length=100)
-    details: Optional[str] = Field(default=None, max_length=2000)
+    job_id: str | None = Field(default=None, max_length=200)
+    recorded_at: str | None = Field(default=None, max_length=100)
+    details: str | None = Field(default=None, max_length=2000)
 
 
 class RedactionSummary(BaseModel):

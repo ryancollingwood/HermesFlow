@@ -2,18 +2,16 @@
 from __future__ import annotations
 
 import ast
-from collections import Counter
 import difflib
 import hashlib
 import json
 import math
 import re
 import sys
-from typing import Any, Literal, Optional
+from collections import Counter
+from typing import Any, Literal
 
 import wmill
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
-
 from f.hermes.client import hermes_endpoint
 from f.hermes_flow.candidate_ops.create import create_candidate
 from f.hermes_flow.catalogue.models import CatalogueEntry, load_catalogue
@@ -21,7 +19,7 @@ from f.hermes_flow.repair.models import RepairContext
 from f.libraries.ai.invoke_hermes_structured import invoke_hermes_structured
 from f.libraries.lineage.models import ArtifactRef, ExecutionContext
 from f.libraries.storage.artifacts import FilesystemArtifactStore
-
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 CAPABILITY_PATH = "f/hermes_flow/repair/generate_candidate"
 CAPABILITY_VERSION = "1.0.0"
@@ -68,7 +66,7 @@ class RepairGenerationResult(BaseModel):
     status: Literal["candidate_created", "rejected"]
     failed_job_id: str
     source_path: str
-    source_version: Optional[str] = None
+    source_version: str | None = None
     source_windmill_hash: str
     repair_context_sha256: str
     generation_prompt_sha256: str
@@ -76,10 +74,10 @@ class RepairGenerationResult(BaseModel):
     generation_artifacts: list[ArtifactRef]
     model: str
     attempts: list[dict[str, Any]]
-    proposal: Optional[RepairPatchProposal] = None
-    validation: Optional[PatchValidation] = None
-    candidate: Optional[dict[str, Any]] = None
-    rejection_reason: Optional[str] = None
+    proposal: RepairPatchProposal | None = None
+    validation: PatchValidation | None = None
+    candidate: dict[str, Any] | None = None
+    rejection_reason: str | None = None
 
 
 def build_generation_prompt(context: RepairContext) -> str:
@@ -279,7 +277,7 @@ def _rejected_result(
     prompt_digest: str,
     invocation,
     reason: str,
-    proposal: Optional[RepairPatchProposal] = None,
+    proposal: RepairPatchProposal | None = None,
 ) -> RepairGenerationResult:
     return RepairGenerationResult(
         status="rejected",
@@ -310,7 +308,7 @@ def generate_repair_candidate(
     max_change_ratio: float = 0.35,
     candidate_client=None,
     hermes_client=None,
-    store: Optional[FilesystemArtifactStore] = None,
+    store: FilesystemArtifactStore | None = None,
 ) -> RepairGenerationResult:
     if max_changed_lines < 1:
         raise RepairGenerationError("max_changed_lines must be positive")

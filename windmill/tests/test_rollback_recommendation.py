@@ -6,7 +6,6 @@ from pathlib import Path
 from urllib.parse import unquote
 
 import pytest
-
 from f.hermes_flow.candidate_ops.rollback_recommendation import (
     RollbackRecommendation,
     RollbackRecommendationError,

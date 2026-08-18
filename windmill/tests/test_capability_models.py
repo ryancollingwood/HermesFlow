@@ -3,8 +3,6 @@ import json
 import pathlib
 
 import pytest
-from pydantic import ValidationError
-
 from f.libraries.capability.models import (
     ALWAYS_APPROVAL_REQUIRED,
     AutonomyAction,
@@ -15,6 +13,7 @@ from f.libraries.capability.models import (
     CapabilityMaturity,
     CapabilityMetadata,
 )
+from pydantic import ValidationError
 
 SCHEMAS_DIR = pathlib.Path(__file__).parent.parent.parent / "docs" / "schemas"
 

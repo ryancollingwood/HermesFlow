@@ -3,15 +3,15 @@ from __future__ import annotations
 
 import hashlib
 import json
+from collections.abc import Callable
 from enum import Enum
-from typing import Callable, Optional, TypedDict
+from typing import TypedDict
 from uuid import UUID
 
 import psycopg2
-from pydantic import BaseModel, ConfigDict, Field
-
 from f.capabilities.collection.normalise_products import ProductNormalizationResult
 from f.libraries.lineage.models import ExecutionContext
+from pydantic import BaseModel, ConfigDict, Field
 
 CAPABILITY_PATH = "f/capabilities/collection/product_snapshot_write"
 CAPABILITY_VERSION = "1.0.0"
@@ -36,7 +36,7 @@ class SnapshotDisposition(str, Enum):
 class SnapshotWriteRecord(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    snapshot_id: Optional[int] = Field(default=None, ge=1)
+    snapshot_id: int | None = Field(default=None, ge=1)
     normalized_product_id: str = Field(..., pattern=r"^[0-9a-f]{64}$")
     source_product_id: str = Field(..., pattern=r"^[0-9a-f]{64}$")
     payload_hash: str = Field(..., pattern=r"^[0-9a-f]{64}$")
@@ -124,10 +124,10 @@ def _connect(db: postgresql):
 def persist_product_snapshots(
     product_normalization: ProductNormalizationResult | dict,
     execution_context: ExecutionContext | dict,
-    db: Optional[postgresql] = None,
+    db: postgresql | None = None,
     *,
     preview: bool = False,
-    connection_factory: Optional[Callable] = None,
+    connection_factory: Callable | None = None,
 ) -> ProductSnapshotWriteResult:
     """Plan or transactionally upsert every normalized product snapshot."""
     normalization = ProductNormalizationResult.model_validate(product_normalization)
@@ -163,35 +163,34 @@ def persist_product_snapshots(
     conn = connect(db)
     records = []
     try:
-        with conn:
-            with conn.cursor() as cursor:
-                for product, payload, payload_hash in payloads:
-                    cursor.execute(_UPSERT, (
-                        str(execution.trace_id),
-                        str(source.trace_id),
-                        str(source.artifact_id),
-                        source.content_hash,
-                        product.normalized_product_id,
-                        product.source_product_id,
-                        normalization.schema_version,
-                        normalization.normalization_version,
-                        payload,
-                        payload_hash,
-                        str(execution.trace_id),
-                        str(source.artifact_id),
-                        product.normalized_product_id,
-                    ))
-                    snapshot_id, inserted, unchanged = cursor.fetchone()
-                    records.append(SnapshotWriteRecord(
-                        snapshot_id=snapshot_id,
-                        normalized_product_id=product.normalized_product_id,
-                        source_product_id=product.source_product_id,
-                        payload_hash=payload_hash,
-                        disposition=(SnapshotDisposition.unchanged if unchanged else (
-                            SnapshotDisposition.inserted
-                            if inserted else SnapshotDisposition.updated
-                        )),
-                    ))
+        with conn, conn.cursor() as cursor:
+            for product, payload, payload_hash in payloads:
+                cursor.execute(_UPSERT, (
+                    str(execution.trace_id),
+                    str(source.trace_id),
+                    str(source.artifact_id),
+                    source.content_hash,
+                    product.normalized_product_id,
+                    product.source_product_id,
+                    normalization.schema_version,
+                    normalization.normalization_version,
+                    payload,
+                    payload_hash,
+                    str(execution.trace_id),
+                    str(source.artifact_id),
+                    product.normalized_product_id,
+                ))
+                snapshot_id, inserted, unchanged = cursor.fetchone()
+                records.append(SnapshotWriteRecord(
+                    snapshot_id=snapshot_id,
+                    normalized_product_id=product.normalized_product_id,
+                    source_product_id=product.source_product_id,
+                    payload_hash=payload_hash,
+                    disposition=(SnapshotDisposition.unchanged if unchanged else (
+                        SnapshotDisposition.inserted
+                        if inserted else SnapshotDisposition.updated
+                    )),
+                ))
     finally:
         conn.close()
     inserted_count = sum(

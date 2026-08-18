@@ -5,7 +5,6 @@ import json
 from pathlib import Path
 
 import pytest
-
 from f.hermes_flow.catalogue.models import CapabilityKind, Catalogue, CatalogueEntry
 from f.hermes_flow.repair.inspection import (
     FailureInspectionError,
@@ -13,9 +12,12 @@ from f.hermes_flow.repair.inspection import (
     classify_failure,
     inspect_failure_from_windmill,
 )
-from f.hermes_flow.repair.models import FailureCategory, RepairContext, RepairContextLimits
-from f.libraries.capability.models import CapabilityMetadata, CapabilityMaturity
-
+from f.hermes_flow.repair.models import (
+    FailureCategory,
+    RepairContext,
+    RepairContextLimits,
+)
+from f.libraries.capability.models import CapabilityMaturity, CapabilityMetadata
 
 CAPABILITY = "f/capabilities/collection/extract_products"
 CONSUMER = "f/workflows/product_collection"

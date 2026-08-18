@@ -10,7 +10,6 @@ from f.libraries.ai.invoke_hermes_structured import (
 )
 from f.libraries.storage.artifacts import FilesystemArtifactStore
 
-
 SCHEMA = {
     "type": "object",
     "properties": {"answer": {"type": "string"}},

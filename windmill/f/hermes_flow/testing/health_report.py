@@ -5,15 +5,17 @@ import os
 from datetime import datetime, timezone
 from enum import Enum
 from pathlib import Path
-from typing import Optional, Protocol
+from typing import Protocol
 from urllib.parse import quote
 
 import wmill
-from pydantic import BaseModel, Field
-
 from f.hermes_flow.catalogue.models import CapabilityKind, load_catalogue
-from f.hermes_flow.testing.scheduled_health import HealthState, WindmillHealthStateStore, _safe_path
-
+from f.hermes_flow.testing.scheduled_health import (
+    HealthState,
+    WindmillHealthStateStore,
+    _safe_path,
+)
+from pydantic import BaseModel, Field
 
 CAPABILITY_PATH = "f/hermes_flow/testing/health_report"
 CAPABILITY_VERSION = "1.0.0"
@@ -38,12 +40,12 @@ class CapabilityHealthRow(BaseModel):
     kind: CapabilityKind
     maturity: str
     active_version: str
-    tested_version: Optional[str] = None
+    tested_version: str | None = None
     owners: list[str]
     status: HealthStatus
-    last_test_status: Optional[str] = None
-    last_test_at: Optional[datetime] = None
-    age_seconds: Optional[int] = Field(default=None, ge=0)
+    last_test_status: str | None = None
+    last_test_at: datetime | None = None
+    age_seconds: int | None = Field(default=None, ge=0)
     freshness: Freshness
     consecutive_failures: int = Field(default=0, ge=0)
     recent_failure_count: int = Field(default=0, ge=0, le=10)
@@ -54,8 +56,8 @@ class CapabilityHealthRow(BaseModel):
     scheduled_health_enabled: bool
     scheduled_dependents: list[str] = Field(default_factory=list)
     asset_url: str
-    last_job_url: Optional[str] = None
-    schedule_url: Optional[str] = None
+    last_job_url: str | None = None
+    schedule_url: str | None = None
 
 
 class CapabilityHealthReport(BaseModel):
@@ -69,7 +71,7 @@ class CapabilityHealthReport(BaseModel):
 
 
 class HealthStateReader(Protocol):
-    def load(self, capability_path: str) -> Optional[HealthState]: ...
+    def load(self, capability_path: str) -> HealthState | None: ...
 
 
 def _asset_url(base_url: str, workspace: str, kind: CapabilityKind, path: str) -> str:
@@ -96,8 +98,8 @@ def _schedule_url(base_url: str, workspace: str, capability_path: str) -> str:
 
 
 def _status(
-    state: Optional[HealthState], active_version: str, now: datetime, stale_after_seconds: int
-) -> tuple[HealthStatus, Freshness, Optional[int]]:
+    state: HealthState | None, active_version: str, now: datetime, stale_after_seconds: int
+) -> tuple[HealthStatus, Freshness, int | None]:
     if state is None or state.last_run_at is None:
         return HealthStatus.untested, Freshness.missing, None
     age_seconds = max(0, int((now - state.last_run_at).total_seconds()))
@@ -120,7 +122,7 @@ def build_capability_health_report(
     windmill_base_url: str = "http://windmill.localhost",
     workspace: str = "main",
     stale_after_seconds: int = 86_400,
-    now: Optional[datetime] = None,
+    now: datetime | None = None,
 ) -> CapabilityHealthReport:
     if stale_after_seconds < 60:
         raise ValueError("stale_after_seconds must be at least 60")
@@ -184,7 +186,7 @@ def build_capability_health_report(
     )
 
 
-def _escape_label(value: Optional[str]) -> str:
+def _escape_label(value: str | None) -> str:
     return (value or "").replace("\\", "\\\\").replace("\n", "\\n").replace('"', '\\"')
 
 
@@ -286,7 +288,7 @@ def generate_health_report(
     stale_after_seconds: int = 86_400,
     metrics_path: str | Path = DEFAULT_METRICS_PATH,
     client=None,
-    now: Optional[datetime] = None,
+    now: datetime | None = None,
 ) -> CapabilityHealthReport:
     windmill = client or wmill.Windmill()
     report = build_capability_health_report(

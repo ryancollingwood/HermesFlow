@@ -28,8 +28,8 @@ import os
 
 
 def main(command: str = "build", full_refresh: bool = False) -> dict:
-    from wmill import get_resource
     from dbt.cli.main import dbtRunner
+    from wmill import get_resource
 
     db = get_resource("f/data_platform/data_platform_db")
 

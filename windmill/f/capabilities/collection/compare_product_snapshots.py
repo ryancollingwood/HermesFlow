@@ -4,17 +4,16 @@ from __future__ import annotations
 import re
 from collections import defaultdict
 from decimal import Decimal
-from typing import Any, Optional, TypedDict
+from typing import Any, TypedDict
 from uuid import UUID
 
 import psycopg2
-from pydantic import BaseModel, ConfigDict, Field
-
 from f.capabilities.collection.normalise_products import (
     CurrencyStatus,
     NormalizedProduct,
     ValueStatus,
 )
+from pydantic import BaseModel, ConfigDict, Field
 
 CAPABILITY_PATH = "f/capabilities/collection/compare_product_snapshots"
 CAPABILITY_VERSION = "1.0.0"
@@ -33,7 +32,7 @@ class SnapshotSourceRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     execution_trace_id: UUID
-    label: Optional[str] = None
+    label: str | None = None
 
 
 class SnapshotRow(BaseModel):
@@ -54,19 +53,19 @@ class ComparisonWarning(BaseModel):
 
     code: str
     message: str
-    execution_trace_id: Optional[UUID] = None
-    source_artifact_id: Optional[UUID] = None
-    normalized_product_id: Optional[str] = None
+    execution_trace_id: UUID | None = None
+    source_artifact_id: UUID | None = None
+    normalized_product_id: str | None = None
 
 
 class SourceCoverage(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     execution_trace_id: UUID
-    source_trace_id: Optional[UUID] = None
-    source_artifact_id: Optional[UUID] = None
-    source_content_hash: Optional[str] = Field(default=None, pattern=r"^[0-9a-f]{64}$")
-    label: Optional[str] = None
+    source_trace_id: UUID | None = None
+    source_artifact_id: UUID | None = None
+    source_content_hash: str | None = Field(default=None, pattern=r"^[0-9a-f]{64}$")
+    label: str | None = None
     product_count: int = Field(..., ge=0)
     unique_product_count: int = Field(..., ge=0)
     priced_product_count: int = Field(..., ge=0)
@@ -82,11 +81,11 @@ class ProductObservation(BaseModel):
     normalized_product_id: str
     source_product_id: str
     name: str
-    brand: Optional[str] = None
-    sku: Optional[str] = None
-    gtin: Optional[str] = None
-    mpn: Optional[str] = None
-    canonical_url: Optional[str] = None
+    brand: str | None = None
+    sku: str | None = None
+    gtin: str | None = None
+    mpn: str | None = None
+    canonical_url: str | None = None
     prices: dict[str, str] = Field(default_factory=dict)
 
 
@@ -106,7 +105,7 @@ class PriceDifference(BaseModel):
     minimum: str
     maximum: str
     absolute_difference: str
-    percentage_difference: Optional[str] = None
+    percentage_difference: str | None = None
 
 
 class ProductComparisonGroup(BaseModel):
@@ -181,7 +180,7 @@ def load_snapshot_rows(db: postgresql, requests: list[SnapshotSourceRequest]) ->
         conn.close()
 
 
-def _token(value: Optional[str]) -> str:
+def _token(value: str | None) -> str:
     return re.sub(r"[^a-z0-9]+", " ", (value or "").casefold()).strip()
 
 
@@ -262,7 +261,7 @@ def _price_differences(observations: list[ProductObservation]) -> list[PriceDiff
         minimum = Decimal(values[0].amount)
         maximum = Decimal(values[-1].amount)
         difference = maximum - minimum
-        percentage = None if minimum == 0 else difference / minimum * Decimal("100")
+        percentage = None if minimum == 0 else difference / minimum * Decimal(100)
         comparisons.append(PriceDifference(
             currency=currency,
             values=values,

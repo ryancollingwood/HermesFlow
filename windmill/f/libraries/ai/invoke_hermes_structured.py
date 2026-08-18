@@ -3,10 +3,7 @@ from __future__ import annotations
 
 import json
 import re
-from typing import Any, Optional
-
-from jsonschema import Draft202012Validator
-from pydantic import BaseModel, Field
+from typing import Any
 
 from f.hermes.client import NO_MEMORY_GUARD, get_client, hermes_endpoint
 from f.libraries.lineage.helpers import (
@@ -18,28 +15,30 @@ from f.libraries.lineage.helpers import (
 )
 from f.libraries.lineage.models import ArtifactRef, ArtifactStage, ExecutionContext
 from f.libraries.storage.artifacts import FilesystemArtifactStore
+from jsonschema import Draft202012Validator
+from pydantic import BaseModel, Field
 
 CAPABILITY_PATH = "f/libraries/ai/invoke_hermes_structured"
 CAPABILITY_VERSION = "1.0.0"
-_SENSITIVE_KEY = re.compile(r"(?:api[_-]?key|authorization|password|secret|token)", re.I)
+_SENSITIVE_KEY = re.compile(r"(?:api[_-]?key|authorization|password|secret|token)", re.IGNORECASE)
 
 
 class InvocationAttempt(BaseModel):
     attempt: int
     status: str
-    error: Optional[str] = None
+    error: str | None = None
     validation_errors: list[str] = Field(default_factory=list)
-    raw_artifact_id: Optional[str] = None
-    usage: Optional[dict[str, Any]] = None
+    raw_artifact_id: str | None = None
+    usage: dict[str, Any] | None = None
 
 
 class StructuredInvocationResult(BaseModel):
     schema_version: str = "1.0"
     status: str
-    parsed_output: Optional[Any] = None
+    parsed_output: Any | None = None
     model: str
     parameters: dict[str, Any]
-    usage: Optional[dict[str, Any]] = None
+    usage: dict[str, Any] | None = None
     attempts: list[InvocationAttempt]
     artifacts: list[ArtifactRef]
     lineage: LineageState
@@ -111,14 +110,14 @@ def _parse_json(content: str) -> Any:
     return json.loads(stripped)
 
 
-def _usage_dict(response: Any) -> Optional[dict[str, Any]]:
+def _usage_dict(response: Any) -> dict[str, Any] | None:
     usage = getattr(response, "usage", None)
     if usage is None:
         return None
     return usage.model_dump() if hasattr(usage, "model_dump") else dict(usage)
 
 
-def _add_usage(total: Optional[dict[str, Any]], current: Optional[dict[str, Any]]) -> Optional[dict[str, Any]]:
+def _add_usage(total: dict[str, Any] | None, current: dict[str, Any] | None) -> dict[str, Any] | None:
     if current is None:
         return total
     aggregate = dict(total or {})
@@ -141,11 +140,11 @@ def invoke_hermes_structured(
     temperature: float = 0.2,
     max_tokens: int = 2048,
     max_retries: int = 2,
-    context: Optional[ExecutionContext] = None,
-    lineage: Optional[LineageState] = None,
-    store: Optional[FilesystemArtifactStore] = None,
+    context: ExecutionContext | None = None,
+    lineage: LineageState | None = None,
+    store: FilesystemArtifactStore | None = None,
     client=None,
-    secret_values: Optional[list[str]] = None,
+    secret_values: list[str] | None = None,
 ) -> StructuredInvocationResult:
     Draft202012Validator.check_schema(output_schema)
     if max_retries < 0 or max_retries > 10:

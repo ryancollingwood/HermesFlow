@@ -3,12 +3,10 @@ from __future__ import annotations
 
 import hashlib
 import json
-from typing import Any, Literal, Optional
+from typing import Any, Literal
 from urllib.parse import quote
 
 import wmill
-from pydantic import BaseModel, Field
-
 from f.hermes_flow.candidate_ops.promote import (
     PromotionConflict,
     PromotionError,
@@ -20,7 +18,7 @@ from f.hermes_flow.repair.orchestrate import (
     _put_attempt,
 )
 from f.libraries.lineage.models import ExecutionContext
-
+from pydantic import BaseModel, Field
 
 CAPABILITY_PATH = "f/hermes_flow/repair/finalize_retry"
 CAPABILITY_VERSION = "1.0.0"
@@ -39,12 +37,12 @@ class RetryRecord(BaseModel):
     attempt: int = Field(ge=1, le=3)
     max_attempts: int = Field(ge=1, le=3)
     parent_trace_id: str
-    retry_trace_id: Optional[str] = None
-    promoted_version: Optional[str] = None
-    retry_job_id: Optional[str] = None
-    retry_result_sha256: Optional[str] = None
-    approved_by: Optional[str] = None
-    details: Optional[str] = None
+    retry_trace_id: str | None = None
+    promoted_version: str | None = None
+    retry_job_id: str | None = None
+    retry_result_sha256: str | None = None
+    approved_by: str | None = None
+    details: str | None = None
 
 
 def _record_from_preparation(prepared: RepairPreparation, status: str, **updates) -> RetryRecord:
@@ -81,7 +79,7 @@ def _persist(client, prepared: RepairPreparation, result: RetryRecord) -> dict:
 def finalize_and_retry(
     prepared: dict | RepairPreparation,
     approval_granted: bool,
-    approved_by: Optional[str] = None,
+    approved_by: str | None = None,
     *,
     context_argument: str = "context",
     retry_timeout_seconds: int = 300,

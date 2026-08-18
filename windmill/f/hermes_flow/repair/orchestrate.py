@@ -8,25 +8,31 @@ from __future__ import annotations
 
 import hashlib
 from datetime import datetime, timezone
-from typing import Any, Literal, Optional, Protocol
+from typing import Any, Literal, Protocol
 from urllib.parse import quote
 
 import wmill
-from pydantic import BaseModel, Field, model_validator
-
 from f.hermes_flow.candidate_ops.promote import prepare_promotion
 from f.hermes_flow.catalogue.models import load_catalogue
-from f.hermes_flow.policies.evaluator import PolicyContext, PolicyDecision, PolicyOutcome, evaluate_policy
+from f.hermes_flow.policies.evaluator import (
+    PolicyContext,
+    PolicyDecision,
+    PolicyOutcome,
+    evaluate_policy,
+)
 from f.hermes_flow.repair.generate_candidate import generate_repair_candidate
 from f.hermes_flow.repair.inspection import inspect_failure_from_windmill
 from f.hermes_flow.repair.models import FailureCategory, RepairContext
-from f.hermes_flow.repair.promote_fixture import FixturePromotionError, promote_source_drift_fixture
+from f.hermes_flow.repair.promote_fixture import (
+    FixturePromotionError,
+    promote_source_drift_fixture,
+)
 from f.hermes_flow.testing.regression import RegressionRunResult, run_regression_tests
 from f.hermes_flow.testing.runner import TestExecutor, TestStatus, load_test_manifests
 from f.libraries.capability.models import AutonomyAction
 from f.libraries.lineage.models import ArtifactRef, ExecutionContext
 from f.libraries.storage.artifacts import FilesystemArtifactStore
-
+from pydantic import BaseModel, Field, model_validator
 
 CAPABILITY_PATH = "f/hermes_flow/repair/adaptive_repair"
 CAPABILITY_VERSION = "1.0.0"
@@ -66,11 +72,11 @@ class AttemptRecord(BaseModel):
     attempt: int = Field(ge=1, le=3)
     max_attempts: int = Field(ge=1, le=3)
     status: str
-    candidate_id: Optional[str] = None
-    candidate_path: Optional[str] = None
-    repair_trace_id: Optional[str] = None
-    retry_job_id: Optional[str] = None
-    details: Optional[str] = None
+    candidate_id: str | None = None
+    candidate_path: str | None = None
+    repair_trace_id: str | None = None
+    retry_job_id: str | None = None
+    details: str | None = None
     updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
 
@@ -88,14 +94,14 @@ class RepairPreparation(BaseModel):
     original_context: ExecutionContext
     repair_context: RepairContext
     repair_policy: PolicyDecision
-    candidate: Optional[dict] = None
+    candidate: dict | None = None
     promoted_fixtures: list[dict] = Field(default_factory=list)
-    regression: Optional[dict] = None
-    promotion: Optional[dict] = None
-    stop_reason: Optional[str] = None
+    regression: dict | None = None
+    promotion: dict | None = None
+    stop_reason: str | None = None
 
     @model_validator(mode="after")
-    def _ready_requires_complete_evidence(self) -> "RepairPreparation":
+    def _ready_requires_complete_evidence(self) -> RepairPreparation:
         if self.status == "ready_for_approval":
             missing = [
                 name for name, value in (
@@ -189,15 +195,15 @@ def prepare_adaptive_repair(
     original_context: dict | ExecutionContext,
     *,
     max_attempts: int = 2,
-    recent_test_evidence: Optional[list[dict]] = None,
-    source_artifact: Optional[dict | ArtifactRef] = None,
-    expected_behavior: Optional[dict] = None,
-    fixture_binding: Optional[dict] = None,
-    sanitization_rules: Optional[dict] = None,
-    client: Optional[WindmillRepairClient] = None,
+    recent_test_evidence: list[dict] | None = None,
+    source_artifact: dict | ArtifactRef | None = None,
+    expected_behavior: dict | None = None,
+    fixture_binding: dict | None = None,
+    sanitization_rules: dict | None = None,
+    client: WindmillRepairClient | None = None,
     hermes_client=None,
-    test_executor: Optional[TestExecutor] = None,
-    store: Optional[FilesystemArtifactStore] = None,
+    test_executor: TestExecutor | None = None,
+    store: FilesystemArtifactStore | None = None,
 ) -> dict:
     windmill = client or wmill.Windmill()
     parent = (
@@ -320,11 +326,11 @@ def main(
     manifest_yaml: str,
     original_context: dict,
     max_attempts: int = 2,
-    recent_test_evidence: Optional[list[dict]] = None,
-    source_artifact: Optional[dict] = None,
-    expected_behavior: Optional[dict] = None,
-    fixture_binding: Optional[dict] = None,
-    sanitization_rules: Optional[dict] = None,
+    recent_test_evidence: list[dict] | None = None,
+    source_artifact: dict | None = None,
+    expected_behavior: dict | None = None,
+    fixture_binding: dict | None = None,
+    sanitization_rules: dict | None = None,
 ) -> dict:
     return prepare_adaptive_repair(
         conn, failed_job_id, catalogue_yaml, manifest_yaml, original_context,

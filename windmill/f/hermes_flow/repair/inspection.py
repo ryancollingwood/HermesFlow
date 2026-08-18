@@ -4,11 +4,10 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from typing import Any, Optional, Protocol
+from typing import Any, Protocol
 from urllib.parse import quote
 
 import wmill
-
 from f.hermes_flow.candidate_ops.diff import _consumer_impact
 from f.hermes_flow.catalogue.models import Catalogue, load_catalogue
 from f.hermes_flow.repair.models import (
@@ -203,7 +202,7 @@ def classify_failure(*parts: Any) -> FailureClassification:
 
 def _artifact_evidence(value: Any) -> tuple[list[ArtifactEvidence], int]:
     found: list[ArtifactEvidence] = []
-    seen: set[tuple[Optional[str], Optional[str]]] = set()
+    seen: set[tuple[str | None, str | None]] = set()
     replacements = 0
 
     def walk(item: Any) -> None:
@@ -312,11 +311,11 @@ def build_repair_context(
     active_asset: dict[str, Any],
     catalogue: Catalogue,
     logs: str = "",
-    recent_test_evidence: Optional[list[dict[str, Any]]] = None,
+    recent_test_evidence: list[dict[str, Any]] | None = None,
     workspace: str = "main",
     windmill_base_url: str = "http://windmill.localhost",
-    limits: Optional[RepairContextLimits] = None,
-    collection_warnings: Optional[list[str]] = None,
+    limits: RepairContextLimits | None = None,
+    collection_warnings: list[str] | None = None,
 ) -> RepairContext:
     bounds = limits or RepairContextLimits()
     if job.get("success") is True or str(job.get("status", "")).lower() in {"success", "succeeded"}:
@@ -419,10 +418,10 @@ def inspect_failure_from_windmill(
     job_id: str,
     catalogue_yaml: str,
     *,
-    recent_test_evidence: Optional[list[dict[str, Any]]] = None,
+    recent_test_evidence: list[dict[str, Any]] | None = None,
     windmill_base_url: str = "http://windmill.localhost",
-    limits: Optional[RepairContextLimits] = None,
-    client: Optional[WindmillReadClient] = None,
+    limits: RepairContextLimits | None = None,
+    client: WindmillReadClient | None = None,
 ) -> RepairContext:
     windmill = client or wmill.Windmill()
     workspace = windmill.workspace
@@ -482,7 +481,7 @@ def inspect_failure_from_windmill(
 def main(
     job_id: str,
     catalogue_yaml: str,
-    recent_test_evidence: Optional[list[dict]] = None,
+    recent_test_evidence: list[dict] | None = None,
     windmill_base_url: str = "http://windmill.localhost",
     max_total_bytes: int = 131_072,
 ) -> dict:

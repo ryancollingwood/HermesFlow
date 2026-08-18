@@ -9,7 +9,6 @@ import httpx
 from mcp.server.fastmcp import FastMCP
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
-
 FLOW_PATH = "f/workflows/product_collection"
 FLOW_VERSION = "1.0.0"
 WINDMILL_URL = "http://windmill_server:8000"

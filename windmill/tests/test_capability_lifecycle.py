@@ -3,7 +3,6 @@ import json
 from dataclasses import dataclass
 
 import pytest
-
 from f.hermes_flow.candidate_ops.lifecycle import (
     deprecate_capability,
     lifecycle_variable_path,
