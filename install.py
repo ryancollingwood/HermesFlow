@@ -756,8 +756,12 @@ def main() -> None:
             "  (allowed user IDs are required for the Hermes Telegram channel).")
 
     # Discord (optional): same both-required rule as Telegram.
-    dc_token = args.discord_bot_token or os.environ.get("DISCORD_BOT_TOKEN", "")
-    dc_users = args.discord_allowed_users or os.environ.get("DISCORD_ALLOWED_USERS", "")
+    # Prefer explicit flags, then values already in the project .env, then the
+    # process environment. Discord credentials are optional and never generated.
+    dc_token = (args.discord_bot_token or env_value("DISCORD_BOT_TOKEN") or
+                os.environ.get("DISCORD_BOT_TOKEN", ""))
+    dc_users = (args.discord_allowed_users or env_value("DISCORD_ALLOWED_USERS") or
+                os.environ.get("DISCORD_ALLOWED_USERS", ""))
     if (dc_token or dc_users) and not (dc_token and dc_users):
         die(f"{CROSS} Discord needs BOTH --discord-bot-token and --discord-allowed-users\n"
             "  (allowed user IDs are required for the Hermes Discord channel).")

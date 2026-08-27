@@ -111,8 +111,57 @@ secrets: ## Generate every required secret in .env that's blank or still a weak 
 wizard: ## Run the Hermes first-run setup wizard (interactive; writes ~/.hermes/.env + config)
 	@set -a; . ./$(ENV_FILE); set +a; \
 	  HERMES_DATA="$${DATA_DIR:-$(DOCKER_HOME)/.hermes}"; \
+	  DISCORD_TOKEN="$${DISCORD_BOT_TOKEN:-}"; \
+	  DISCORD_USERS="$${DISCORD_ALLOWED_USERS:-}"; \
+	  printf 'Discord bot token [leave blank to keep current]: '; read -rs DISCORD_TOKEN_INPUT; printf '\n'; \
+	  [ -n "$$DISCORD_TOKEN_INPUT" ] && DISCORD_TOKEN="$$DISCORD_TOKEN_INPUT"; \
+	  printf 'Discord allowed users [leave blank to keep current]: '; read -r DISCORD_USERS_INPUT; \
+	  [ -n "$$DISCORD_USERS_INPUT" ] && DISCORD_USERS="$$DISCORD_USERS_INPUT"; \
+	  DISCORD_HOME_CHANNEL="$${DISCORD_HOME_CHANNEL:-}"; \
+	  DISCORD_HOME_CHANNEL_NAME="$${DISCORD_HOME_CHANNEL_NAME:-Home}"; \
+	  DISCORD_FREE_RESPONSE_CHANNELS="$${DISCORD_FREE_RESPONSE_CHANNELS:-}"; \
+	  DISCORD_REACTIONS="$${DISCORD_REACTIONS:-true}"; \
+	  DISCORD_ALLOW_ANY_ATTACHMENT="$${DISCORD_ALLOW_ANY_ATTACHMENT:-true}"; \
+	  DISCORD_REQUIRE_MENTION="$${DISCORD_REQUIRE_MENTION:-true}"; \
+	  printf 'Discord home channel [leave blank to keep current]: '; read -r DISCORD_HOME_CHANNEL_INPUT; \
+	  [ -n "$$DISCORD_HOME_CHANNEL_INPUT" ] && DISCORD_HOME_CHANNEL="$$DISCORD_HOME_CHANNEL_INPUT"; \
+	  printf 'Discord home channel name [$$DISCORD_HOME_CHANNEL_NAME]: '; read -r DISCORD_HOME_CHANNEL_NAME_INPUT; \
+	  [ -n "$$DISCORD_HOME_CHANNEL_NAME_INPUT" ] && DISCORD_HOME_CHANNEL_NAME="$$DISCORD_HOME_CHANNEL_NAME_INPUT"; \
+	  printf 'Discord free-response channels [leave blank to keep current]: '; read -r DISCORD_FREE_RESPONSE_CHANNELS_INPUT; \
+	  [ -n "$$DISCORD_FREE_RESPONSE_CHANNELS_INPUT" ] && DISCORD_FREE_RESPONSE_CHANNELS="$$DISCORD_FREE_RESPONSE_CHANNELS_INPUT"; \
+	  printf 'Enable Discord reactions [$$DISCORD_REACTIONS]: '; read -r DISCORD_REACTIONS_INPUT; \
+	  [ -n "$$DISCORD_REACTIONS_INPUT" ] && DISCORD_REACTIONS="$$DISCORD_REACTIONS_INPUT"; \
+	  printf 'Allow any Discord attachment [$$DISCORD_ALLOW_ANY_ATTACHMENT]: '; read -r DISCORD_ALLOW_ANY_ATTACHMENT_INPUT; \
+	  [ -n "$$DISCORD_ALLOW_ANY_ATTACHMENT_INPUT" ] && DISCORD_ALLOW_ANY_ATTACHMENT="$$DISCORD_ALLOW_ANY_ATTACHMENT_INPUT"; \
+	  printf 'Require Discord mention [$$DISCORD_REQUIRE_MENTION]: '; read -r DISCORD_REQUIRE_MENTION_INPUT; \
+	  [ -n "$$DISCORD_REQUIRE_MENTION_INPUT" ] && DISCORD_REQUIRE_MENTION="$$DISCORD_REQUIRE_MENTION_INPUT"; \
+	  env_update() { \
+	    KEY="$$1"; VALUE="$$2"; ESCAPED=$$(printf '%s' "$$VALUE" | sed 's/[\\&|]/\\&/g'); \
+	    if grep -q "^$$KEY=" $(ENV_FILE); then \
+	      sed -i.bak "s|^$$KEY=.*|$$KEY=$$ESCAPED|" $(ENV_FILE) && rm -f $(ENV_FILE).bak; \
+	    else \
+	      { [ -s $(ENV_FILE) ] && [ -n "$$(tail -c1 $(ENV_FILE))" ] && printf '\\n' >> $(ENV_FILE); }; \
+	      printf '%s=%s\\n' "$$KEY" "$$VALUE" >> $(ENV_FILE); \
+	    fi; \
+	  }; \
+	  [ -n "$$DISCORD_TOKEN_INPUT" ] && env_update DISCORD_BOT_TOKEN "$$DISCORD_TOKEN"; \
+	  [ -n "$$DISCORD_USERS_INPUT" ] && env_update DISCORD_ALLOWED_USERS "$$DISCORD_USERS"; \
+	  env_update DISCORD_HOME_CHANNEL "$$DISCORD_HOME_CHANNEL"; \
+	  env_update DISCORD_HOME_CHANNEL_NAME "$$DISCORD_HOME_CHANNEL_NAME"; \
+	  env_update DISCORD_FREE_RESPONSE_CHANNELS "$$DISCORD_FREE_RESPONSE_CHANNELS"; \
+	  env_update DISCORD_REACTIONS "$$DISCORD_REACTIONS"; \
+	  env_update DISCORD_ALLOW_ANY_ATTACHMENT "$$DISCORD_ALLOW_ANY_ATTACHMENT"; \
+	  env_update DISCORD_REQUIRE_MENTION "$$DISCORD_REQUIRE_MENTION"; \
 	  docker run -it --rm \
 	    -v "$$HERMES_DATA":/opt/data \
+	    -e "DISCORD_BOT_TOKEN=$$DISCORD_TOKEN" \
+	    -e "DISCORD_ALLOWED_USERS=$$DISCORD_USERS" \
+	    -e "DISCORD_HOME_CHANNEL=$$DISCORD_HOME_CHANNEL" \
+	    -e "DISCORD_HOME_CHANNEL_NAME=$$DISCORD_HOME_CHANNEL_NAME" \
+	    -e "DISCORD_FREE_RESPONSE_CHANNELS=$$DISCORD_FREE_RESPONSE_CHANNELS" \
+	    -e "DISCORD_REACTIONS=$$DISCORD_REACTIONS" \
+	    -e "DISCORD_ALLOW_ANY_ATTACHMENT=$$DISCORD_ALLOW_ANY_ATTACHMENT" \
+	    -e "DISCORD_REQUIRE_MENTION=$$DISCORD_REQUIRE_MENTION" \
 	    $(HERMES_IMAGE) setup
 
 secure: ## chmod 600 the secret files (skipped on Windows where chmod is a no-op)

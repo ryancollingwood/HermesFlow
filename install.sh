@@ -569,6 +569,13 @@ case "$PROVIDER" in
 esac
 MODEL="${MODEL:-$DEFAULT_MODEL}"
 
+# Load existing project values before resolving optional channel defaults. This
+# keeps a re-run non-destructive while still allowing process env vars to fill
+# in values when .env does not exist yet.
+if [ -f .env ]; then
+  set -a; . ./.env; set +a
+fi
+
 # Accept the key from the matching env var if not passed explicitly.
 if [ -z "$API_KEY" ]; then
   API_KEY="$(printenv "$KEY_VAR" 2>/dev/null || true)"
