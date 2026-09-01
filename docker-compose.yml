@@ -159,6 +159,9 @@ services:
       # npx-based MCP server ("env: 'node': No such file or directory").
       # Keep the image's own entries and append /opt/data/bin (claude, tirith).
       - PATH=/opt/hermes/bin:/opt/hermes/.venv/bin:/opt/data/.local/bin:/opt/data/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+      # Windmill MCP API Key — used by the hermes/skills/windmill skill to reach the Windmill server.
+      # You'll need to log into windmill and create a new API key for this skill, then paste it into the .env file or set it here.
+      - WM_MCP_TOKEN=${WM_MCP_TOKEN:-}
     volumes:
       - ${DATA_DIR:-./data/hermes}:/opt/data
       - ${SHARED_DIR:-./data/shared}:/shared
