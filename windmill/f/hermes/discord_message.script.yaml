@@ -1,0 +1,29 @@
+summary: message delivery via discord
+description: Delivers a message via discord
+lock: '!inline f/hermes/discord_message.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    card_color:
+      type: integer
+      description: ''
+      default: 5793266
+    footer_message:
+      type: string
+      description: ''
+      default: Delivered via Windmill Debug UI
+      originalType: string
+    message_text:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    title:
+      type: string
+      description: ''
+      default: Automated Report
+      originalType: string
+  required:
+    - message_text

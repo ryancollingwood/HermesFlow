@@ -731,6 +731,28 @@ windmill-push: ## Push windmill/ assets (resource type, resource, scripts) to th
 	      echo "✓ updated secret variable $$vp"; \
 	    else echo "⚠ couldn't set $$vp — set it in the UI (Variables → $$vp)"; fi; \
 	  fi; \
+	  if [ -n "$$token" ] && [ -n "$${DISCORD_BOT_TOKEN:-}" ]; then \
+	    vp="f/hermes/discord_bot_token"; \
+	    if curl -fsS -H "Host: $$hh" -H "Authorization: Bearer $$token" -H 'Content-Type: application/json' \
+	         -X POST "$$base/api/w/main/variables/create" \
+	         -d "{\"path\":\"$$vp\",\"value\":\"$$DISCORD_BOT_TOKEN\",\"is_secret\":true,\"description\":\"Discord bot token, used by Windmill scripts sending messages to Discord\"}" >/dev/null 2>&1; then \
+	      echo "✓ created secret variable $$vp"; \
+	    elif curl -fsS -H "Host: $$hh" -H "Authorization: Bearer $$token" -H 'Content-Type: application/json' \
+	         -X POST "$$base/api/w/main/variables/update/$$vp" -d "{\"value\":\"$$DISCORD_BOT_TOKEN\"}" >/dev/null 2>&1; then \
+	      echo "✓ updated secret variable $$vp"; \
+	    else echo "⚠ couldn't set $$vp — set it in the UI (Variables → $$vp)"; fi; \
+	  fi; \
+	  if [ -n "$$token" ] && [ -n "$${DISCORD_HOME_CHANNEL:-}" ]; then \
+	    vp="f/hermes/discord_home_channel"; \
+	    if curl -fsS -H "Host: $$hh" -H "Authorization: Bearer $$token" -H 'Content-Type: application/json' \
+	         -X POST "$$base/api/w/main/variables/create" \
+	         -d "{\"path\":\"$$vp\",\"value\":\"$$DISCORD_HOME_CHANNEL\",\"is_secret\":true,\"description\":\"Discord channel ID for default message delivery\"}" >/dev/null 2>&1; then \
+	      echo "✓ created secret variable $$vp"; \
+	    elif curl -fsS -H "Host: $$hh" -H "Authorization: Bearer $$token" -H 'Content-Type: application/json' \
+	         -X POST "$$base/api/w/main/variables/update/$$vp" -d "{\"value\":\"$$DISCORD_HOME_CHANNEL\"}" >/dev/null 2>&1; then \
+	      echo "✓ updated secret variable $$vp"; \
+	    else echo "⚠ couldn't set $$vp — set it in the UI (Variables → $$vp)"; fi; \
+	  fi; \
 	  if [ -n "$$token" ] && [ -n "$${WINDMILL_COLLECTION_DB_PASSWORD:-}" ]; then \
 	    vp="f/collection/db_password"; \
 	    if curl -fsS -H "Host: $$hh" -H "Authorization: Bearer $$token" -H 'Content-Type: application/json' \
