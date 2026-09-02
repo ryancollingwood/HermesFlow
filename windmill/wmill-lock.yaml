@@ -38,6 +38,7 @@ locks:
   f/hermes_flow/testing/source_drift_fixture: b294e74b79b18639df85980160271df5694bbf3a7e8b886c655ed83de09a27c9
   f/hermes/chat: 7f9f3ed47afa424bcfe5ca24bcc1dd0a053ac62e64a354b6f0d6c92b0cee3361
   f/hermes/client: 3885294d79bcf8e513b0d0bece16452dabdaceca7451626a65ecd256a736b44e
+  f/hermes/discord_message: 1c570e98cd48a9490994ff25f4ed310403091f32c3b38ad5607d8f81616d3cdc
   f/hermes/telegram: 73c69c808eeb70df3dddd41bb0a08fb07dcca981ad87ebb8a72e889c10ba50ee
   f/libraries/ai/invoke_hermes_structured: c628ff611791c6a418f919ef54f00cffab48fb8d1d03e2cd74fa93b7b1bd0caa
   f/libraries/capability/models: 522b5c8640dfc9537dea94898b215dd7f4e3cd60b6b35288b4695895481eae14
