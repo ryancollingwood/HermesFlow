@@ -1,15 +1,20 @@
-summary: Shared Hermes client + tool registry + run_tool
+summary: Hermes execute_code (Python + tool orchestration)
 description: ''
-lock: '!inline f/hermes/client.script.lock'
+lock: '!inline f/hermes/execute_code.script.lock'
 kind: script
 schema:
   $schema: https://json-schema.org/draft/2020-12/schema
   type: object
   properties:
-    conn:
+    code:
+      type: string
+      description: ''
+      default: ''
+      originalType: string
+    hermes:
       type: object
       description: ''
       default: null
       format: resource-hermes_endpoint
   required:
-    - conn
+    - hermes

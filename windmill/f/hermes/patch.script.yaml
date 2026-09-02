@@ -1,0 +1,44 @@
+summary: Hermes patch (find-and-replace / patch mode)
+description: ''
+lock: '!inline f/hermes/patch.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    hermes:
+      type: object
+      description: ''
+      default: null
+      format: resource-hermes_endpoint
+    mode:
+      type: string
+      description: ''
+      default: replace
+      originalType: string
+    new_string:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    old_string:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    patch:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    path:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    replace_all:
+      type: boolean
+      description: ''
+      default: false
+  required:
+    - hermes

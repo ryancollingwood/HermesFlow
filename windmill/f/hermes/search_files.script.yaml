@@ -1,0 +1,52 @@
+summary: Hermes search_files
+description: ''
+lock: '!inline f/hermes/search_files.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    context:
+      type: integer
+      description: ''
+      default: null
+    file_glob:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    hermes:
+      type: object
+      description: ''
+      default: null
+      format: resource-hermes_endpoint
+    limit:
+      type: integer
+      description: ''
+      default: null
+    offset:
+      type: integer
+      description: ''
+      default: null
+    output_mode:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    path:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    pattern:
+      type: string
+      description: ''
+      default: ''
+      originalType: string
+    target:
+      type: string
+      description: ''
+      default: content
+      originalType: string
+  required:
+    - hermes

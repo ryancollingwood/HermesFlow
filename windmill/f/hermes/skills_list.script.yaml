@@ -1,15 +1,20 @@
-summary: Shared Hermes client + tool registry + run_tool
+summary: Hermes skills_list
 description: ''
-lock: '!inline f/hermes/client.script.lock'
+lock: '!inline f/hermes/skills_list.script.lock'
 kind: script
 schema:
   $schema: https://json-schema.org/draft/2020-12/schema
   type: object
   properties:
-    conn:
+    category:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    hermes:
       type: object
       description: ''
       default: null
       format: resource-hermes_endpoint
   required:
-    - conn
+    - hermes

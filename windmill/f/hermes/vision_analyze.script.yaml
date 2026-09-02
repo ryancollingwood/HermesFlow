@@ -1,0 +1,25 @@
+summary: Hermes vision_analyze
+description: ''
+lock: '!inline f/hermes/vision_analyze.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    hermes:
+      type: object
+      description: ''
+      default: null
+      format: resource-hermes_endpoint
+    path:
+      type: string
+      description: ''
+      default: ''
+      originalType: string
+    question:
+      type: string
+      description: ''
+      default: Describe this image
+      originalType: string
+  required:
+    - hermes

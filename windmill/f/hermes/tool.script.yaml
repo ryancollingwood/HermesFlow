@@ -1,0 +1,5 @@
+summary: Generic dispatcher for any Hermes tool (raw output)
+description: ''
+lock: '!inline f/hermes/tool.script.lock'
+kind: script
+schema: null

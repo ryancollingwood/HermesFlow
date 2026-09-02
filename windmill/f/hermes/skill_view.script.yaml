@@ -1,0 +1,5 @@
+summary: Hermes skill_view
+description: ''
+lock: '!inline f/hermes/skill_view.script.lock'
+kind: script
+schema: null

@@ -1,0 +1,25 @@
+summary: Hermes write_file
+description: ''
+lock: '!inline f/hermes/write_file.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    content:
+      type: string
+      description: ''
+      default: ''
+      originalType: string
+    hermes:
+      type: object
+      description: ''
+      default: null
+      format: resource-hermes_endpoint
+    path:
+      type: string
+      description: ''
+      default: ''
+      originalType: string
+  required:
+    - hermes

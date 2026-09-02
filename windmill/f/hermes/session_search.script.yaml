@@ -1,0 +1,57 @@
+summary: Hermes session_search
+description: ''
+lock: '!inline f/hermes/session_search.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    around_message_id:
+      type: integer
+      description: ''
+      default: null
+    detail:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    hermes:
+      type: object
+      description: ''
+      default: null
+      format: resource-hermes_endpoint
+    limit:
+      type: integer
+      description: ''
+      default: null
+    profile:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    query:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    role_filter:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    session_id:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    sort:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    window:
+      type: integer
+      description: ''
+      default: null
+  required:
+    - hermes

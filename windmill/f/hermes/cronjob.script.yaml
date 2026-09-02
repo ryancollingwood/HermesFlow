@@ -1,0 +1,98 @@
+summary: Hermes cronjob (create/list/update/pause/resume/remove/run)
+description: ''
+lock: '!inline f/hermes/cronjob.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    action:
+      type: string
+      description: ''
+      default: list
+      originalType: string
+    name:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    attach_to_session:
+      type: boolean
+      description: ''
+      default: false
+    context_from:
+      type: array
+      description: ''
+      default: null
+      items:
+        type: string
+      originalType: string[]
+    deliver:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    enabled_toolsets:
+      type: array
+      description: ''
+      default: null
+      items:
+        type: string
+      originalType: string[]
+    hermes:
+      type: object
+      description: ''
+      default: null
+      format: resource-hermes_endpoint
+    job_id:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    monitor_script:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    monitor_url:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    no_agent:
+      type: boolean
+      description: ''
+      default: false
+    prompt:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    repeat:
+      type: integer
+      description: ''
+      default: null
+    schedule:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    script:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    skills:
+      type: array
+      description: ''
+      default: null
+      items:
+        type: string
+      originalType: string[]
+    workdir:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+  required:
+    - hermes

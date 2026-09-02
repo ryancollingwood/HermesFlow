@@ -1,0 +1,4 @@
+description: Discord user IDs (comma-separated) whose reactions are allowed to
+  grade the quiz. Empty = any reactor.
+value: '211719705398870016'
+is_secret: false

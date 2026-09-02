@@ -1,0 +1,24 @@
+summary: Hermes web_search (raw results)
+description: ''
+lock: '!inline f/hermes/web_search.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    hermes:
+      type: object
+      description: ''
+      default: null
+      format: resource-hermes_endpoint
+    limit:
+      type: integer
+      description: ''
+      default: 5
+    query:
+      type: string
+      description: ''
+      default: ''
+      originalType: string
+  required:
+    - hermes

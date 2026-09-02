@@ -1,0 +1,28 @@
+summary: Hermes read_file
+description: ''
+lock: '!inline f/hermes/read_file.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    hermes:
+      type: object
+      description: ''
+      default: null
+      format: resource-hermes_endpoint
+    limit:
+      type: integer
+      description: ''
+      default: null
+    offset:
+      type: integer
+      description: ''
+      default: null
+    path:
+      type: string
+      description: ''
+      default: ''
+      originalType: string
+  required:
+    - hermes

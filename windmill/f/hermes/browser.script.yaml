@@ -1,0 +1,34 @@
+summary: Hermes browser automation (exec snippet or action)
+description: ''
+lock: '!inline f/hermes/browser.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    action:
+      type: string
+      description: ''
+      default: exec
+      originalType: string
+    arguments:
+      type: object
+      description: ''
+      default: null
+      properties: {}
+    hermes:
+      type: object
+      description: ''
+      default: null
+      format: resource-hermes_endpoint
+    session:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    timeout_s:
+      type: integer
+      description: ''
+      default: null
+  required:
+    - hermes

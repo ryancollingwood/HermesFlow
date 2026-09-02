@@ -1,0 +1,5 @@
+summary: Hermes image_generate
+description: ''
+lock: '!inline f/hermes/image_generate.script.lock'
+kind: script
+schema: null

@@ -1,0 +1,5 @@
+summary: Hermes skill_manage (create/patch/edit/delete)
+description: ''
+lock: '!inline f/hermes/skill_manage.script.lock'
+kind: script
+schema: null

@@ -1,0 +1,48 @@
+summary: Hermes terminal (run a shell command)
+description: ''
+lock: '!inline f/hermes/terminal.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    background:
+      type: boolean
+      description: ''
+      default: false
+    command:
+      type: string
+      description: ''
+      default: ''
+      originalType: string
+    hermes:
+      type: object
+      description: ''
+      default: null
+      format: resource-hermes_endpoint
+    notify_on_complete:
+      type: boolean
+      description: ''
+      default: false
+    pty:
+      type: boolean
+      description: ''
+      default: false
+    timeout:
+      type: integer
+      description: ''
+      default: null
+    watch_patterns:
+      type: array
+      description: ''
+      default: null
+      items:
+        type: string
+      originalType: string[]
+    workdir:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+  required:
+    - hermes

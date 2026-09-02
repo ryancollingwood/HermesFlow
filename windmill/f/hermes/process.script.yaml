@@ -1,0 +1,42 @@
+summary: Hermes process (manage background processes)
+description: ''
+lock: '!inline f/hermes/process.script.lock'
+kind: script
+schema:
+  $schema: https://json-schema.org/draft/2020-12/schema
+  type: object
+  properties:
+    action:
+      type: string
+      description: ''
+      default: list
+      originalType: string
+    data:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    hermes:
+      type: object
+      description: ''
+      default: null
+      format: resource-hermes_endpoint
+    limit:
+      type: integer
+      description: ''
+      default: null
+    offset:
+      type: integer
+      description: ''
+      default: null
+    session_id:
+      type: string
+      description: ''
+      default: null
+      originalType: string
+    timeout:
+      type: integer
+      description: ''
+      default: null
+  required:
+    - hermes
