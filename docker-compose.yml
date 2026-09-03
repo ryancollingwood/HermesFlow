@@ -162,6 +162,9 @@ services:
       # Windmill MCP API Key — used by the hermes/skills/windmill skill to reach the Windmill server.
       # You'll need to log into windmill and create a new API key for this skill, then paste it into the .env file or set it here.
       - WM_MCP_TOKEN=${WM_MCP_TOKEN:-}
+      # Windmill Admin API Key — used by the hermes/skills/windmill skill to reach the Windmill server.
+      # You'll need to log into windmill and create a new API key for this skill, then paste it into the .env file or set it here.
+      - WINDMILL_ADMIN_TOKEN=${WINDMILL_ADMIN_TOKEN:-}
     volumes:
       - ${DATA_DIR:-./data/hermes}:/opt/data
       - ${SHARED_DIR:-./data/shared}:/shared
